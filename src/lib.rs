@@ -10,24 +10,14 @@ pub fn id() -> Quaternion {
     (1.0, [0.0; 3])
 }
 
-/// 恒等四元数ならtrueを返す
-#[inline(always)]
-pub fn if_id(a: &Quaternion) -> bool {
-    if (a.0 == 1.0) && (norm_vec(a.1) == 0.0) {
-        return true;
-    }
-    false
-}
-
 /// theta[rad]
 #[inline(always)]
 pub fn axis_angle(theta: f64, axis: Vector3) -> Quaternion {
-    // クォータニオンとして正規化してベクトル部を取り出す．
     let axis = normalize_vec(axis);
-    let q_scalar = (theta / 2.0).cos();
+    let q_s = (theta / 2.0).cos();
     let s = (theta / 2.0).sin();
-    let q_vector = mul_scalar_vec(s, axis);
-    (q_scalar, q_vector)
+    let q_v = mul_scalar_vec(s, axis);
+    (q_s, q_v)
 }
 
 #[inline(always)]
@@ -53,15 +43,15 @@ pub fn add_vec(a: Vector3, b: Vector3) -> Vector3 {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }
 
-#[inline(always)]
-pub fn conj(a: Quaternion) -> Quaternion {
-    ( a.0, [-a.1[0], -a.1[1], -a.1[2]] )
-}
-
 /// Add two quaternions.
 #[inline(always)]
 pub fn add(a: Quaternion, b: Quaternion) -> Quaternion {
     ( a.0 + b.0, add_vec(a.1, b.1) )
+}
+
+#[inline(always)]
+pub fn conj(a: Quaternion) -> Quaternion {
+    ( a.0, [-a.1[0], -a.1[1], -a.1[2]] )
 }
 
 /// Quatrnion multiply. 
@@ -108,7 +98,7 @@ pub fn normalize(a: Quaternion) -> Quaternion {
 pub fn normalize_vec(r: Vector3) -> Vector3 {
     let norm = norm_vec(r);
     if norm == 0.0 {
-        return [0.0; 3];
+        return r;
     }
     mul_scalar_vec(1.0 / norm, r)
 }
@@ -124,11 +114,11 @@ pub fn inverse(a: Quaternion) -> Quaternion {
 /// Exponential of Quaternion.
 #[inline(always)]
 pub fn exp(a: Quaternion) -> Quaternion {
-    // ゼロ除算回避
-    if if_id(&a) {
-        return (E, [0.0; 3]);
-    }
     let coef = E.powf(a.0);  // coefficient（係数）
+    // ゼロ除算回避
+    if norm_vec(a.1) == 0.0 {
+        return (coef, [0.0; 3]);
+    }
     let vec_norm = norm_vec(a.1);
     let n   = normalize_vec(a.1);
     let q_s = vec_norm.cos();
@@ -139,8 +129,8 @@ pub fn exp(a: Quaternion) -> Quaternion {
 /// norm(exp_norm1(a)) == 1
 #[inline(always)]
 pub fn exp_norm1(a: Quaternion) -> Quaternion {
-    if if_id(&a) {
-        return (E, [0.0; 3]);
+    if norm_vec(a.1) == 0.0 {
+        return id();
     }
     let vec_norm = norm_vec(a.1);
     let n   = normalize_vec(a.1);
@@ -174,10 +164,9 @@ pub fn power(a: Quaternion, t: f64) -> Quaternion {
 
 /// The power of quaternion.
 /// Return the unit quaternion.
-/// norm(power_norm(a, t)) == 1
+/// norm(power_norm1(a, t)) == 1
 #[inline(always)]
 pub fn power_norm1(a: Quaternion, t: f64) -> Quaternion {
-    // q = cos(θ/2) + n sin(θ/2) = cos(Ω) + n sin(Ω)
     // 最後に正規化するからノルムのt乗は掛けてない．
     let omega = a.0.acos();
     let n   = normalize_vec(a.1);
@@ -205,28 +194,34 @@ pub fn coordinate_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     result.1
 }
 
-/// Return max number in arguments.
-#[inline(always)]
-fn max3(a: f64, b: f64, c: f64) -> f64 {
-    let mut result;
-    if a <= b {
-        result = b;
-    } else {
-        result = a;
-    }
-    if result <= c {
-        result = c;
-    }
-    result
-}
-
 /// 微小変化を表すクォータニオンを返す．
 /// The integration of angular velocity. 
 /// omega[rad/s]
+/// dt[s]
 #[inline(always)]
 pub fn integration(omega: Vector3, dt: f64) -> Quaternion {
-    let tmp = mul_scalar_vec(dt / 2.0, omega);
-    exp_norm1( (0.0, tmp) )
+    const THRESHOLD: f64 = 0.625;  // 三角関数の近似誤差，約0.06%
+    let arg = mul_scalar_vec(dt / 2.0, omega);
+    let arg_norm = norm_vec(arg);
+
+    if arg_norm < THRESHOLD {
+        return exp_norm1( (0.0, arg) );
+    }
+
+    // 引数が大きすぎたら分割して計算し，回転の合成を行う．
+    let num = (arg_norm / THRESHOLD).floor();
+    let arg_part = mul_scalar_vec(1.0 / num, arg);
+    let mut q = exp_norm1( (0.0, arg_part) );
+    let loop_num = (num as u32) - 1;  // -1は余り計算の分
+    for _i in 0..loop_num {
+        let dq = exp_norm1( (0.0, arg_part) );
+        q = mul(dq, q);
+    }
+    // 余りの分を計算
+    let tmp = mul_scalar_vec(-num, arg_part);
+    let arg_remainder = add_vec(arg, tmp);
+    let dq = exp_norm1( (0.0, arg_remainder) );
+    mul(dq, q)
 }
 
 /// linear interpolation.
@@ -303,7 +298,8 @@ pub fn slerp_1(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
 mod test {
     use super::*;
     const PI: f64 = std::f64::consts::PI;
-    const EPSILON: f64 = 0.000001;
+    const EPSILON: f64 = 0.00000001;
+
 
     #[test]
     fn test_add() {
@@ -327,11 +323,6 @@ mod test {
         assert!( (result[0] - 0.0).abs() < EPSILON);
         assert!( (result[1] - 2.0).abs() < EPSILON);
         assert!( (result[2] + 2.0).abs() < EPSILON);
-    }
-
-    #[test]
-    fn test_max3() {
-        assert_eq!(3.0, max3(1.0, 3.0, -5.5));
     }
 
     // 二つの方法でSlerpを行う．
