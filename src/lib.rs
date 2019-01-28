@@ -40,7 +40,7 @@ pub fn cross_vec(a: Vector3, b: Vector3) -> Vector3 {
 
 #[inline(always)]
 pub fn add_vec(a: Vector3, b: Vector3) -> Vector3 {
-    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+    [a[0]+b[0], a[1]+b[1], a[2]+b[2]]
 }
 
 /// Add two quaternions.
@@ -69,7 +69,7 @@ pub fn mul(a: Quaternion, b: Quaternion) -> Quaternion {
 /// Calc multiply scalar and vector.
 #[inline(always)]
 pub fn mul_scalar_vec(s: f64, v: Vector3) -> Vector3 {
-    [s * v[0], s * v[1], s * v[2]]
+    [s*v[0], s*v[1], s*v[2]]
 }
 
 /// Calc multiply scalar and quaternion.
@@ -98,7 +98,7 @@ pub fn normalize(a: Quaternion) -> Quaternion {
 pub fn normalize_vec(r: Vector3) -> Vector3 {
     let norm = norm_vec(r);
     if norm == 0.0 {
-        return r;
+        return [0.0; 3];
     }
     mul_scalar_vec(1.0 / norm, r)
 }
@@ -115,28 +115,18 @@ pub fn inverse(a: Quaternion) -> Quaternion {
 #[inline(always)]
 pub fn exp(a: Quaternion) -> Quaternion {
     let coef = E.powf(a.0);  // coefficient（係数）
-    // ゼロ除算回避
-    if norm_vec(a.1) == 0.0 {
+    let vec_norm = norm_vec(a.1);
+
+    // ゼロ除算対策はnorm_vec()側でやってるからこのif文は無くても良い．
+    // 軽量化を求めるか，シンプルさを求めるか...
+    if vec_norm == 0.0 {
         return (coef, [0.0; 3]);
     }
-    let vec_norm = norm_vec(a.1);
-    let n   = normalize_vec(a.1);
+
     let q_s = vec_norm.cos();
+    let n   = normalize_vec(a.1);
     let q_v = mul_scalar_vec(vec_norm.sin(), n);
     mul_scalar_quat( coef, (q_s, q_v) )
-}
-
-/// norm(exp_norm1(a)) == 1
-#[inline(always)]
-pub fn exp_norm1(a: Quaternion) -> Quaternion {
-    if norm_vec(a.1) == 0.0 {
-        return id();
-    }
-    let vec_norm = norm_vec(a.1);
-    let n   = normalize_vec(a.1);
-    let q_s = vec_norm.cos();
-    let q_v = mul_scalar_vec(vec_norm.sin(), n);
-    normalize( (q_s, q_v) )
 }
 
 /// Natural logarithm.
@@ -153,7 +143,6 @@ pub fn ln(a: Quaternion) -> Quaternion {
 /// The power of quaternion.
 #[inline(always)]
 pub fn power(a: Quaternion, t: f64) -> Quaternion {
-    // q = cos(Ω) + n sin(Ω) = cos(θ/2) + n sin(θ/2)
     let coef = norm(a).powf(t);
     let omega = a.0.acos();
     let n = normalize_vec(a.1);
@@ -162,20 +151,7 @@ pub fn power(a: Quaternion, t: f64) -> Quaternion {
     mul_scalar_quat( coef, (q_s, q_v) )
 }
 
-/// The power of quaternion.
-/// Return the unit quaternion.
-/// norm(power_norm1(a, t)) == 1
-#[inline(always)]
-pub fn power_norm1(a: Quaternion, t: f64) -> Quaternion {
-    // 最後に正規化するからノルムのt乗は掛けてない．
-    let omega = a.0.acos();
-    let n   = normalize_vec(a.1);
-    let q_s = (t * omega).cos();
-    let q_v = mul_scalar_vec( (t * omega).sin(), n );
-    normalize( (q_s, q_v) )
-}
-
-/// Coordinate rotate. (r <== a r a*)
+/// Coordinate rotate. (r <-- a r a*)
 #[inline(always)]
 pub fn vector_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     let a = normalize(a);
@@ -185,7 +161,7 @@ pub fn vector_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     result.1
 }
 
-/// Vector rotate. (r <== a* r a)
+/// Vector rotate. (r <-- a* r a)
 #[inline(always)]
 pub fn coordinate_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     let a = normalize(a);
@@ -194,7 +170,7 @@ pub fn coordinate_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     result.1
 }
 
-/// 微小変化を表すクォータニオンを返す．
+/// 角速度で積分して微小変化を表すクォータニオンを返す．
 /// The integration of angular velocity. 
 /// omega[rad/s]
 /// dt[s]
@@ -203,24 +179,24 @@ pub fn integration(omega: Vector3, dt: f64) -> Quaternion {
     const THRESHOLD: f64 = 0.625;  // 三角関数の近似誤差，約0.06%
     let arg = mul_scalar_vec(dt / 2.0, omega);
     let arg_norm = norm_vec(arg);
-
+    // integration
     if arg_norm < THRESHOLD {
-        return exp_norm1( (0.0, arg) );
+        return exp( (0.0, arg) );
     }
 
     // 引数が大きすぎたら分割して計算し，回転の合成を行う．
     let num = (arg_norm / THRESHOLD).floor();
     let arg_part = mul_scalar_vec(1.0 / num, arg);
-    let mut q = exp_norm1( (0.0, arg_part) );
+    let mut q = exp( (0.0, arg_part) );  // Is the real part must be zero
     let loop_num = (num as u32) - 1;  // -1は余り計算の分
     for _i in 0..loop_num {
-        let dq = exp_norm1( (0.0, arg_part) );
+        let dq = exp( (0.0, arg_part) );
         q = mul(dq, q);
     }
     // 余りの分を計算
     let tmp = mul_scalar_vec(-num, arg_part);
     let arg_remainder = add_vec(arg, tmp);
-    let dq = exp_norm1( (0.0, arg_remainder) );
+    let dq = exp( (0.0, arg_remainder) );
     mul(dq, q)
 }
 
@@ -288,7 +264,7 @@ pub fn slerp_1(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
     }
     // slerp
     let a_conj = conj(a);
-    let tmp = power_norm1( mul(a_conj, b), t);
+    let tmp = power( mul(a_conj, b), t);
     mul(a, tmp)
 }
 
@@ -355,14 +331,6 @@ mod test {
         for i in 0..3 {
             assert!( (n_2[i] - n_1[i]).abs() < EPSILON );
         }
-    }
-
-    #[test]
-    fn exp_norm() {
-        let q: Quaternion = axis_angle(PI, [1.0, 4.0, 2.0]);
-        let norm_0 = norm( normalize( exp(q) ) );
-        let norm_1 = norm( exp_norm1(q) );
-        assert!( (norm_1 - norm_0).abs() < EPSILON );
     }
 
 }
