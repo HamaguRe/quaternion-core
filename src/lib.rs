@@ -170,34 +170,14 @@ pub fn coordinate_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     result.1
 }
 
-/// 角速度で積分して微小変化を表すクォータニオンを返す．
+/// 角速度で積分して，微小変化を表すクォータニオンを返す．
 /// The integration of angular velocity. 
 /// omega[rad/s]
 /// dt[s]
 #[inline(always)]
 pub fn integration(omega: Vector3, dt: f64) -> Quaternion {
-    const THRESHOLD: f64 = 0.625;  // 三角関数の近似誤差，約0.06%
     let arg = mul_scalar_vec(dt / 2.0, omega);
-    let arg_norm = norm_vec(arg);
-    // integration
-    if arg_norm < THRESHOLD {
-        return exp( (0.0, arg) );
-    }
-
-    // 引数が大きすぎたら分割して計算し，回転の合成を行う．
-    let num = (arg_norm / THRESHOLD).floor();
-    let arg_part = mul_scalar_vec(1.0 / num, arg);
-    let mut q = exp( (0.0, arg_part) );  // Is the real part must be zero
-    let loop_num = (num as u32) - 1;  // -1は余り計算の分
-    for _i in 0..loop_num {
-        let dq = exp( (0.0, arg_part) );
-        q = mul(dq, q);
-    }
-    // 余りの分を計算
-    let tmp = mul_scalar_vec(-num, arg_part);
-    let arg_remainder = add_vec(arg, tmp);
-    let dq = exp( (0.0, arg_remainder) );
-    mul(dq, q)
+    exp( (0.0, arg) )
 }
 
 /// linear interpolation.
@@ -331,6 +311,18 @@ mod test {
         for i in 0..3 {
             assert!( (n_2[i] - n_1[i]).abs() < EPSILON );
         }
+    }
+
+    #[test]
+    fn integration_test() {
+        let omega: Vector3 = [0.0, PI/2.0, 0.0];  // [rad/s]
+        let dt = 1.0;  // [s]
+        let dq = integration(omega, dt);
+        let mut r: Vector3 = [2.0, 2.0, 0.0];
+        r = vector_rotation(dq, r);
+        assert!( (r[0] - 0.0).abs() < EPSILON );
+        assert!( (r[1] - 2.0).abs() < EPSILON );
+        assert!( (r[2] + 2.0).abs() < EPSILON );
     }
 
 }
