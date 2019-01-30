@@ -12,14 +12,16 @@ pub fn id() -> Quaternion {
 }
 
 /// 回転角と軸ベクトルを指定して四元数を生成．
+/// axisは単位ベクトルでなくても良い．
 /// Generate quaternion by specifying rotation angle and axis vector.
-/// theta[rad]
+/// The "axes" need not be unit vectors.
+/// angle[rad]
 #[inline(always)]
-pub fn axis_angle(theta: f64, axis: Vector3) -> Quaternion {
-    let axis = normalize_vec(axis);
-    let q_s = (theta / 2.0).cos();
-    let s = (theta / 2.0).sin();
-    let q_v = mul_scalar_vec(s, axis);
+pub fn axis_angle(axis: Vector3, angle: f64) -> Quaternion {
+    let n = normalize_vec(axis);
+    let q_s = (angle / 2.0).cos();
+    let s = (angle / 2.0).sin();
+    let q_v = mul_scalar_vec(s, n);
     (q_s, q_v)
 }
 
@@ -198,6 +200,16 @@ pub fn coordinate_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     let a_conj = conj(a);
     let result = mul( a_conj, mul((0.0, r), a) );
     result.1
+}
+
+/// ベクトル "a" から "b" への回転を行うクォータニオンを求める．
+/// Find a quaternion to rotate from vector "a" to "b".
+#[inline(always)]
+pub fn rotation_a_to_b(a: Vector3, b: Vector3) -> Quaternion {
+    let axis = cross_vec(a, b);
+    let s = norm_vec(a) * norm_vec(b);
+    let theta = (dot_vec(a, b) / s).cos();
+    axis_angle(axis, theta)
 }
 
 /// 角速度で積分して，dt[sec]間の回転を表すクォータニオンを返す．

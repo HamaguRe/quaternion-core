@@ -33,8 +33,8 @@ fn test_vector_rotation() {
 // 二つの方法でSlerpを行う．
 #[test]
 fn test_slerp() {
-    let p = axis_angle(PI, [2.0, 1.2, 3.5]);
-    let q = axis_angle(PI/2.0, [3.0, 4.5, 1.0]);
+    let p = axis_angle([2.0, 1.2, 3.5], PI);
+    let q = axis_angle([3.0, 4.5, 1.0], PI/2.0);
     let mut t = 0.1;
     for _i in 0..10 {
         let p_t = slerp(p, q, t);
@@ -53,7 +53,7 @@ fn test_slerp() {
 // どっちの方法でも大丈夫だけど，n_2の方が計算量が少ない．
 #[test]
 fn find_unit_vector() {
-    let q: Quaternion = axis_angle(PI, [1.0, 4.0, 2.0]);
+    let q: Quaternion = axis_angle([1.0, 4.0, 2.0], PI);
     let omega = q.0.acos();
     let n_1: Vector3 = mul_scalar_vec(1.0 / omega.sin(), q.1);
     let n_2: Vector3 = normalize_vec(q.1);
