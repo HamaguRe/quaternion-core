@@ -208,7 +208,7 @@ pub fn coordinate_rotation(a: Quaternion, r: Vector3) -> Vector3 {
 pub fn rotation_a_to_b(a: Vector3, b: Vector3) -> Quaternion {
     let axis = cross_vec(a, b);
     let s = norm_vec(a) * norm_vec(b);
-    let theta = (dot_vec(a, b) / s).cos();
+    let theta = (dot_vec(a, b) / s).acos();
     axis_angle(axis, theta)
 }
 
