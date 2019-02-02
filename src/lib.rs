@@ -204,12 +204,13 @@ pub fn coordinate_rotation(a: Quaternion, r: Vector3) -> Vector3 {
 
 /// ベクトル "a" から "b" への回転を行うクォータニオンを求める．
 /// Find a quaternion to rotate from vector "a" to "b".
+/// t (0 <= t <= 1)
 #[inline(always)]
-pub fn rotation_a_to_b(a: Vector3, b: Vector3) -> Quaternion {
+pub fn rotation_a_to_b(a: Vector3, b: Vector3, t: f64) -> Quaternion {
     let axis = cross_vec(a, b);
     let s = norm_vec(a) * norm_vec(b);
     let theta = (dot_vec(a, b) / s).acos();
-    axis_angle(axis, theta)
+    axis_angle(axis, theta * t)
 }
 
 /// 角速度で積分して，dt[sec]間の回転を表すクォータニオンを返す．
@@ -251,7 +252,7 @@ pub fn slerp(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
     let a = normalize(a);
     let mut b = normalize(b);
 
-    // Dot production of quaternion.
+    // 最短経路で補間する．
     let mut dot = dot(a, b);
     if dot < 0.0 {
         b = mul_scalar_quat(-1.0, b);
@@ -271,7 +272,6 @@ pub fn slerp(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
     let q_1 = mul_scalar_quat(s_1, a);
     let s_2 = (t * omega).sin() / sin_omega;
     let q_2 = mul_scalar_quat(s_2, b);
-
     add(q_1, q_2)
 }
 
@@ -281,7 +281,14 @@ pub fn slerp(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
 #[inline(always)]
 pub fn slerp_1(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
     let a = normalize(a);
-    let b = normalize(b);
+    let mut b = normalize(b);
+
+    let dot = dot(a, b);
+    if dot < 0.0 {
+        b = mul_scalar_quat(-1.0, b);
+    }
+
+    // a.0 が1より大きくなった時の適切な処理がわからない...
     // Set it to 1 to avoid undefined behavior.
     // The domain of the scalar part is [-1 <= a.0 <= 1].
     let mut arg = mul( conj(a), b );
