@@ -64,12 +64,37 @@ fn find_unit_vector() {
 
 #[test]
 fn integration_test() {
+    let q0 = id();
     let omega: Vector3 = [0.0, PI/2.0, 0.0];  // [rad/s]
     let dt = 1.0;  // [s]
-    let dq = integration(omega, dt);
     let mut r: Vector3 = [2.0, 2.0, 0.0];
-    r = vector_rotation(dq, r);
+
+    let q = integration(omega, q0, dt);
+    r = vector_rotation(q, r);
     assert!( (r[0] - 0.0).abs() < EPSILON );
     assert!( (r[1] - 2.0).abs() < EPSILON );
     assert!( (r[2] + 2.0).abs() < EPSILON );
+}
+
+#[test]
+fn integration_method_test() {
+    let q0 = id();
+    let omega: Vector3 = [0.0, PI/2.0, 0.0];  // [rad/s]
+    let dt = 0.003;  // [s]
+
+    // 理論的には正確な積分を行う．
+    // dt間の角速度が一定であれば，dtを大きくしても正確に積分できる．
+    let q_1 = integration(omega, q0, dt);
+    println!("{:?}", q_1);
+
+    // この方法は積分結果が超球面上に存在しない．
+    // 三角関数を使わないぶん計算量は少ないが，導出方法として正確ではない．
+    // dtが大きすぎると誤差が大きくなる．
+    let q_2 = integration_1(omega, q0, dt);
+    println!("{:?}", q_2);
+
+    assert!( (q_1.0 - q_2.0).abs() < EPSILON );
+    assert!( (q_1.1[0] - q_2.1[0]).abs() < EPSILON );
+    assert!( (q_1.1[1] - q_2.1[1]).abs() < EPSILON );
+    assert!( (q_1.1[2] - q_2.1[2]).abs() < EPSILON );
 }
