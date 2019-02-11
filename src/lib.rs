@@ -1,8 +1,6 @@
 pub type Vector3 = [f64; 3];
 pub type Quaternion = (f64, Vector3);
 
-const E: f64 = std::f64::consts::E;  // Napier's constant
-
 
 /// 恒等四元数を生成．
 /// Generate identity quaternion.
@@ -143,7 +141,7 @@ pub fn inverse(a: Quaternion) -> Quaternion {
 /// Exponential of Quaternion.
 #[inline(always)]
 pub fn exp(a: Quaternion) -> Quaternion {
-    let coef = E.powf(a.0);  // coefficient（係数）
+    let coef = a.0.exp();  // coefficient（係数）
     let vec_norm = norm_vec(a.1);
     // An if statement to avoid unnecessary calculation.
     if vec_norm == 0.0 {
@@ -212,7 +210,7 @@ pub fn rotation_a_to_b(a: Vector3, b: Vector3, t: f64) -> Quaternion {
 }
 
 /// The integrate of angular velocity.
-/// 角速度を積分して，引数に渡したクォータニオンqを更新する．
+/// 角速度を積分して，引数に渡したクォータニオン"q"を更新する．
 /// Update the quaternion "q" passed to the argument.
 /// 
 /// omega[rad/sec]
@@ -227,7 +225,7 @@ pub fn integration(omega: Vector3, q: Quaternion, dt: f64) -> Quaternion {
 /// The integrate of angular velocity.
 /// 角速度を積分して，引数に渡したクォータニオン"q"を更新する．
 /// 近似式を用いるため，"integration()"関数よりも計算量が少ない．
-/// "dt"を大きくしすぎると誤差が大きくなる．
+/// "dt"を大きくしすぎると真値との誤差が大きくなる．
 /// Update the quaternion "q" passed to the argument.
 /// Since it uses an approximate expression,
 /// calculation amount is smaller than "integration()" function.
