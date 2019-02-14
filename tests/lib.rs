@@ -69,7 +69,7 @@ fn integration_test() {
     let dt = 1.0;  // [s]
     let mut r: Vector3 = [2.0, 2.0, 0.0];
 
-    let q = integration(omega, q0, dt);
+    let q = vector_integration(q0, omega, dt);
     r = vector_rotation(q, r);
     assert!( (r[0] - 0.0).abs() < EPSILON );
     assert!( (r[1] - 2.0).abs() < EPSILON );
@@ -84,13 +84,13 @@ fn integration_method_test() {
 
     // 理論的には正確な積分を行う．
     // dt間の角速度が一定であれば，dtを大きくしても正確に積分できる．
-    let q_1 = integration(omega, q0, dt);
+    let q_1 = vector_integration(q0, omega, dt);
     println!("{:?}", q_1);
 
     // この方法は積分結果が超球面上に存在しない．
     // 三角関数を使わないぶん計算量は少ないが，導出方法として正確ではない．
     // dtが大きすぎると誤差が大きくなる．
-    let q_2 = integration_1(omega, q0, dt);
+    let q_2 = vector_integration_euler(q0, omega, dt);
     println!("{:?}", q_2);
 
     assert!( (q_1.0 - q_2.0).abs() < EPSILON );

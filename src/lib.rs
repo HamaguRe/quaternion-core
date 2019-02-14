@@ -210,20 +210,34 @@ pub fn rotation_a_to_b(a: Vector3, b: Vector3, t: f64) -> Quaternion {
 }
 
 /// The integrate of angular velocity.
-/// 角速度を積分して，引数に渡したクォータニオン"q"を更新する．
-/// Update the quaternion "q" passed to the argument.
-/// 
+/// dt間のクォータニオンの変化量を返す．
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
-pub fn integration(omega: Vector3, q: Quaternion, dt: f64) -> Quaternion {
+pub fn integration(omega: Vector3, dt: f64) -> Quaternion {
     let arg = mul_scalar_vec(dt / 2.0, omega);
-    let dq = exp( (0.0, arg) );
-    normalize( mul(dq, q) )
+    exp( (0.0, arg) )
+}
+
+/// ボディ角速度を積分して，引数に渡したクォータニオン"q"を更新する．
+/// Update the quaternion "q" passed to the argument.
+#[inline(always)]
+pub fn vector_integration(q: Quaternion, omega: Vector3, dt: f64) -> Quaternion {
+    let dq = integration(omega, dt);
+    mul(dq, q)
+}
+
+/// 空間角速度を積分して，引数に渡したクォータニオン"q"を積分する．
+#[inline(always)]
+pub fn coordinate_integration(q: Quaternion, omega: Vector3, dt: f64) -> Quaternion {
+    let dq = integration(omega, dt);
+    mul(q, dq)
 }
 
 /// The integrate of angular velocity.
-/// 角速度を積分して，引数に渡したクォータニオン"q"を更新する．
+/// The Euler method
+/// オイラー法
+/// 機体角速度を積分して，引数に渡したクォータニオン"q"を更新する．
 /// 近似式を用いるため，"integration()"関数よりも計算量が少ない．
 /// "dt"を大きくしすぎると真値との誤差が大きくなる．
 /// Update the quaternion "q" passed to the argument.
@@ -234,8 +248,16 @@ pub fn integration(omega: Vector3, q: Quaternion, dt: f64) -> Quaternion {
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
-pub fn integration_1(omega: Vector3, q: Quaternion, dt: f64) -> Quaternion {
-    let dq = mul((0.0, omega), q);
+pub fn vector_integration_euler(q: Quaternion, omega: Vector3, dt: f64) -> Quaternion {
+    let dq = mul( (0.0, omega), q);  // 機体角速度を用いる
+    let dq = mul_scalar_quat(dt / 2.0, dq);
+    normalize( add(q, dq) )
+}
+
+/// 空間角速度を積分して，引数に渡したクォータニオン"q"を更新する．
+#[inline(always)]
+pub fn coordinate_integration_euler(q: Quaternion, omega: Vector3, dt: f64) -> Quaternion {
+    let dq = mul( q, (0.0, omega) );  // 空間角速度を用いる
     let dq = mul_scalar_quat(dt / 2.0, dq);
     normalize( add(q, dq) )
 }
