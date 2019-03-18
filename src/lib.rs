@@ -1,3 +1,5 @@
+const PI: f64 = std::f64::consts::PI;
+
 pub type Vector3 = [f64; 3];
 pub type Quaternion = (f64, Vector3);
 
@@ -15,7 +17,7 @@ pub fn id() -> Quaternion {
 /// The "axes" need not be unit vectors.
 /// angle[rad]
 #[inline(always)]
-pub fn axis_angle(axis: Vector3, angle: f64) -> Quaternion {
+pub fn from_axis_angle(axis: Vector3, angle: f64) -> Quaternion {
     let n = normalize_vec(axis);
     let q_s = (angle / 2.0).cos();
     let s = (angle / 2.0).sin();
@@ -23,10 +25,53 @@ pub fn axis_angle(axis: Vector3, angle: f64) -> Quaternion {
     (q_s, q_v)
 }
 
+/// オイラー角[rad]から四元数を生成．
+#[inline(always)]
+pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion {
+    let alpha = yaw   / 2.0;
+    let beta  = pitch / 2.0;
+    let gamma = roll  / 2.0;
+    // Compute these value only once
+    let sin_alpha = alpha.sin();
+    let cos_alpha = alpha.cos();
+    let sin_beta = beta.sin();
+    let cos_beta = beta.cos();
+    let sin_gamma = gamma.sin();
+    let cos_gamma = gamma.cos();
+
+    let q0 = cos_alpha * cos_beta * cos_gamma + sin_alpha * sin_beta * sin_gamma;
+    let q1 = cos_alpha * cos_beta * sin_gamma - sin_alpha * sin_beta * cos_gamma;
+    let q2 = cos_alpha * sin_beta * cos_gamma + sin_alpha * cos_beta * sin_gamma;
+    let q3 = sin_alpha * cos_beta * cos_gamma - cos_alpha * sin_beta * sin_gamma;
+    (q0, [q1, q2, q3])
+}
+
+/// クォータニオンをオイラー角[rad]に変換
+/// Return --> [roll, pitch, yaw]
+#[inline(always)]
+pub fn to_euler_angles(q: Quaternion) -> Vector3 {
+    let q0 = q.0;
+    let q1 = q.1[0];
+    let q2 = q.1[1];
+    let q3 = q.1[2];
+
+    let m11 = 2.0 * (q0*q0 + q1*q1) -1.0;
+    let m12 = 2.0 * (q1*q2 + q0*q3);
+    let m13 = 2.0 * (q0*q2 - q1*q3);
+    let m23 = 2.0 * (q2*q3 + q0*q1);
+    let m33 = 2.0 * (q0*q0 + q3*q3) -1.0;
+
+    let roll = (m23 / m33).atan();
+    let pitch = asin_safe(m13);
+    let yaw = (m12 / m11).atan();
+
+    [roll, pitch, yaw]
+}
+
 /// ベクトルの内積
 /// Dot product of vector
 #[inline(always)]
-pub fn dot_vec(a: Vector3, b: Vector3) -> f64 {
+fn dot_vec(a: Vector3, b: Vector3) -> f64 {
     a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 }
 
@@ -40,7 +85,7 @@ pub fn dot(a: Quaternion, b: Quaternion) -> f64 {
 /// 外積
 /// Cross product
 #[inline(always)]
-pub fn cross_vec(a: Vector3, b: Vector3) -> Vector3 {
+fn cross_vec(a: Vector3, b: Vector3) -> Vector3 {
     let vec0 = a[1]*b[2] - a[2]*b[1];
     let vec1 = a[2]*b[0] - a[0]*b[2];
     let vec2 = a[0]*b[1] - a[1]*b[0];
@@ -50,7 +95,7 @@ pub fn cross_vec(a: Vector3, b: Vector3) -> Vector3 {
 /// 二つのベクトルを加算する
 /// Add two vectors
 #[inline(always)]
-pub fn add_vec(a: Vector3, b: Vector3) -> Vector3 {
+fn add_vec(a: Vector3, b: Vector3) -> Vector3 {
     [a[0]+b[0], a[1]+b[1], a[2]+b[2]]
 }
 
@@ -115,7 +160,7 @@ pub fn normalize(a: Quaternion) -> Quaternion {
 #[inline(always)]
 pub fn normalize_vec(r: Vector3) -> Vector3 {
     let norm = norm_vec(r);
-    if norm == 0.0 {
+    if norm == 0.0 {  // ゼロ除算回避
         return [0.0; 3];
     }
     mul_scalar_vec(1.0 / norm, r)
@@ -132,9 +177,8 @@ pub fn conj(a: Quaternion) -> Quaternion {
 /// Compute inverse quaternion
 #[inline(always)]
 pub fn inverse(a: Quaternion) -> Quaternion {
-    let conj = conj(a);
     let norm_square = dot(a, a);
-    mul_scalar_quat(1.0 / norm_square, conj)
+    mul_scalar_quat( 1.0 / norm_square, conj(a) )
 }
 
 /// ネイピア数eのクォータニオン冪
@@ -158,7 +202,7 @@ pub fn exp(a: Quaternion) -> Quaternion {
 #[inline(always)]
 pub fn power(a: Quaternion, t: f64) -> Quaternion {
     let coef = norm(a).powf(t);
-    let omega = a.0.acos();
+    let omega = acos_safe(a.0);
     let n = normalize_vec(a.1);
     let q_s = (t * omega).cos();
     let q_v = mul_scalar_vec( (t * omega).sin(), n );
@@ -171,42 +215,39 @@ pub fn power(a: Quaternion, t: f64) -> Quaternion {
 pub fn ln(a: Quaternion) -> Quaternion {
     let vec_norm = norm_vec(a.1);
     let q_s = vec_norm.ln();
-    let s = (a.0 / vec_norm).acos();
+    let s = acos_safe(a.0 / vec_norm);
     let n = normalize_vec(a.1);
     let q_v = mul_scalar_vec(s, n);
     (q_s, q_v)
 }
 
 /// 位置ベクトルの回転
-/// Coordinate rotate. (r <-- a r a*)
+/// Coordinate rotate. (r' = a r a*)
 #[inline(always)]
 pub fn vector_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     let a = normalize(a);
-    let a_conj = conj(a);
     // ベクトルを，スカラー部0のクォータニオンとして計算する．
-    let result = mul( a, mul((0.0, r), a_conj) );
+    let result = mul( mul(a, (0.0, r)), conj(a) );
     result.1
 }
 
 /// 座標系の回転
-/// Vector rotate. (r <-- a* r a)
+/// Vector rotate. (r' = a* r a)
 #[inline(always)]
 pub fn coordinate_rotation(a: Quaternion, r: Vector3) -> Vector3 {
     let a = normalize(a);
-    let a_conj = conj(a);
-    let result = mul( a_conj, mul((0.0, r), a) );
+    let result = mul( conj(a), mul((0.0, r), a) );
     result.1
 }
 
 /// ベクトル "a" から "b" への回転を行うクォータニオンを求める．
 /// Find a quaternion to rotate from vector "a" to "b".
-/// t (0 <= t <= 1)
 #[inline(always)]
-pub fn rotation_a_to_b(a: Vector3, b: Vector3, t: f64) -> Quaternion {
+pub fn rotation_a_to_b(a: Vector3, b: Vector3) -> Quaternion {
     let axis = cross_vec(a, b);
     let s = norm_vec(a) * norm_vec(b);
-    let theta = (dot_vec(a, b) / s).acos();
-    axis_angle(axis, theta * t)
+    let theta = acos_safe( dot_vec(a, b) / s );
+    from_axis_angle(axis, theta)
 }
 
 /// The integrate of angular velocity.
@@ -219,7 +260,7 @@ pub fn integration(omega: Vector3, dt: f64) -> Quaternion {
     exp( (0.0, arg) )
 }
 
-/// ボディ角速度を積分して，引数に渡したクォータニオン"q"を更新する．
+/// ボディ角速度を積分して，引数に渡したクォータニオンを更新する．
 /// Update the quaternion "q" passed to the argument.
 #[inline(always)]
 pub fn vector_integration(q: Quaternion, omega: Vector3, dt: f64) -> Quaternion {
@@ -227,24 +268,15 @@ pub fn vector_integration(q: Quaternion, omega: Vector3, dt: f64) -> Quaternion 
     mul(dq, q)
 }
 
-/// 空間角速度を積分して，引数に渡したクォータニオン"q"を積分する．
+/// 空間角速度を積分して，引数に渡したクォータニオンを積分する．
 #[inline(always)]
 pub fn coordinate_integration(q: Quaternion, omega: Vector3, dt: f64) -> Quaternion {
     let dq = integration(omega, dt);
     mul(q, dq)
 }
 
-/// The integrate of angular velocity.
-/// The Euler method
 /// オイラー法
-/// 機体角速度を積分して，引数に渡したクォータニオン"q"を更新する．
-/// 近似式を用いるため，"integration()"関数よりも計算量が少ない．
-/// "dt"を大きくしすぎると真値との誤差が大きくなる．
-/// Update the quaternion "q" passed to the argument.
-/// Since it uses an approximate expression,
-/// calculation amount is smaller than "integration()" function.
-/// If "dt" is made too large, the error becomes large.
-/// 
+/// 機体角速度を積分して，引数に渡したクォータニオンを積分する．
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
@@ -254,7 +286,10 @@ pub fn vector_integration_euler(q: Quaternion, omega: Vector3, dt: f64) -> Quate
     normalize( add(q, dq) )
 }
 
-/// 空間角速度を積分して，引数に渡したクォータニオン"q"を更新する．
+/// オイラー法
+/// 空間角速度を積分して，引数に渡したクォータニオンを更新する．
+/// omega[rad/sec]
+/// dt[sec]
 #[inline(always)]
 pub fn coordinate_integration_euler(q: Quaternion, omega: Vector3, dt: f64) -> Quaternion {
     let dq = mul( q, (0.0, omega) );  // 空間角速度を用いる
@@ -263,7 +298,7 @@ pub fn coordinate_integration_euler(q: Quaternion, omega: Vector3, dt: f64) -> Q
 }
 
 /// 線形補間
-/// "a"から"b"への経路を補完するクォータニオンを生成する．
+/// 引数"a"から"b"への経路を補完するクォータニオンを生成する．
 /// 引数t(0 <= t <= 1) は補間パラメータ．
 /// Linear interpolation
 /// Generate a quaternion that interpolate the route from "a" to "b".
@@ -289,22 +324,18 @@ pub fn slerp(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
     // Normalize to avoid undefined behavior.
     let a = normalize(a);
     let mut b = normalize(b);
-
     // 最短経路で補間する．
     let mut dot = dot(a, b);
     if dot < 0.0 {
         b = mul_scalar_quat(-1.0, b);
         dot = -dot;
     }
-
     // If the inputs are too close for comfort, linearly interpolate.
-    const DOT_THRESHOLD: f64 = 0.9995;
-    if dot > DOT_THRESHOLD {
+    if dot > 0.9995 {
         return lerp(a, b, t);
     }
-
     // selrp
-    let omega = dot.acos();  // Angle between the two quaternion
+    let omega = acos_safe(dot);  // Angle between the two quaternion
     let sin_omega = omega.sin();
     let s_1 = ((1.0 - t)*omega).sin() / sin_omega;
     let q_1 = mul_scalar_quat(s_1, a);
@@ -313,6 +344,7 @@ pub fn slerp(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
     add(q_1, q_2)
 }
 
+/// クォータニオンの冪乗を用いたSlerp
 /// Sherical linear interpolation. 
 /// Use quaternion's exponential.
 /// "a" --> "b".
@@ -320,19 +352,44 @@ pub fn slerp(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
 pub fn slerp_1(a: Quaternion, b: Quaternion, t: f64) -> Quaternion {
     let a = normalize(a);
     let mut b = normalize(b);
-
-    let dot = dot(a, b);
+    // 最短経路で補完
+    let mut dot = dot(a, b);
     if dot < 0.0 {
         b = mul_scalar_quat(-1.0, b);
+        dot = -dot;
     }
-
-    // a.0 が1より大きくなった時の適切な処理がわからない...
-    // Set it to 1 to avoid undefined behavior.
-    // The domain of the scalar part is [-1 <= a.0 <= 1].
-    let mut arg = mul( conj(a), b );
-    if arg.0.abs() > 1.0 {
-        arg.0 = arg.0.round();
+    // lerp
+    if dot > 0.9995 {
+        return lerp(a, b, t);
     }
-    let tmp = power( arg, t);
+    // slerp
+    let tmp = mul( conj(a), b );
+    let tmp = power(tmp, t);
     mul(a, tmp)
+}
+
+/// 定義域外の値はカットして未定義動作を防ぐ
+fn asin_safe(s: f64) -> f64 {
+    let result;
+    if s >= 1.0 {  // Avoid undefined behavior
+        result = PI / 2.0;
+    } else if s <= -1.0 {
+        result = -PI / 2.0;
+    } else {
+        result = s.asin();
+    }
+    result
+}
+
+/// 定義域外の値をカットして未定義動作を防ぐ
+fn acos_safe(s: f64) -> f64 {
+    let result;
+    if s >= 1.0 {  // Avoid undefined behavior
+        result = 0.0;
+    } else if s <= -1.0{
+        result = PI;
+    } else {
+        result = s.acos();
+    }
+    result
 }

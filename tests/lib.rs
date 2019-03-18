@@ -5,6 +5,28 @@ use quaternion::*;
 const PI: f64 = std::f64::consts::PI;
 const EPSILON: f64 = 0.00000001;
 
+fn deg_to_rad(deg: f64) -> f64 {
+    (deg / 180.0) * PI
+}
+
+
+#[test]
+fn test_euler_quaternion() {
+    let roll_ori = deg_to_rad(20.0);
+    let pitch_ori = deg_to_rad(18.0);  // 180度を超えると値がおかしくなる
+    let yaw_ori = deg_to_rad(0.0);  // 180度，360度で符号が反転する．
+
+    let q = from_euler_angles(roll_ori, pitch_ori, yaw_ori);
+    let eulers = to_euler_angles(q);
+    
+    // 値チェック
+    println!("roll: {}, ori: {}", eulers[0], roll_ori);
+    assert!( (eulers[0] - roll_ori).abs() < EPSILON );
+    println!("pitch: {}, ori: {}", eulers[1], pitch_ori);
+    assert!( (eulers[1] - pitch_ori).abs() < EPSILON );
+    println!("yaw: {}, ori: {}", eulers[2], yaw_ori);
+    assert!( (eulers[2] - yaw_ori).abs() < EPSILON );
+}
 
 #[test]
 fn test_add() {
@@ -30,30 +52,11 @@ fn test_vector_rotation() {
     assert!( (result[2] + 2.0).abs() < EPSILON);
 }
 
-// 二つの方法でSlerpを行う．
-#[test]
-fn test_slerp() {
-    let p = axis_angle([2.0, 1.2, 3.5], PI);
-    let q = axis_angle([3.0, 4.5, 1.0], PI/2.0);
-    let mut t = 0.1;
-    for _i in 0..10 {
-        let p_t = slerp(p, q, t);
-        let q_t = slerp_1(p, q, t);
-        // check
-        assert!( (p_t.0 - q_t.0).abs() < EPSILON );
-        for i in 0..3 {
-            assert!( (p_t.1[i] - q_t.1[i]).abs() < EPSILON );
-        }
-
-        t += 0.1;
-    }
-}
-
 // 二つの方法で，回転を表すクォータニオンの単位ベクトルを求める．
 // どっちの方法でも大丈夫だけど，n_2の方が計算量が少ない．
 #[test]
 fn find_unit_vector() {
-    let q: Quaternion = axis_angle([1.0, 4.0, 2.0], PI);
+    let q: Quaternion = from_axis_angle([1.0, 4.0, 2.0], PI);
     let omega = q.0.acos();
     let n_1: Vector3 = mul_scalar_vec(1.0 / omega.sin(), q.1);
     let n_2: Vector3 = normalize_vec(q.1);
@@ -63,7 +66,7 @@ fn find_unit_vector() {
 }
 
 #[test]
-fn integration_test() {
+fn test_integration() {
     let q0 = id();
     let omega: Vector3 = [0.0, PI/2.0, 0.0];  // [rad/s]
     let dt = 1.0;  // [s]
@@ -76,8 +79,9 @@ fn integration_test() {
     assert!( (r[2] + 2.0).abs() < EPSILON );
 }
 
+// 二つの積分方法を試す
 #[test]
-fn integration_method_test() {
+fn test_integration_method() {
     let q0 = id();
     let omega: Vector3 = [0.0, PI/2.0, 0.0];  // [rad/s]
     let dt = 0.003;  // [s]
@@ -97,4 +101,25 @@ fn integration_method_test() {
     assert!( (q_1.1[0] - q_2.1[0]).abs() < EPSILON );
     assert!( (q_1.1[1] - q_2.1[1]).abs() < EPSILON );
     assert!( (q_1.1[2] - q_2.1[2]).abs() < EPSILON );
+}
+
+// 二つの方法でSlerpを行う．
+#[test]
+fn test_slerp_eq() {
+    let p = from_axis_angle([2.0, 1.2, 3.5], PI);
+    let q = from_axis_angle([3.0, 4.5, 1.0], PI/2.0);
+    let mut t = 0.1;
+    for _i in 0..10 {
+        let p_t = slerp(p, q, t);
+        let q_t = slerp_1(p, q, t);
+        println!("p_slerp: {:?}", p_t);
+        println!("q_slerp_1: {:?}", q_t);
+        // check
+        assert!( (p_t.0 - q_t.0).abs() < EPSILON );
+        for i in 0..3 {
+            assert!( (p_t.1[i] - q_t.1[i]).abs() < EPSILON );
+        }
+
+        t += 0.1;
+    }
 }
