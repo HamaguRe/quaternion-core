@@ -37,15 +37,15 @@ fn test_add() {
 
 #[test]
 fn test_norm() {
-    let q: Quaternion = (2f64.powf(-0.5), [0.0, 2f64.powf(-0.5), 0.0]);
+    let q: Quaternion<f64> = (2f64.powf(-0.5), [0.0, 2f64.powf(-0.5), 0.0]);
     assert!((norm(q) - 1.0).abs() < EPSILON);
 }
 
 // 手計算した結果で動作確認
 #[test]
 fn test_vector_rotation() {
-    let r: Vector3 = [2.0, 2.0, 0.0];
-    let q: Quaternion = (2f64.powf(-0.5), [0.0, 2f64.powf(-0.5), 0.0]);
+    let r: Vector3<f64> = [2.0, 2.0, 0.0];
+    let q: Quaternion<f64> = (2f64.powf(-0.5), [0.0, 2f64.powf(-0.5), 0.0]);
     let result = vector_rotation(q, r);
     assert!( (result[0] - 0.0).abs() < EPSILON);
     assert!( (result[1] - 2.0).abs() < EPSILON);
@@ -56,10 +56,10 @@ fn test_vector_rotation() {
 // どっちの方法でも大丈夫だけど，n_2の方が計算量が少ない．
 #[test]
 fn find_unit_vector() {
-    let q: Quaternion = from_axis_angle([1.0, 4.0, 2.0], PI);
+    let q: Quaternion<f64> = from_axis_angle([1.0, 4.0, 2.0], PI);
     let omega = q.0.acos();
-    let n_1: Vector3 = mul_scalar_vec(1.0 / omega.sin(), q.1);
-    let n_2: Vector3 = normalize_vec(q.1);
+    let n_1: Vector3<f64> = mul_scalar_vec(1.0 / omega.sin(), q.1);
+    let n_2: Vector3<f64> = normalize_vec(q.1);
     for i in 0..3 {
         assert!( (n_2[i] - n_1[i]).abs() < EPSILON );
     }
@@ -68,9 +68,9 @@ fn find_unit_vector() {
 #[test]
 fn test_integration() {
     let q0 = id();
-    let omega: Vector3 = [0.0, PI/2.0, 0.0];  // [rad/s]
+    let omega: Vector3<f64> = [0.0, PI/2.0, 0.0];  // [rad/s]
     let dt = 1.0;  // [s]
-    let mut r: Vector3 = [2.0, 2.0, 0.0];
+    let mut r: Vector3<f64> = [2.0, 2.0, 0.0];
 
     let q = vector_integration(q0, omega, dt);
     r = vector_rotation(q, r);
@@ -83,7 +83,7 @@ fn test_integration() {
 #[test]
 fn test_integration_method() {
     let q0 = id();
-    let omega: Vector3 = [0.0, PI/2.0, 0.0];  // [rad/s]
+    let omega: Vector3<f64> = [0.0, PI/2.0, 0.0];  // [rad/s]
     let dt = 0.003;  // [s]
 
     // 理論的には正確な積分を行う．

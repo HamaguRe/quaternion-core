@@ -1,5 +1,8 @@
 [package]
 name = "quaternion"
-version = "0.5.1"
+version = "0.6.1"
 authors = ["HamaguRe <space-denpa.jp>"]
 edition = "2018"
+
+[dependencies]
+num-traits = "0.2.6"
