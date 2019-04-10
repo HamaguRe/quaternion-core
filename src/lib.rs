@@ -15,6 +15,7 @@ pub fn id<T>() -> Quaternion<T>
 where T: Float {
     let one  = T::one();
     let zero = T::zero();
+    
     (one, [zero; 3])
 }
 
@@ -27,10 +28,11 @@ where T: Float {
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T> 
 where T: Float {
     let two = T::one() + T::one();
+
     let n = normalize_vec(axis);
     let q_s = (angle / two).cos();
     let s   = (angle / two).sin();
-    let q_v = mul_scalar_vec(s, n);
+    let q_v = scale_vec(s, n);
     (q_s, q_v)
 }
 
@@ -59,7 +61,7 @@ where T: Float {
 }
 
 /// クォータニオンをオイラー角[rad]に変換
-/// Return --> [roll, pitch, yaw]
+/// Quaternion --> [roll, pitch, yaw]
 #[inline(always)]
 pub fn to_euler_angles<T>(q: Quaternion<T>) -> Vector3<T> 
 where T: Float + FloatConst {
@@ -86,7 +88,7 @@ where T: Float + FloatConst {
 /// ベクトルの内積
 /// Dot product of vector
 #[inline(always)]
-fn dot_vec<T>(a: Vector3<T>, b: Vector3<T>) -> T 
+pub fn dot_vec<T>(a: Vector3<T>, b: Vector3<T>) -> T 
 where T: Float {
     a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 }
@@ -102,7 +104,7 @@ where T: Float {
 /// 外積
 /// Cross product
 #[inline(always)]
-fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T> 
+pub fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T> 
 where T: Float {
     let vec0 = a[1]*b[2] - a[2]*b[1];
     let vec1 = a[2]*b[0] - a[0]*b[2];
@@ -113,7 +115,7 @@ where T: Float {
 /// 二つのベクトルを加算する
 /// Add two vectors
 #[inline(always)]
-fn add_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T> 
+pub fn add_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T> 
 where T: Float {
     [a[0]+b[0], a[1]+b[1], a[2]+b[2]]
 }
@@ -133,18 +135,25 @@ where T: Float {
 #[inline(always)]
 pub fn mul<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    let q_s = a.0 * b.0 - dot_vec(a.1, b.1);
-    let vec_1 = mul_scalar_vec(a.0, b.1);
-    let vec_2 = mul_scalar_vec(b.0, a.1);
-    let vec_3 = cross_vec(a.1, b.1);
-    let q_v = add_vec( vec_1, add_vec(vec_2, vec_3) );
-    (q_s, q_v)
+    let tmp0 = mul_vec(a.1, b.1);
+    let vec0 = scale_vec(a.0, b.1);
+    let vec1 = scale_vec(b.0, a.1);
+    let tmp1 = ( a.0 * b.0, add_vec(vec0, vec1) );
+    add(tmp0, tmp1)
+}
+
+/// ハミルトン積のために定義した，特別なベクトル同士の積
+/// ab ≡ -a・b + a×b
+#[inline(always)]
+pub fn mul_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T> 
+where T: Float {
+    ( -dot_vec(a, b), cross_vec(a, b) )
 }
 
 /// スカラーとベクトルの積
 /// Multiplication of scalar and vector.
 #[inline(always)]
-pub fn mul_scalar_vec<T>(s: T, v: Vector3<T>) -> Vector3<T> 
+pub fn scale_vec<T>(s: T, v: Vector3<T>) -> Vector3<T> 
 where T: Float {
     [s*v[0], s*v[1], s*v[2]]
 }
@@ -152,9 +161,9 @@ where T: Float {
 /// スカラーとクォータニオンの積
 /// Multiplication of scalar and quaternion.
 #[inline(always)]
-pub fn mul_scalar_quat<T>(s: T, a: Quaternion<T>) -> Quaternion<T> 
+pub fn scale<T>(s: T, a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    ( s * a.0, mul_scalar_vec(s, a.1) )
+    ( s * a.0, scale_vec(s, a.1) )
 }
 
 /// L2ノルムを計算
@@ -179,7 +188,8 @@ where T: Float {
 pub fn normalize<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
     let one = T::one();
-    mul_scalar_quat(one / norm(a), a)
+
+    scale(one / norm(a), a)
 }
 
 /// 正規化
@@ -191,10 +201,10 @@ where T: Float {
     let one  = T::one();
 
     let norm = norm_vec(r);
-    if norm == zero {  // ゼロ除算回避
-        return [zero; 3];
+    if norm == zero {
+        return [zero; 3];  // ゼロ除算回避
     }
-    mul_scalar_vec(one / norm, r)
+    scale_vec(one / norm, r)
 }
 
 /// 共役クォータニオンを求める
@@ -211,8 +221,9 @@ where T: Float {
 pub fn inverse<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
     let one = T::one();
+
     let norm_square = dot(a, a);
-    mul_scalar_quat( one / norm_square, conj(a) )
+    scale( one / norm_square, conj(a) )
 }
 
 /// ネイピア数eのクォータニオン冪
@@ -230,8 +241,8 @@ where T: Float {
     }
     let q_s = vec_norm.cos();
     let n   = normalize_vec(a.1);
-    let q_v = mul_scalar_vec(vec_norm.sin(), n);
-    mul_scalar_quat( coef, (q_s, q_v) )
+    let q_v = scale_vec(vec_norm.sin(), n);
+    scale( coef, (q_s, q_v) )
 }
 
 /// クォータニオンの冪乗
@@ -243,8 +254,8 @@ where T: Float + FloatConst {
     let omega = acos_safe(a.0);
     let n = normalize_vec(a.1);
     let q_s = (t * omega).cos();
-    let q_v = mul_scalar_vec( (t * omega).sin(), n );
-    mul_scalar_quat( coef, (q_s, q_v) )
+    let q_v = scale_vec( (t * omega).sin(), n );
+    scale( coef, (q_s, q_v) )
 }
 
 /// クォータニオンの自然対数
@@ -256,7 +267,7 @@ where T: Float + FloatConst {
     let q_s = vec_norm.ln();
     let s = acos_safe(a.0 / vec_norm);
     let n = normalize_vec(a.1);
-    let q_v = mul_scalar_vec(s, n);
+    let q_v = scale_vec(s, n);
     (q_s, q_v)
 }
 
@@ -266,8 +277,8 @@ where T: Float + FloatConst {
 pub fn vector_rotation<T>(a: Quaternion<T>, r: Vector3<T>) -> Vector3<T> 
 where T: Float {
     let zero = T::zero();
+    
     let a = normalize(a);
-    // ベクトルを，スカラー部0のクォータニオンとして計算する．
     let result = mul( mul(a, (zero, r)), conj(a) );
     result.1
 }
@@ -278,20 +289,22 @@ where T: Float {
 pub fn coordinate_rotation<T>(a: Quaternion<T>, r: Vector3<T>) -> Vector3<T> 
 where T: Float {
     let zero = T::zero();
+
     let a = normalize(a);
     let result = mul( conj(a), mul((zero, r), a) );
     result.1
 }
 
-/// ベクトル "a" から "b" への回転を行うクォータニオンを求める．
+/// ベクトル "a" を ベクトル "b" へ最短距離で回転させるクォータニオンを求める．
 /// Find a quaternion to rotate from vector "a" to "b".
+/// 0 <= t <= 1
 #[inline(always)]
-pub fn rotation_a_to_b<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T> 
+pub fn rotation_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
     let axis = cross_vec(a, b);
     let s = norm_vec(a) * norm_vec(b);
     let theta = acos_safe( dot_vec(a, b) / s );
-    from_axis_angle(axis, theta)
+    from_axis_angle(axis, theta * t)
 }
 
 /// The integrate of angular velocity.
@@ -302,12 +315,14 @@ where T: Float + FloatConst {
 pub fn integration<T>(omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
-    let two = T::one() + T::one();
-    let arg = mul_scalar_vec(dt / two, omega);
+    let two  = T::one() + T::one();
+    
+    let arg = scale_vec(dt / two, omega);
     exp( (zero, arg) )
 }
 
-/// ボディ角速度を積分して，引数に渡したクォータニオンを更新する．
+/// The integration of space angular velocity.
+/// 空間角速度を積分して，引数に渡したクォータニオンを更新する．
 /// Update the quaternion "q" passed to the argument.
 #[inline(always)]
 pub fn vector_integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
@@ -316,7 +331,8 @@ where T: Float {
     mul(dq, q)
 }
 
-/// 空間角速度を積分して，引数に渡したクォータニオンを積分する．
+/// The integration of body angular velocity.
+/// 機体角速度を積分して，引数に渡したクォータニオンを積分する．
 #[inline(always)]
 pub fn coordinate_integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
@@ -325,32 +341,34 @@ where T: Float {
 }
 
 /// オイラー法
-/// 機体角速度を積分して，引数に渡したクォータニオンを積分する．
+/// The integration of space angular velocity.
+/// 空間角速度を積分して，引数に渡したクォータニオンを積分する．
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
 pub fn vector_integration_euler<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
-    let two = T::one() + T::one();
+    let two  = T::one() + T::one();
 
     let dq = mul( (zero, omega), q);  // 機体角速度を用いる
-    let dq = mul_scalar_quat(dt / two, dq);
+    let dq = scale(dt / two, dq);
     normalize( add(q, dq) )
 }
 
 /// オイラー法
-/// 空間角速度を積分して，引数に渡したクォータニオンを更新する．
+/// The integration of body angular velocity.
+/// 機体角速度を積分して，引数に渡したクォータニオンを更新する．
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
 pub fn coordinate_integration_euler<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
-    let two = T::one() + T::one();
+    let two  = T::one() + T::one();
 
     let dq = mul( q, (zero, omega) );  // 空間角速度を用いる
-    let dq = mul_scalar_quat(dt / two, dq);
+    let dq = scale(dt / two, dq);
     normalize( add(q, dq) )
 }
 
@@ -367,8 +385,8 @@ where T: Float {
 
     let a = normalize(a);
     let b = normalize(b);
-    let q_1 = mul_scalar_quat(one - t, a);
-    let q_2 = mul_scalar_quat(t, b);
+    let q_1 = scale(one - t, a);
+    let q_2 = scale(t, b);
     let result = add(q_1, q_2);
     normalize(result)
 }
@@ -392,7 +410,7 @@ where T: Float + FloatConst {
     // 最短経路で補間する．
     let mut dot = dot(a, b);
     if dot < zero {
-        b = mul_scalar_quat(-one, b);
+        b = scale(-one, b);
         dot = -dot;
     }
     // If the inputs are too close for comfort, linearly interpolate.
@@ -403,9 +421,9 @@ where T: Float + FloatConst {
     let omega = acos_safe(dot);  // Angle between the two quaternion
     let sin_omega = omega.sin();
     let s_1 = ((one - t)*omega).sin() / sin_omega;
-    let q_1 = mul_scalar_quat(s_1, a);
+    let q_1 = scale(s_1, a);
     let s_2 = (t * omega).sin() / sin_omega;
-    let q_2 = mul_scalar_quat(s_2, b);
+    let q_2 = scale(s_2, b);
     add(q_1, q_2)
 }
 
@@ -425,7 +443,7 @@ where T: Float + FloatConst {
     // 最短経路で補完
     let mut dot = dot(a, b);
     if dot < zero {
-        b = mul_scalar_quat(-one, b);
+        b = scale(-one, b);
         dot = -dot;
     }
     // lerp
@@ -443,7 +461,7 @@ fn asin_safe<T>(s: T) -> T
 where T: Float + FloatConst {
     let one = T::one();
     let two = one + one;
-    let pi = T::PI();
+    let pi  = T::PI();
 
     let result;
     if s >= one {  // Avoid undefined behavior
@@ -460,8 +478,8 @@ where T: Float + FloatConst {
 fn acos_safe<T>(s: T) -> T 
 where T: Float + FloatConst {
     let zero = T::zero();
-    let one = T::one();
-    let pi = T::PI();
+    let one  = T::one();
+    let pi   = T::PI();
 
     let result;
     if s >= one {  // Avoid undefined behavior

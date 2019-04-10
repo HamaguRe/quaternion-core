@@ -58,13 +58,14 @@ fn test_vector_rotation() {
 fn find_unit_vector() {
     let q: Quaternion<f64> = from_axis_angle([1.0, 4.0, 2.0], PI);
     let omega = q.0.acos();
-    let n_1: Vector3<f64> = mul_scalar_vec(1.0 / omega.sin(), q.1);
+    let n_1: Vector3<f64> = scale_vec(1.0 / omega.sin(), q.1);
     let n_2: Vector3<f64> = normalize_vec(q.1);
     for i in 0..3 {
         assert!( (n_2[i] - n_1[i]).abs() < EPSILON );
     }
 }
 
+/// 角速度を正しく積分出来ているかテスト
 #[test]
 fn test_integration() {
     let q0 = id();
@@ -82,25 +83,34 @@ fn test_integration() {
 // 二つの積分方法を試す
 #[test]
 fn test_integration_method() {
-    let q0 = id();
-    let omega: Vector3<f64> = [0.0, PI/2.0, 0.0];  // [rad/s]
-    let dt = 0.003;  // [s]
+    let omega: Vector3<f64> = [PI/6.0, PI/2.0, PI/4.0];  // [rad/s]
+    let dt = 0.001;  // [s]
 
-    // 理論的には正確な積分を行う．
-    // dt間の角速度が一定であれば，dtを大きくしても正確に積分できる．
-    let q_1 = vector_integration(q0, omega, dt);
-    println!("{:?}", q_1);
+    let mut q_1 = id();
+    let mut q_2 = id();
+    for _ in 0..1000 {
+        // 理論的には正確な積分を行う．
+        // dt間の角速度が一定であれば，dtを大きくしても正確に積分できる．
+        q_1 = vector_integration(q_1, omega, dt);
 
-    // この方法は積分結果が超球面上に存在しない．
-    // 三角関数を使わないぶん計算量は少ないが，導出方法として正確ではない．
-    // dtが大きすぎると誤差が大きくなる．
-    let q_2 = vector_integration_euler(q0, omega, dt);
-    println!("{:?}", q_2);
+        // この方法は積分結果が超球面上に存在しない．
+        // 三角関数を使わないぶん計算量は少ないが，導出方法として正確ではない．
+        // dtが大きすぎると誤差が大きくなる．
+        //
+        // 空間角速度で計算しても同じ結果になる．何故...？
+        // ↓
+        // 同一軸での回転を表す四元数を合成した場合，積の順序に関わらず結果は等しくなるため．
+        // 途中で角速度を変えればズレるはず．
+        q_2 = vector_integration_euler(q_2, omega, dt);
+    }
+    println!("q_1: {:?}", q_1);
+    println!("q_2: {:?}", q_2);
 
-    assert!( (q_1.0 - q_2.0).abs() < EPSILON );
-    assert!( (q_1.1[0] - q_2.1[0]).abs() < EPSILON );
-    assert!( (q_1.1[1] - q_2.1[1]).abs() < EPSILON );
-    assert!( (q_1.1[2] - q_2.1[2]).abs() < EPSILON );
+    let epsilon = 0.0001;
+    assert!( (q_1.0 - q_2.0).abs() < epsilon );
+    assert!( (q_1.1[0] - q_2.1[0]).abs() < epsilon );
+    assert!( (q_1.1[1] - q_2.1[1]).abs() < epsilon );
+    assert!( (q_1.1[2] - q_2.1[2]).abs() < epsilon );
 }
 
 // 二つの方法でSlerpを行う．
