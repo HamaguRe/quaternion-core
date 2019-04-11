@@ -6,6 +6,7 @@ use num_traits::float::{Float, FloatConst};
 
 pub type Vector3<T> = [T; 3];
 pub type Quaternion<T> = (T, Vector3<T>);
+pub type DirectionCosines<T> = [Vector3<T>; 3];
 
 
 /// 恒等四元数を生成．
@@ -36,6 +37,21 @@ where T: Float {
     (q_s, q_v)
 }
 
+/// 方向余弦行列から四元数を生成．
+#[inline(always)]
+pub fn from_direction_cosines<T>(m: DirectionCosines<T>) -> Quaternion<T>
+where T: Float {
+    let one = T::one();
+    let two = one + one;
+    let four = two + two;
+
+    let q0 = (one / two) * (m[0][0] + m[1][1] + m[2][2] + one).sqrt();
+    let q1 = (m[1][2] - m[2][1]) / (four * q0);
+    let q2 = (m[2][0] - m[0][2]) / (four * q0);
+    let q3 = (m[0][1] - m[1][0]) / (four * q0);
+    (q0, [q1, q2, q3])
+}
+
 /// オイラー角[rad]から四元数を生成．
 #[inline(always)]
 pub fn from_euler_angles<T>(roll: T, pitch: T, yaw: T) -> Quaternion<T> 
@@ -60,7 +76,36 @@ where T: Float {
     (q0, [q1, q2, q3])
 }
 
-/// クォータニオンをオイラー角[rad]に変換
+/// 四元数を方向余弦行列（回転行列）に変換
+#[inline(always)]
+pub fn to_direction_cosines<T>(q: Quaternion<T>) -> DirectionCosines<T>
+where T: Float {
+    let one = T::one();
+    let two = one + one;
+
+    let q0 = q.0;
+    let q1 = q.1[0];
+    let q2 = q.1[1];
+    let q3 = q.1[2];
+
+    let m11 = two * (q0*q0 + q1*q1) - one;
+    let m12 = two * (q1*q2 + q0*q3);
+    let m13 = two * (q1*q3 - q0*q2);
+    let m21 = two * (q1*q2 - q0*q3);
+    let m22 = two * (q0*q0 + q2*q2) - one;
+    let m23 = two * (q2*q3 + q0*q1);
+    let m31 = two * (q1*q3 + q0*q2);
+    let m32 = two * (q2*q3 - q0*q1);
+    let m33 = two * (q0*q0 + q3*q3) - one;
+
+    [
+        [m11, m12, m13],
+        [m21, m22, m23],
+        [m31, m32, m33]
+    ]
+}
+
+/// 四元数をオイラー角[rad]に変換
 /// Quaternion --> [roll, pitch, yaw]
 #[inline(always)]
 pub fn to_euler_angles<T>(q: Quaternion<T>) -> Vector3<T> 
@@ -72,15 +117,16 @@ where T: Float + FloatConst {
     let q1 = q.1[0];
     let q2 = q.1[1];
     let q3 = q.1[2];
+    
     let m11 = two * (q0*q0 + q1*q1) - one;
     let m12 = two * (q1*q2 + q0*q3);
-    let m13 = two * (q0*q2 - q1*q3);
+    let m13 = two * (q1*q3 - q0*q2);
     let m23 = two * (q2*q3 + q0*q1);
     let m33 = two * (q0*q0 + q3*q3) - one;
 
-    let roll = (m23 / m33).atan();
-    let pitch = asin_safe(m13);
-    let yaw = (m12 / m11).atan();
+    let roll  = (m23 / m33).atan();
+    let pitch = asin_safe(-m13);
+    let yaw   = (m12 / m11).atan();
 
     [roll, pitch, yaw]
 }
@@ -93,7 +139,7 @@ where T: Float {
     a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 }
 
-/// クォータニオンの内積
+/// 四元数の内積
 /// Dot product of quaternion
 #[inline(always)]
 pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
@@ -120,7 +166,7 @@ where T: Float {
     [a[0]+b[0], a[1]+b[1], a[2]+b[2]]
 }
 
-/// 二つのクォータニオンを加算する
+/// 二つの四元数を加算する
 /// Add two quaternions.
 #[inline(always)]
 pub fn add<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T> 
@@ -128,7 +174,7 @@ where T: Float {
     ( a.0 + b.0, add_vec(a.1, b.1) )
 }
 
-/// クォータニオン積
+/// 四元数積
 /// 積の順序は "ab"(!=ba)
 /// Multiplication of quaternion.
 /// The product order is "ab"(!= ba)
@@ -158,7 +204,7 @@ where T: Float {
     [s*v[0], s*v[1], s*v[2]]
 }
 
-/// スカラーとクォータニオンの積
+/// スカラーと四元数の積
 /// Multiplication of scalar and quaternion.
 #[inline(always)]
 pub fn scale<T>(s: T, a: Quaternion<T>) -> Quaternion<T> 
@@ -207,7 +253,7 @@ where T: Float {
     scale_vec(one / norm, r)
 }
 
-/// 共役クォータニオンを求める
+/// 共役四元数を求める
 /// Compute conjugated quaternion
 #[inline(always)]
 pub fn conj<T>(a: Quaternion<T>) -> Quaternion<T> 
@@ -215,7 +261,7 @@ where T: Float {
     ( a.0, [-a.1[0], -a.1[1], -a.1[2]] )
 }
 
-/// 逆クォータニオンを求める
+/// 逆四元数を求める
 /// Compute inverse quaternion
 #[inline(always)]
 pub fn inverse<T>(a: Quaternion<T>) -> Quaternion<T> 
@@ -226,7 +272,7 @@ where T: Float {
     scale( one / norm_square, conj(a) )
 }
 
-/// ネイピア数eのクォータニオン冪
+/// ネイピア数eの四元数冪
 /// Exponential of Quaternion<T>.
 #[inline(always)]
 pub fn exp<T>(a: Quaternion<T>) -> Quaternion<T> 
@@ -245,7 +291,7 @@ where T: Float {
     scale( coef, (q_s, q_v) )
 }
 
-/// クォータニオンの冪乗
+/// 四元数の冪乗
 /// The power of quaternion.
 #[inline(always)]
 pub fn power<T>(a: Quaternion<T>, t: T) -> Quaternion<T> 
@@ -258,7 +304,7 @@ where T: Float + FloatConst {
     scale( coef, (q_s, q_v) )
 }
 
-/// クォータニオンの自然対数
+/// 四元数の自然対数
 /// Natural logarithm of quaternion
 #[inline(always)]
 pub fn ln<T>(a: Quaternion<T>) -> Quaternion<T> 
@@ -295,7 +341,7 @@ where T: Float {
     result.1
 }
 
-/// ベクトル "a" を ベクトル "b" へ最短距離で回転させるクォータニオンを求める．
+/// ベクトル "a" を ベクトル "b" へ最短距離で回転させる四元数を求める．
 /// Find a quaternion to rotate from vector "a" to "b".
 /// 0 <= t <= 1
 #[inline(always)]
@@ -308,7 +354,7 @@ where T: Float + FloatConst {
 }
 
 /// The integrate of angular velocity.
-/// dt間のクォータニオンの変化量を返す．
+/// dt間の四元数の変化量を返す．
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
@@ -322,7 +368,7 @@ where T: Float {
 }
 
 /// The integration of space angular velocity.
-/// 空間角速度を積分して，引数に渡したクォータニオンを更新する．
+/// 空間角速度を積分して，引数に渡した四元数を更新する．
 /// Update the quaternion "q" passed to the argument.
 #[inline(always)]
 pub fn vector_integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
@@ -332,7 +378,7 @@ where T: Float {
 }
 
 /// The integration of body angular velocity.
-/// 機体角速度を積分して，引数に渡したクォータニオンを積分する．
+/// 機体角速度を積分して，引数に渡した四元数を積分する．
 #[inline(always)]
 pub fn coordinate_integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
@@ -342,7 +388,7 @@ where T: Float {
 
 /// オイラー法
 /// The integration of space angular velocity.
-/// 空間角速度を積分して，引数に渡したクォータニオンを積分する．
+/// 空間角速度を積分して，引数に渡した四元数を積分する．
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
@@ -358,7 +404,7 @@ where T: Float {
 
 /// オイラー法
 /// The integration of body angular velocity.
-/// 機体角速度を積分して，引数に渡したクォータニオンを更新する．
+/// 機体角速度を積分して，引数に渡した四元数を更新する．
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
@@ -373,7 +419,7 @@ where T: Float {
 }
 
 /// 線形補間
-/// 引数"a"から"b"への経路を補完するクォータニオンを生成する．
+/// 引数"a"から"b"への経路を補完する四元数を生成する．
 /// 引数t(0 <= t <= 1) は補間パラメータ．
 /// Linear interpolation
 /// Generate a quaternion that interpolate the route from "a" to "b".
@@ -392,7 +438,7 @@ where T: Float {
 }
 
 /// 球状線形補間
-/// "a"から"b"への経路を補完するクォータニオンを生成する．
+/// "a"から"b"への経路を補完する四元数を生成する．
 /// 引数t(0 <= t <= 1) は補間パラメータ．
 /// Spherical linear interpolation
 /// Generate a quaternion that interpolate the route from "a" to "b".
@@ -427,7 +473,7 @@ where T: Float + FloatConst {
     add(q_1, q_2)
 }
 
-/// クォータニオンの冪乗を用いたSlerp
+/// 四元数の冪乗を用いたSlerp
 /// Sherical linear interpolation. 
 /// Use quaternion's exponential.
 /// "a" --> "b".
