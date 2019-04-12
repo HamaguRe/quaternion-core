@@ -320,27 +320,33 @@ where T: Float + FloatConst {
 }
 
 /// 位置ベクトルの回転
-/// r' = a r a*
+/// r' = q r q*
 #[inline(always)]
 pub fn vector_rotation<T>(q: Quaternion<T>, r: Vector3<T>) -> Vector3<T> 
 where T: Float {
+    let two = T::one() + T::one();
+
     let q = normalize(q);
-    let tmp0 = scale_vec(q.0, r);
-    let mut tmp1 = mul_vec(q.1, r);
-    tmp1.1 = add_vec(tmp0, tmp1.1);
-    mul( tmp1, conj(q) ).1
+    let term1 = scale_vec( q.0 * q.0, r );
+    let term2 = scale_vec( two * q.0, cross_vec(q.1, r) );
+    let term3 = scale_vec( dot_vec(r, q.1), q.1 );
+    let term4 = cross_vec( q.1, cross_vec(q.1, r) );
+    add_vec(term1, add_vec(term2, add_vec(term3, term4)))
 }
 
 /// 座標系の回転
-/// r' = a* r a
+/// r' = q* r q
 #[inline(always)]
 pub fn coordinate_rotation<T>(q: Quaternion<T>, r: Vector3<T>) -> Vector3<T> 
 where T: Float {
+    let two = T::one() + T::one();
+
     let q = normalize(q);
-    let tmp0 = scale_vec(q.0, r);
-    let mut tmp1 = mul_vec(r, q.1);
-    tmp1.1 = add_vec(tmp0, tmp1.1);
-    mul( conj(q) , tmp1 ).1
+    let term1 = scale_vec( q.0 * q.0, r );
+    let term2 = scale_vec( two * q.0, cross_vec(r, q.1) );
+    let term3 = scale_vec( dot_vec(r, q.1), q.1 );
+    let term4 = cross_vec( q.1, cross_vec(q.1, r) );
+    add_vec(term1, add_vec(term2, add_vec(term3, term4)))
 }
 
 /// ベクトル "a" を ベクトル "b" へ最短距離で回転させる四元数を求める．

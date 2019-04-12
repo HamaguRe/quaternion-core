@@ -52,6 +52,16 @@ fn test_vector_rotation() {
     assert!( (result[2] + 2.0).abs() < EPSILON);
 }
 
+#[test]
+fn test_coordinate_rotation() {
+    let r = [2.0, 2.0, 0.0];
+    let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
+    let result = coordinate_rotation(q, r);
+    assert!( (result[0] - 0.0).abs() < EPSILON);
+    assert!( (result[1] - 2.0).abs() < EPSILON);
+    assert!( (result[2] - 2.0).abs() < EPSILON);
+}
+
 // 二つの方法で，回転を表すクォータニオンの単位ベクトルを求める．
 // どっちの方法でも大丈夫だけど，n_2の方が計算量が少ない．
 #[test]

@@ -13,7 +13,7 @@
 #### Cargo.toml
 ```
 [dependencies]
-quaternion = {git = "https://github.com/HamaguRe/quaternion.git", rev = "691f87c0de15685c5df0e2b12202aa59e13c924c"}
+quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="691f87c0de15685c5df0e2b12202aa59e13c924c"}
 ```
 
 #### example.rs
