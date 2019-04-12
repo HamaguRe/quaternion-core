@@ -73,11 +73,11 @@ fn test_integration() {
     let dt = 1.0;  // [s]
     let mut r: Vector3<f64> = [2.0, 2.0, 0.0];
 
-    let q = vector_integration(q0, omega, dt);
-    r = vector_rotation(q, r);
+    let q = integration(q0, omega, dt);
+    r = coordinate_rotation(q, r);
     assert!( (r[0] - 0.0).abs() < EPSILON );
     assert!( (r[1] - 2.0).abs() < EPSILON );
-    assert!( (r[2] + 2.0).abs() < EPSILON );
+    assert!( (r[2] - 2.0).abs() < EPSILON );
 }
 
 // 二つの積分方法を試す
@@ -91,7 +91,7 @@ fn test_integration_method() {
     for _ in 0..1000 {
         // 理論的には正確な積分を行う．
         // dt間の角速度が一定であれば，dtを大きくしても正確に積分できる．
-        q_1 = vector_integration(q_1, omega, dt);
+        q_1 = integration(q_1, omega, dt);
 
         // この方法は積分結果が超球面上に存在しない．
         // 三角関数を使わないぶん計算量は少ないが，導出方法として正確ではない．
@@ -101,7 +101,7 @@ fn test_integration_method() {
         // ↓
         // 同一軸での回転を表す四元数を合成した場合，積の順序に関わらず結果は等しくなるため．
         // 途中で角速度を変えればズレるはず．
-        q_2 = vector_integration_euler(q_2, omega, dt);
+        q_2 = integration_euler(q_2, omega, dt);
     }
     println!("q_1: {:?}", q_1);
     println!("q_2: {:?}", q_2);

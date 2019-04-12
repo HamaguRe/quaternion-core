@@ -281,10 +281,12 @@ where T: Float {
 
     let coef = a.0.exp();  // coefficient（係数）
     let vec_norm = norm_vec(a.1);
+
     // An if statement to avoid unnecessary calculation.
     if vec_norm == zero {
         return (coef, [zero; 3]);
     }
+    
     let q_s = vec_norm.cos();
     let n   = normalize_vec(a.1);
     let q_v = scale_vec(vec_norm.sin(), n);
@@ -318,27 +320,27 @@ where T: Float + FloatConst {
 }
 
 /// 位置ベクトルの回転
-/// Coordinate rotate. (r' = a r a*)
+/// r' = a r a*
 #[inline(always)]
-pub fn vector_rotation<T>(a: Quaternion<T>, r: Vector3<T>) -> Vector3<T> 
+pub fn vector_rotation<T>(q: Quaternion<T>, r: Vector3<T>) -> Vector3<T> 
 where T: Float {
-    let zero = T::zero();
-    
-    let a = normalize(a);
-    let result = mul( mul(a, (zero, r)), conj(a) );
-    result.1
+    let q = normalize(q);
+    let tmp0 = scale_vec(q.0, r);
+    let mut tmp1 = mul_vec(q.1, r);
+    tmp1.1 = add_vec(tmp0, tmp1.1);
+    mul( tmp1, conj(q) ).1
 }
 
 /// 座標系の回転
-/// Vector rotate. (r' = a* r a)
+/// r' = a* r a
 #[inline(always)]
-pub fn coordinate_rotation<T>(a: Quaternion<T>, r: Vector3<T>) -> Vector3<T> 
+pub fn coordinate_rotation<T>(q: Quaternion<T>, r: Vector3<T>) -> Vector3<T> 
 where T: Float {
-    let zero = T::zero();
-
-    let a = normalize(a);
-    let result = mul( conj(a), mul((zero, r), a) );
-    result.1
+    let q = normalize(q);
+    let tmp0 = scale_vec(q.0, r);
+    let mut tmp1 = mul_vec(r, q.1);
+    tmp1.1 = add_vec(tmp0, tmp1.1);
+    mul( conj(q) , tmp1 ).1
 }
 
 /// ベクトル "a" を ベクトル "b" へ最短距離で回転させる四元数を求める．
@@ -354,52 +356,18 @@ where T: Float + FloatConst {
 }
 
 /// The integrate of angular velocity.
-/// dt間の四元数の変化量を返す．
+/// 機体角速度を積分して，引数に渡した四元数を更新する．
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
-pub fn integration<T>(omega: Vector3<T>, dt: T) -> Quaternion<T> 
+pub fn integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
     let two  = T::one() + T::one();
     
     let arg = scale_vec(dt / two, omega);
-    exp( (zero, arg) )
-}
-
-/// The integration of space angular velocity.
-/// 空間角速度を積分して，引数に渡した四元数を更新する．
-/// Update the quaternion "q" passed to the argument.
-#[inline(always)]
-pub fn vector_integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
-where T: Float {
-    let dq = integration(omega, dt);
-    mul(dq, q)
-}
-
-/// The integration of body angular velocity.
-/// 機体角速度を積分して，引数に渡した四元数を積分する．
-#[inline(always)]
-pub fn coordinate_integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
-where T: Float {
-    let dq = integration(omega, dt);
+    let dq  = exp( (zero, arg) );
     mul(q, dq)
-}
-
-/// オイラー法
-/// The integration of space angular velocity.
-/// 空間角速度を積分して，引数に渡した四元数を積分する．
-/// omega[rad/sec]
-/// dt[sec]
-#[inline(always)]
-pub fn vector_integration_euler<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
-where T: Float {
-    let zero = T::zero();
-    let two  = T::one() + T::one();
-
-    let dq = mul( (zero, omega), q);  // 機体角速度を用いる
-    let dq = scale(dt / two, dq);
-    normalize( add(q, dq) )
 }
 
 /// オイラー法
@@ -408,7 +376,7 @@ where T: Float {
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
-pub fn coordinate_integration_euler<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
+pub fn integration_euler<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
     let two  = T::one() + T::one();
@@ -502,7 +470,7 @@ where T: Float + FloatConst {
     mul(a, tmp)
 }
 
-/// 定義域外の値はカットして未定義動作を防ぐ
+/// 定義域外の値をカットして未定義動作を防ぐ
 fn asin_safe<T>(s: T) -> T 
 where T: Float + FloatConst {
     let one = T::one();
