@@ -41,6 +41,16 @@ fn test_norm() {
     assert!((norm(q) - 1.0).abs() < EPSILON);
 }
 
+#[test]
+fn test_sign_inversion() {
+    let q = (-1.0, [1.0, 2.0, -1.0]);
+    let p = sign_inversion(q);
+    assert_eq!(p.0, 1.0);
+    assert_eq!(p.1[0], -1.0);
+    assert_eq!(p.1[1], -2.0);
+    assert_eq!(p.1[2],  1.0);
+}
+
 // 手計算した結果で動作確認
 #[test]
 fn test_vector_rotation() {

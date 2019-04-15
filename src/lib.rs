@@ -174,6 +174,14 @@ where T: Float {
     ( a.0 + b.0, add_vec(a.1, b.1) )
 }
 
+/// ハミルトン積のために定義した，特別なベクトル同士の積
+/// ab ≡ -a・b + a×b
+#[inline(always)]
+pub fn mul_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T> 
+where T: Float {
+    ( -dot_vec(a, b), cross_vec(a, b) )
+}
+
 /// 四元数積
 /// 積の順序は "ab"(!=ba)
 /// Multiplication of quaternion.
@@ -186,14 +194,6 @@ where T: Float {
     let vec1 = scale_vec(b.0, a.1);
     let tmp1 = ( a.0 * b.0, add_vec(vec0, vec1) );
     add(tmp0, tmp1)
-}
-
-/// ハミルトン積のために定義した，特別なベクトル同士の積
-/// ab ≡ -a・b + a×b
-#[inline(always)]
-pub fn mul_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T> 
-where T: Float {
-    ( -dot_vec(a, b), cross_vec(a, b) )
 }
 
 /// スカラーとベクトルの積
@@ -253,12 +253,26 @@ where T: Float {
     scale_vec(one / norm, r)
 }
 
+/// 符号反転
+#[inline(always)]
+pub fn sign_inversion_vec<T>(r: Vector3<T>) -> Vector3<T> 
+where T: Float {
+    [ -r[0], -r[1], -r[2] ]
+}
+
+/// 符号反転
+#[inline(always)]
+pub fn sign_inversion<T>(q: Quaternion<T>) -> Quaternion<T>
+where T: Float {
+    ( -q.0, sign_inversion_vec(q.1) )
+}
+
 /// 共役四元数を求める
 /// Compute conjugated quaternion
 #[inline(always)]
 pub fn conj<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    ( a.0, [-a.1[0], -a.1[1], -a.1[2]] )
+    ( a.0, sign_inversion_vec(a.1) )
 }
 
 /// 逆四元数を求める
@@ -331,7 +345,7 @@ where T: Float {
     let term2 = scale_vec( two * q.0, cross_vec(q.1, r) );
     let term3 = scale_vec( dot_vec(r, q.1), q.1 );
     let term4 = cross_vec( q.1, cross_vec(q.1, r) );
-    add_vec(term1, add_vec(term2, add_vec(term3, term4)))
+    add_vec( add_vec(term1, term2), add_vec(term3, term4) )
 }
 
 /// 座標系の回転
@@ -346,7 +360,7 @@ where T: Float {
     let term2 = scale_vec( two * q.0, cross_vec(r, q.1) );
     let term3 = scale_vec( dot_vec(r, q.1), q.1 );
     let term4 = cross_vec( q.1, cross_vec(q.1, r) );
-    add_vec(term1, add_vec(term2, add_vec(term3, term4)))
+    add_vec( add_vec(term1, term2), add_vec(term3, term4) )
 }
 
 /// ベクトル "a" を ベクトル "b" へ最短距離で回転させる四元数を求める．
@@ -407,8 +421,7 @@ where T: Float {
     let b = normalize(b);
     let q_1 = scale(one - t, a);
     let q_2 = scale(t, b);
-    let result = add(q_1, q_2);
-    normalize(result)
+    normalize( add(q_1, q_2) )
 }
 
 /// 球状線形補間
@@ -430,7 +443,7 @@ where T: Float + FloatConst {
     // 最短経路で補間する．
     let mut dot = dot(a, b);
     if dot < zero {
-        b = scale(-one, b);
+        b = sign_inversion(b);
         dot = -dot;
     }
     // If the inputs are too close for comfort, linearly interpolate.
@@ -440,7 +453,7 @@ where T: Float + FloatConst {
     // selrp
     let omega = acos_safe(dot);  // Angle between the two quaternion
     let sin_omega = omega.sin();
-    let s_1 = ((one - t)*omega).sin() / sin_omega;
+    let s_1 = ( (one - t) * omega ).sin() / sin_omega;
     let q_1 = scale(s_1, a);
     let s_2 = (t * omega).sin() / sin_omega;
     let q_2 = scale(s_2, b);
@@ -455,7 +468,6 @@ where T: Float + FloatConst {
 pub fn slerp_1<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
     let zero = T::zero();
-    let one  = T::one();
     let threshold: T = num_traits::cast(0.9995).unwrap();
 
     let a = normalize(a);
@@ -463,7 +475,7 @@ where T: Float + FloatConst {
     // 最短経路で補完
     let mut dot = dot(a, b);
     if dot < zero {
-        b = scale(-one, b);
+        b = sign_inversion(b);
         dot = -dot;
     }
     // lerp
