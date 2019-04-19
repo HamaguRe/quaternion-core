@@ -6,4 +6,4 @@ edition = "2018"
 repository = "https://github.com/HamaguRe/quaternion.git"
 
 [dependencies]
-num-traits = "0.2.6"
+num-traits = "0.2"

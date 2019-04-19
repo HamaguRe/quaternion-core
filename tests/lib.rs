@@ -1,5 +1,4 @@
 extern crate quaternion;
-
 use quaternion::*;
 
 const PI: f64 = std::f64::consts::PI;
@@ -113,7 +112,6 @@ fn test_integration_method() {
         // dt間の角速度が一定であれば，dtを大きくしても正確に積分できる．
         q_1 = integration(q_1, omega, dt);
 
-        // この方法は積分結果が超球面上に存在しない．
         // 三角関数を使わないぶん計算量は少ないが，導出方法として正確ではない．
         // dtが大きすぎると誤差が大きくなる．
         //

@@ -182,9 +182,9 @@ where T: Float {
     ( -dot_vec(a, b), cross_vec(a, b) )
 }
 
-/// 四元数積
+/// ハミルトン積
 /// 積の順序は "ab"(!=ba)
-/// Multiplication of quaternion.
+/// Hamilton product
 /// The product order is "ab"(!= ba)
 #[inline(always)]
 pub fn mul<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T> 
@@ -489,6 +489,7 @@ where T: Float + FloatConst {
 }
 
 /// 定義域外の値をカットして未定義動作を防ぐ
+#[inline(always)]
 fn asin_safe<T>(s: T) -> T 
 where T: Float + FloatConst {
     let one = T::one();
@@ -507,6 +508,7 @@ where T: Float + FloatConst {
 }
 
 /// 定義域外の値をカットして未定義動作を防ぐ
+#[inline(always)]
 fn acos_safe<T>(s: T) -> T 
 where T: Float + FloatConst {
     let zero = T::zero();
