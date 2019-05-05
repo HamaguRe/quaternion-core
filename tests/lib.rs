@@ -12,19 +12,19 @@ fn deg_to_rad(deg: f64) -> f64 {
 #[test]
 fn test_euler_quaternion() {
     let roll_ori = deg_to_rad(20.0);
-    let pitch_ori = deg_to_rad(18.0);  // 180度を超えると値がおかしくなる
+    let pitch_ori = deg_to_rad(15.0);  // 180度を超えると値がおかしくなる
     let yaw_ori = deg_to_rad(0.0);  // 180度，360度で符号が反転する．
 
     let q = from_euler_angles(roll_ori, pitch_ori, yaw_ori);
     let eulers = to_euler_angles(q);
     
     // 値チェック
-    println!("roll: {}, ori: {}", eulers[0], roll_ori);
     assert!( (eulers[0] - roll_ori).abs() < EPSILON );
-    println!("pitch: {}, ori: {}", eulers[1], pitch_ori);
     assert!( (eulers[1] - pitch_ori).abs() < EPSILON );
-    println!("yaw: {}, ori: {}", eulers[2], yaw_ori);
     assert!( (eulers[2] - yaw_ori).abs() < EPSILON );
+    println!("roll: {}, ori: {}", eulers[0], roll_ori);
+    println!("pitch: {}, ori: {}", eulers[1], pitch_ori);
+    println!("yaw: {}, ori: {}", eulers[2], yaw_ori);
 }
 
 #[test]
@@ -36,8 +36,8 @@ fn test_add() {
 
 #[test]
 fn test_norm() {
-    let q: Quaternion<f64> = (2f64.powf(-0.5), [0.0, 2f64.powf(-0.5), 0.0]);
-    assert!((norm(q) - 1.0).abs() < EPSILON);
+    let q = from_axis_angle([1.0, 2.0, 0.5], 1.5);
+    assert!( (norm(q) - 1.0f64).abs() < EPSILON);
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn test_sign_inversion() {
 #[test]
 fn test_vector_rotation() {
     let r: Vector3<f64> = [2.0, 2.0, 0.0];
-    let q: Quaternion<f64> = (2f64.powf(-0.5), [0.0, 2f64.powf(-0.5), 0.0]);
+    let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
     let result = vector_rotation(q, r);
     assert!( (result[0] - 0.0).abs() < EPSILON);
     assert!( (result[1] - 2.0).abs() < EPSILON);
@@ -71,16 +71,19 @@ fn test_coordinate_rotation() {
     assert!( (result[2] - 2.0).abs() < EPSILON);
 }
 
-// 二つの方法で，回転を表すクォータニオンの単位ベクトルを求める．
-// どっちの方法でも大丈夫だけど，n_2の方が計算量が少ない．
+// 回転を表すクォータニオンの単位ベクトル（回転軸）を求める．
 #[test]
-fn find_unit_vector() {
+fn test_get_unit_vector() {
     let q: Quaternion<f64> = from_axis_angle([1.0, 4.0, 2.0], PI);
-    let omega = q.0.acos();
-    let n_1: Vector3<f64> = scale_vec(1.0 / omega.sin(), q.1);
+
+    // 一番計算量が少ないが，引数が単位四元数であることを前提とする．
+    let n_1: Vector3<f64> = get_unit_vector(q);
+    // n_1より少し計算量が多いが，必ず単位ベクトルを返す．
     let n_2: Vector3<f64> = normalize_vec(q.1);
+
     for i in 0..3 {
-        assert!( (n_2[i] - n_1[i]).abs() < EPSILON );
+        assert!( (n_1[i] - q.1[i]).abs() < EPSILON );
+        assert!( (n_2[i] - q.1[i]).abs() < EPSILON );
     }
 }
 

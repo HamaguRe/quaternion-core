@@ -131,6 +131,23 @@ where T: Float + FloatConst {
     [roll, pitch, yaw]
 }
 
+/// 回転を表す四元数から，単位ベクトル（回転軸）を取り出す．
+/// normalize_vec関数よりも計算量が少ないが，
+/// norm(q)==1であることを前提とする．
+/// 引数に渡す四元数のノルムが保証できない場合には
+/// normalize_vec関数を用いるべき．
+#[inline(always)]
+pub fn get_unit_vector<T>(q: Quaternion<T>) -> Vector3<T>
+where T: Float {
+    let zero = T::zero();
+    let one  = T::one();
+
+    if q.0 == one {
+        return [zero; 3];  // ゼロ除算回避
+    }
+    scale_vec(one / (one - q.0 * q.0).sqrt(), q.1)
+}
+
 /// ベクトルの内積
 /// Dot product of vector
 #[inline(always)]
@@ -163,7 +180,7 @@ where T: Float {
 #[inline(always)]
 pub fn add_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T> 
 where T: Float {
-    [a[0]+b[0], a[1]+b[1], a[2]+b[2]]
+    [ a[0]+b[0], a[1]+b[1], a[2]+b[2] ]
 }
 
 /// 二つの四元数を加算する
@@ -201,7 +218,7 @@ where T: Float {
 #[inline(always)]
 pub fn scale_vec<T>(s: T, v: Vector3<T>) -> Vector3<T> 
 where T: Float {
-    [s*v[0], s*v[1], s*v[2]]
+    [ s*v[0], s*v[1], s*v[2] ]
 }
 
 /// スカラーと四元数の積
@@ -370,13 +387,14 @@ where T: Float {
 pub fn rotation_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
     let axis = cross_vec(a, b);
-    let s = norm_vec(a) * norm_vec(b);
-    let theta = acos_safe( dot_vec(a, b) / s );
+    let norms = norm_vec(a) * norm_vec(b);
+    let theta = acos_safe( dot_vec(a, b) / norms );
     from_axis_angle(axis, theta * t)
 }
 
-/// The integrate of angular velocity.
-/// 機体角速度を積分して，引数に渡した四元数を更新する．
+/// センサ座標系の姿勢変化を積分して，引数に渡した始原数を更新する．
+/// Integrate attitude change of body coordinate system, 
+/// and update Quaternion passed to the argument.
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]
@@ -391,8 +409,10 @@ where T: Float {
 }
 
 /// オイラー法
-/// The integration of body angular velocity.
-/// 機体角速度を積分して，引数に渡した四元数を更新する．
+/// Euler method
+/// センサ座標系の姿勢変化を積分して，引数に渡した始原数を更新する．
+/// Integrate attitude change of body coordinate system, 
+/// and update Quaternion passed to the argument.
 /// omega[rad/sec]
 /// dt[sec]
 #[inline(always)]

@@ -6,6 +6,10 @@
 
   関数の動作については、ドキュメンテーションコメントを参照してください。
 
+  クォータニオン自体について知りたい方は、以下のページを参照してください。
+
+  * [四元数まとめ資料を書いた（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
+
 #### 【English】
   It is a quaternion library written in Rust.
   
@@ -13,11 +17,11 @@
 
   Refer to the documentation comments for function behavior.
 
-# Examle of use
+# Example of use
 #### Cargo.toml
 ```
 [dependencies]
-quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="d79af72367b644357c6f3dd481123c221778aa2c"}
+quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="4461617c628fbed3a1052993f5b7b74923ffec63"}
 ```
 
 #### example.rs
