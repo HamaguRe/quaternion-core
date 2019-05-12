@@ -74,17 +74,31 @@ fn test_coordinate_rotation() {
 // 回転を表すクォータニオンの単位ベクトル（回転軸）を求める．
 #[test]
 fn test_get_unit_vector() {
-    let q: Quaternion<f64> = from_axis_angle([1.0, 4.0, 2.0], PI);
+    let axis = [1.0, 4.0, 2.0];
+    let q: Quaternion<f64> = from_axis_angle(axis, PI);
+    assert!( (norm(q) - 1.0).abs() < EPSILON );
 
     // 一番計算量が少ないが，引数が単位四元数であることを前提とする．
-    let n_1: Vector3<f64> = get_unit_vector(q);
+    let n_1 = get_unit_vector(q);
     // n_1より少し計算量が多いが，必ず単位ベクトルを返す．
-    let n_2: Vector3<f64> = normalize_vec(q.1);
+    let n_2 = normalize_vec(q.1);
 
+    let n = normalize_vec(axis);
     for i in 0..3 {
-        assert!( (n_1[i] - q.1[i]).abs() < EPSILON );
-        assert!( (n_2[i] - q.1[i]).abs() < EPSILON );
+        assert!( (n_1[i] - n[i]).abs() < EPSILON );
+        assert!( (n_2[i] - n[i]).abs() < EPSILON );
     }
+}
+
+// 回転角を取り出す
+#[test]
+fn test_get_angle() {
+    let axis = [1.0, 4.0, 2.0];
+    let angle = PI;
+    let q: Quaternion<f64> = from_axis_angle(axis, angle);
+
+    let get_angle = get_angle(q);
+    assert!( (get_angle - angle).abs() < EPSILON );
 }
 
 /// 角速度を正しく積分出来ているかテスト

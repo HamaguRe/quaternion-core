@@ -1,6 +1,5 @@
 // Quaternion Libraly
 // f32 or f64
-
 extern crate num_traits;
 use num_traits::float::{Float, FloatConst};
 
@@ -23,7 +22,7 @@ where T: Float {
 /// 回転角と軸ベクトルを指定して四元数を生成．
 /// axisは単位ベクトルでなくても良い．
 /// Generate quaternion by specifying rotation angle and axis vector.
-/// The "axes" need not be unit vectors.
+/// The "axes" need not be unit vector.
 /// angle[rad]
 #[inline(always)]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T> 
@@ -146,6 +145,16 @@ where T: Float {
         return [zero; 3];  // ゼロ除算回避
     }
     scale_vec(one / (one - q.0 * q.0).sqrt(), q.1)
+}
+
+/// 回転を表す四元数から，軸周りの回転角[rad]を取り出す．
+#[inline(always)]
+pub fn get_angle<T>(q: Quaternion<T>) -> T
+where T: Float + FloatConst {
+    let two = T::one() + T::one();
+
+    let q = normalize(q);
+    two * acos_safe(q.0)
 }
 
 /// ベクトルの内積
@@ -516,15 +525,12 @@ where T: Float + FloatConst {
     let two = one + one;
     let pi  = T::PI();
 
-    let result;
     if s >= one {  // Avoid undefined behavior
-        result = pi / two;
+        return  pi / two;
     } else if s <= -one {
-        result = -pi / two;
-    } else {
-        result = s.asin();
+        return -pi / two;
     }
-    result
+    s.asin()
 }
 
 /// 定義域外の値をカットして未定義動作を防ぐ
@@ -535,13 +541,10 @@ where T: Float + FloatConst {
     let one  = T::one();
     let pi   = T::PI();
 
-    let result;
     if s >= one {  // Avoid undefined behavior
-        result = zero;
-    } else if s <= -one{
-        result = pi;
-    } else {
-        result = s.acos();
+        return zero;
+    } else if s <= -one {
+        return pi;
     }
-    result
+    s.acos()
 }
