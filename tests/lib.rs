@@ -2,7 +2,7 @@ extern crate quaternion;
 use quaternion::*;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 0.00000001;
+const EPSILON: f64 = 1e-8;
 
 fn deg_to_rad(deg: f64) -> f64 {
     (deg / 180.0) * PI

@@ -144,7 +144,7 @@ where T: Float {
     if q.0 == one {
         return [zero; 3];  // ゼロ除算回避
     }
-    scale_vec(one / (one - q.0 * q.0).sqrt(), q.1)
+    scale_vec( (one - q.0 * q.0).sqrt().recip(), q.1)
 }
 
 /// 回転を表す四元数から，軸周りの回転角[rad]を取り出す．
@@ -259,9 +259,7 @@ where T: Float {
 #[inline(always)]
 pub fn normalize<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    let one = T::one();
-
-    scale(one / norm(a), a)
+    scale( norm(a).recip(), a )
 }
 
 /// 正規化
@@ -270,13 +268,12 @@ where T: Float {
 pub fn normalize_vec<T>(r: Vector3<T>) -> Vector3<T> 
 where T: Float {
     let zero = T::zero();
-    let one  = T::one();
 
     let norm = norm_vec(r);
     if norm == zero {
         return [zero; 3];  // ゼロ除算回避
     }
-    scale_vec(one / norm, r)
+    scale_vec( norm.recip(), r )
 }
 
 /// 符号反転
@@ -306,10 +303,8 @@ where T: Float {
 #[inline(always)]
 pub fn inverse<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    let one = T::one();
-
     let norm_square = dot(a, a);
-    scale( one / norm_square, conj(a) )
+    scale( norm_square.recip(), conj(a) )
 }
 
 /// ネイピア数eの四元数冪
@@ -318,11 +313,17 @@ where T: Float {
 pub fn exp<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
+    let one  = T::one();
 
-    let coef = a.0.exp();  // coefficient（係数）
-    let vec_norm = norm_vec(a.1);
+    let coef;  // coefficient（係数）
+    if a.0 == zero {  // Avoid unnecessary calculation.
+        coef = one;
+    } else {
+        coef = a.0.exp();
+    }
 
     // An if statement to avoid unnecessary calculation.
+    let vec_norm = norm_vec(a.1);
     if vec_norm == zero {
         return (coef, [zero; 3]);
     }
