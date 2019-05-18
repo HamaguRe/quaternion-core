@@ -44,10 +44,11 @@ where T: Float {
     let two = one + one;
     let four = two + two;
 
-    let q0 = (one / two) * (m[0][0] + m[1][1] + m[2][2] + one).sqrt();
-    let q1 = (m[1][2] - m[2][1]) / (four * q0);
-    let q2 = (m[2][0] - m[0][2]) / (four * q0);
-    let q3 = (m[0][1] - m[1][0]) / (four * q0);
+    let q0 = (m[0][0] + m[1][1] + m[2][2] + one).sqrt() / two;
+    let tmp = (four * q0).recip();
+    let q1 = (m[1][2] - m[2][1]) * tmp;
+    let q2 = (m[2][0] - m[0][2]) * tmp;
+    let q3 = (m[0][1] - m[1][0]) * tmp;
     (q0, [q1, q2, q3])
 }
 
@@ -55,11 +56,11 @@ where T: Float {
 #[inline(always)]
 pub fn from_euler_angles<T>(roll: T, pitch: T, yaw: T) -> Quaternion<T> 
 where T: Float {
-    let two = T::one() + T::one();
+    let half = ( T::one() + T::one() ).recip();
 
-    let alpha = yaw   / two;
-    let beta  = pitch / two;
-    let gamma = roll  / two;
+    let alpha = yaw   * half;
+    let beta  = pitch * half;
+    let gamma = roll  * half;
     // Compute these value only once
     let sin_alpha = alpha.sin();
     let cos_alpha = alpha.cos();
@@ -463,7 +464,6 @@ where T: Float {
 #[inline(always)]
 pub fn slerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
-    let zero = T::zero();
     let one  = T::one();
     let threshold: T = num_traits::cast(0.9995).unwrap();
 
@@ -472,7 +472,7 @@ where T: Float + FloatConst {
     let mut b = normalize(b);
     // 最短経路で補間する．
     let mut dot = dot(a, b);
-    if dot < zero {
+    if dot.is_sign_negative() == true {
         b = sign_inversion(b);
         dot = -dot;
     }
@@ -497,14 +497,13 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn slerp_1<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
-    let zero = T::zero();
     let threshold: T = num_traits::cast(0.9995).unwrap();
 
     let a = normalize(a);
     let mut b = normalize(b);
     // 最短経路で補完
     let mut dot = dot(a, b);
-    if dot < zero {
+    if dot.is_sign_negative() == true {
         b = sign_inversion(b);
         dot = -dot;
     }

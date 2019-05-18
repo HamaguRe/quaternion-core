@@ -6,7 +6,7 @@
 
   関数の動作については、ドキュメンテーションコメントを参照してください。
 
-  クォータニオン自体について知りたい方は、以下のページを参照してください。
+  また、クォータニオン自体について知りたい方は、以下のページを参照してください。
 
   * [四元数まとめ資料を書いた（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
 
@@ -21,7 +21,7 @@
 #### Cargo.toml
 ```
 [dependencies]
-quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="0eb366c287f77cec36f6228af1e5a9e0d24ff562"}
+quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="2f9d07e7254c4911feaad57350e4931eb59e44b2"}
 ```
 
 #### example.rs
@@ -30,10 +30,10 @@ extern crate quaternion;
 use quaternion as quat;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 0.00000001;
+const EPSILON: f64 = 1e-8;
 
 fn main() {
-    // vector rotation
+    // Position vector
     let r = [2.0, 2.0, 0.0];
     // π/2[rad] rotation around the y axis.
     let q = quat::from_axis_angle([0.0, 1.0, 0.0], PI/2.0);

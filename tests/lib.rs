@@ -41,6 +41,13 @@ fn test_norm() {
 }
 
 #[test]
+fn test_normalize() {
+    let q = (1.0, [2.0, 3.0, 4.0]);
+    let q_n = normalize(q);
+    assert!( (norm(q_n) - 1.0f64).abs() < EPSILON );
+}
+
+#[test]
 fn test_sign_inversion() {
     let q = (-1.0, [1.0, 2.0, -1.0]);
     let p = sign_inversion(q);
@@ -129,7 +136,7 @@ fn test_integration_method() {
         // dt間の角速度が一定であれば，dtを大きくしても正確に積分できる．
         q_1 = integration(q_1, omega, dt);
 
-        // 三角関数を使わないぶん計算量は少ないが，導出方法として正確ではない．
+        // 三角関数を使わないぶん計算量は少ないが，計算方法として正確ではない．
         // dtが大きすぎると誤差が大きくなる．
         //
         // 空間角速度で計算しても同じ結果になる．何故...？
