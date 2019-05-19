@@ -8,7 +8,6 @@ fn deg_to_rad(deg: f64) -> f64 {
     (deg / 180.0) * PI
 }
 
-
 #[test]
 fn test_euler_quaternion() {
     let roll_ori = deg_to_rad(20.0);

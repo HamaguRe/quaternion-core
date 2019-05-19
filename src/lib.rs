@@ -27,11 +27,11 @@ where T: Float {
 #[inline(always)]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T> 
 where T: Float {
-    let two = T::one() + T::one();
+    let half: T = num_traits::cast(0.5).unwrap();
 
     let n = normalize_vec(axis);
-    let q_s = (angle / two).cos();
-    let s   = (angle / two).sin();
+    let q_s = (angle * half).cos();
+    let s   = (angle * half).sin();
     let q_v = scale_vec(s, n);
     (q_s, q_v)
 }
@@ -41,10 +41,10 @@ where T: Float {
 pub fn from_direction_cosines<T>(m: DirectionCosines<T>) -> Quaternion<T>
 where T: Float {
     let one = T::one();
-    let two = one + one;
-    let four = two + two;
+    let half: T = num_traits::cast(0.5).unwrap();
+    let four: T = num_traits::cast(4.0).unwrap();
 
-    let q0 = (m[0][0] + m[1][1] + m[2][2] + one).sqrt() / two;
+    let q0 = (m[0][0] + m[1][1] + m[2][2] + one).sqrt() * half;
     let tmp = (four * q0).recip();
     let q1 = (m[1][2] - m[2][1]) * tmp;
     let q2 = (m[2][0] - m[0][2]) * tmp;
@@ -56,7 +56,7 @@ where T: Float {
 #[inline(always)]
 pub fn from_euler_angles<T>(roll: T, pitch: T, yaw: T) -> Quaternion<T> 
 where T: Float {
-    let half = ( T::one() + T::one() ).recip();
+    let half: T = num_traits::cast(0.5).unwrap();
 
     let alpha = yaw   * half;
     let beta  = pitch * half;
@@ -81,7 +81,7 @@ where T: Float {
 pub fn to_direction_cosines<T>(q: Quaternion<T>) -> DirectionCosines<T>
 where T: Float {
     let one = T::one();
-    let two = one + one;
+    let two = T::one() + T::one();
 
     let q0 = q.0;
     let q1 = q.1[0];
@@ -111,7 +111,7 @@ where T: Float {
 pub fn to_euler_angles<T>(q: Quaternion<T>) -> Vector3<T> 
 where T: Float + FloatConst {
     let one = T::one();
-    let two = one + one;
+    let two = T::one() + T::one();
 
     let q0 = q.0;
     let q1 = q.1[0];
@@ -398,8 +398,8 @@ where T: Float {
 pub fn rotation_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
     let axis = cross_vec(a, b);
-    let norms = norm_vec(a) * norm_vec(b);
-    let theta = acos_safe( dot_vec(a, b) / norms );
+    let norm_a_b = norm_vec(a) * norm_vec(b);
+    let theta = acos_safe( dot_vec(a, b) / norm_a_b );
     from_axis_angle(axis, theta * t)
 }
 
@@ -412,9 +412,9 @@ where T: Float + FloatConst {
 pub fn integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
-    let two  = T::one() + T::one();
+    let half: T = num_traits::cast(0.5).unwrap();
     
-    let arg = scale_vec(dt / two, omega);
+    let arg = scale_vec(dt * half, omega);
     let dq  = exp( (zero, arg) );
     mul(q, dq)
 }
@@ -430,10 +430,10 @@ where T: Float {
 pub fn integration_euler<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
-    let two  = T::one() + T::one();
+    let half: T = num_traits::cast(0.5).unwrap();
 
     let dq = mul( q, (zero, omega) );  // 空間角速度を用いる
-    let dq = scale(dt / two, dq);
+    let dq = scale(dt * half, dq);
     normalize( add(q, dq) )
 }
 
@@ -522,13 +522,12 @@ where T: Float + FloatConst {
 fn asin_safe<T>(s: T) -> T 
 where T: Float + FloatConst {
     let one = T::one();
-    let two = one + one;
-    let pi  = T::PI();
+    let frac_pi_2 = T::FRAC_PI_2(); // π/2
 
     if s >= one {  // Avoid undefined behavior
-        return  pi / two;
+        return  frac_pi_2;
     } else if s <= -one {
-        return -pi / two;
+        return -frac_pi_2;
     }
     s.asin()
 }
