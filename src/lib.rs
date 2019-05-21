@@ -304,8 +304,7 @@ where T: Float {
 #[inline(always)]
 pub fn inverse<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    let norm_square = dot(a, a);
-    scale( norm_square.recip(), conj(a) )
+    scale( dot(a, a).recip(), conj(a) )
 }
 
 /// ネイピア数eの四元数冪
@@ -403,7 +402,7 @@ where T: Float + FloatConst {
     from_axis_angle(axis, theta * t)
 }
 
-/// センサ座標系の姿勢変化を積分して，引数に渡した始原数を更新する．
+/// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
 /// Integrate attitude change of body coordinate system, 
 /// and update Quaternion passed to the argument.
 /// omega[rad/sec]
@@ -414,14 +413,14 @@ where T: Float {
     let zero = T::zero();
     let half: T = num_traits::cast(0.5).unwrap();
     
-    let arg = scale_vec(dt * half, omega);
-    let dq  = exp( (zero, arg) );
-    mul(q, dq)
+    let tmp = scale_vec(dt * half, omega);
+    let dq  = exp( (zero, tmp) );
+    mul(dq, q)
 }
 
 /// オイラー法
 /// Euler method
-/// センサ座標系の姿勢変化を積分して，引数に渡した始原数を更新する．
+/// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
 /// Integrate attitude change of body coordinate system, 
 /// and update Quaternion passed to the argument.
 /// omega[rad/sec]
@@ -432,8 +431,8 @@ where T: Float {
     let zero = T::zero();
     let half: T = num_traits::cast(0.5).unwrap();
 
-    let dq = mul( q, (zero, omega) );  // 空間角速度を用いる
-    let dq = scale(dt * half, dq);
+    let tmp = mul( (zero, omega), q );
+    let dq = scale(dt * half, tmp);
     normalize( add(q, dq) )
 }
 
@@ -482,10 +481,10 @@ where T: Float + FloatConst {
     }
     // selrp
     let omega = acos_safe(dot);  // Angle between the two quaternion
-    let sin_omega = omega.sin();
-    let s_1 = ( (one - t) * omega ).sin() / sin_omega;
+    let sin_omega_recip = omega.sin().recip();
+    let s_1 = ( (one - t) * omega ).sin() * sin_omega_recip;
     let q_1 = scale(s_1, a);
-    let s_2 = (t * omega).sin() / sin_omega;
+    let s_2 = (t * omega).sin() * sin_omega_recip;
     let q_2 = scale(s_2, b);
     add(q_1, q_2)
 }
