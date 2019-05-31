@@ -4,15 +4,20 @@ use quaternion::*;
 const PI: f64 = std::f64::consts::PI;
 const EPSILON: f64 = 1e-8;
 
-fn deg_to_rad(deg: f64) -> f64 {
-    (deg / 180.0) * PI
+#[test]
+fn test_generic() {
+    let id_f32 = id::<f32>();  // turbofish!
+    let id_f64 = id::<f64>();
+
+    assert_eq!( (1.0f32, [0.0f32; 3]) , id_f32 );
+    assert_eq!( (1.0f64, [0.0f64; 3]) , id_f64 );
 }
 
 #[test]
 fn test_euler_quaternion() {
-    let roll_ori = deg_to_rad(20.0);
-    let pitch_ori = deg_to_rad(15.0);  // 180度を超えると値がおかしくなる
-    let yaw_ori = deg_to_rad(0.0);  // 180度，360度で符号が反転する．
+    let roll_ori  = 20.0_f64.to_radians();
+    let pitch_ori = 15.0_f64.to_radians();  // 180度を超えると値がおかしくなる
+    let yaw_ori   = 0.0_f64.to_radians();  // 180度，360度で符号が反転する．
 
     let q = from_euler_angles(roll_ori, pitch_ori, yaw_ori);
     let eulers = to_euler_angles(q);
@@ -30,7 +35,7 @@ fn test_euler_quaternion() {
 fn test_add() {
     let a = (0.5, [1.0, 1.0, 1.0]);
     let b = (0.5, [1.0, 1.0, 1.0]);
-    assert_eq!(add(a, b), (1.0, [2.0, 2.0, 2.0]));
+    assert_eq!( add(a, b), (1.0, [2.0, 2.0, 2.0]) );
 }
 
 #[test]
@@ -47,13 +52,11 @@ fn test_normalize() {
 }
 
 #[test]
-fn test_sign_inversion() {
+fn test_negate() {
     let q = (-1.0, [1.0, 2.0, -1.0]);
-    let p = sign_inversion(q);
-    assert_eq!(p.0, 1.0);
-    assert_eq!(p.1[0], -1.0);
-    assert_eq!(p.1[1], -2.0);
-    assert_eq!(p.1[2],  1.0);
+    let p = negate(q);
+
+    assert_eq!( p, (1.0, [-1.0, -2.0, 1.0]) )
 }
 
 // 手計算した結果で動作確認
@@ -105,6 +108,15 @@ fn test_get_angle() {
 
     let get_angle = get_angle(q);
     assert!( (get_angle - angle).abs() < EPSILON );
+}
+
+#[test]
+fn test_cross() {
+    let r1 = [1.0, 0.0, 0.0];
+    let r2 = [0.0, 1.0, 0.0];
+
+    let r = cross_vec::<f64>(r1, r2);
+    assert_eq!( [0.0, 0.0, 1.0] , r );
 }
 
 /// 角速度を正しく積分出来ているかテスト

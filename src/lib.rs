@@ -22,7 +22,7 @@ where T: Float {
 /// 回転角と軸ベクトルを指定して四元数を生成．
 /// axisは単位ベクトルでなくても良い．
 /// Generate quaternion by specifying rotation angle and axis vector.
-/// The "axes" need not be unit vector.
+/// The "axis" need not be unit vector.
 /// angle[rad]
 #[inline(always)]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T> 
@@ -168,6 +168,7 @@ where T: Float {
 
 /// 四元数の内積
 /// Dot product of quaternion
+/// a・b
 #[inline(always)]
 pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
 where T: Float {
@@ -176,6 +177,7 @@ where T: Float {
 
 /// 外積
 /// Cross product
+/// a×b
 #[inline(always)]
 pub fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T> 
 where T: Float {
@@ -278,17 +280,19 @@ where T: Float {
 }
 
 /// 符号反転
+/// return "-r"
 #[inline(always)]
-pub fn sign_inversion_vec<T>(r: Vector3<T>) -> Vector3<T> 
+pub fn negate_vec<T>(r: Vector3<T>) -> Vector3<T> 
 where T: Float {
     [ -r[0], -r[1], -r[2] ]
 }
 
 /// 符号反転
+/// return "-q"
 #[inline(always)]
-pub fn sign_inversion<T>(q: Quaternion<T>) -> Quaternion<T>
+pub fn negate<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
-    ( -q.0, sign_inversion_vec(q.1) )
+    ( -q.0, negate_vec(q.1) )
 }
 
 /// 共役四元数を求める
@@ -296,7 +300,7 @@ where T: Float {
 #[inline(always)]
 pub fn conj<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    ( a.0, sign_inversion_vec(a.1) )
+    ( a.0, negate_vec(a.1) )
 }
 
 /// 逆四元数を求める
@@ -472,7 +476,7 @@ where T: Float + FloatConst {
     // 最短経路で補間する．
     let mut dot = dot(a, b);
     if dot.is_sign_negative() == true {
-        b = sign_inversion(b);
+        b = negate(b);
         dot = -dot;
     }
     // If the inputs are too close for comfort, linearly interpolate.
@@ -503,7 +507,7 @@ where T: Float + FloatConst {
     // 最短経路で補完
     let mut dot = dot(a, b);
     if dot.is_sign_negative() == true {
-        b = sign_inversion(b);
+        b = negate(b);
         dot = -dot;
     }
     // lerp
