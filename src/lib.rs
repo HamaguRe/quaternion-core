@@ -234,25 +234,17 @@ where T: Float {
 /// L2ノルムを計算
 /// Calculate L2 norm
 #[inline(always)]
-pub fn norm<T>(a: Quaternion<T>) -> T 
-where T: Float {
-    dot(a, a).sqrt()
-}
-
-/// L2ノルムを計算
-/// Calculate L2 norm
-#[inline(always)]
 pub fn norm_vec<T>(r: Vector3<T>) -> T 
 where T: Float {
     dot_vec(r, r).sqrt()
 }
 
-/// ノルムが1になるように正規化
-/// Normalized so that norm is 1
+/// L2ノルムを計算
+/// Calculate L2 norm
 #[inline(always)]
-pub fn normalize<T>(a: Quaternion<T>) -> Quaternion<T> 
+pub fn norm<T>(a: Quaternion<T>) -> T 
 where T: Float {
-    scale( norm(a).recip(), a )
+    dot(a, a).sqrt()
 }
 
 /// 正規化
@@ -267,6 +259,14 @@ where T: Float {
         return [zero; 3];  // ゼロ除算回避
     }
     scale_vec( norm.recip(), r )
+}
+
+/// ノルムが1になるように正規化
+/// Normalized so that norm is 1
+#[inline(always)]
+pub fn normalize<T>(a: Quaternion<T>) -> Quaternion<T> 
+where T: Float {
+    scale( norm(a).recip(), a )
 }
 
 /// 符号反転
@@ -317,11 +317,7 @@ where T: Float {
 #[inline(always)]
 pub fn exp<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    let vec_norm = norm_vec(a.1);
-    let q_s = vec_norm.cos();
-    let n = normalize_vec(a.1);
-    let q_v = scale_vec(vec_norm.sin(), n);
-    scale( a.0.exp(), (q_s, q_v) )
+    scale( a.0.exp(), exp_vec(a.1) )
 }
 
 /// 四元数の冪乗
