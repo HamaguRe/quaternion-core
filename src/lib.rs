@@ -78,15 +78,10 @@ where T: Float {
 
 /// 四元数を方向余弦行列（回転行列）に変換
 #[inline(always)]
-pub fn to_direction_cosines<T>(q: Quaternion<T>) -> DirectionCosines<T>
+pub fn to_direction_cosines<T>((q0, [q1, q2, q3]): Quaternion<T>) -> DirectionCosines<T>
 where T: Float {
     let one = T::one();
     let two = T::one() + T::one();
-
-    let q0 = q.0;
-    let q1 = q.1[0];
-    let q2 = q.1[1];
-    let q3 = q.1[2];
 
     let m11 = two * (q0*q0 + q1*q1) - one;
     let m12 = two * (q1*q2 + q0*q3);
@@ -108,16 +103,11 @@ where T: Float {
 /// 四元数をオイラー角[rad]に変換
 /// Quaternion --> [roll, pitch, yaw]
 #[inline(always)]
-pub fn to_euler_angles<T>(q: Quaternion<T>) -> Vector3<T> 
+pub fn to_euler_angles<T>((q0, [q1, q2, q3]): Quaternion<T>) -> Vector3<T> 
 where T: Float + FloatConst {
     let one = T::one();
     let two = T::one() + T::one();
 
-    let q0 = q.0;
-    let q1 = q.1[0];
-    let q2 = q.1[1];
-    let q3 = q.1[2];
-    
     let m11 = two * (q0*q0 + q1*q1) - one;
     let m12 = two * (q1*q2 + q0*q3);
     let m13 = two * (q1*q3 - q0*q2);
@@ -311,31 +301,27 @@ where T: Float {
     scale( dot(a, a).recip(), conj(a) )
 }
 
+/// ネイピア数eのベクトル冪
+/// Exponential of Vector3.
+#[inline(always)]
+pub fn exp_vec<T>(a: Vector3<T>) -> Quaternion<T> 
+where T: Float {
+    let norm = norm_vec(a);
+    let n = normalize_vec(a);
+    let q_v = scale_vec(norm.sin(), n);
+    (norm.cos(), q_v)
+}
+
 /// ネイピア数eの四元数冪
-/// Exponential of Quaternion<T>.
+/// Exponential of Quaternion.
 #[inline(always)]
 pub fn exp<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float {
-    let zero = T::zero();
-    let one  = T::one();
-
-    let coef;  // coefficient（係数）
-    if a.0 == zero {  // Avoid unnecessary calculation.
-        coef = one;
-    } else {
-        coef = a.0.exp();
-    }
-
-    // An if statement to avoid unnecessary calculation.
     let vec_norm = norm_vec(a.1);
-    if vec_norm == zero {
-        return (coef, [zero; 3]);
-    }
-    
     let q_s = vec_norm.cos();
-    let n   = normalize_vec(a.1);
+    let n = normalize_vec(a.1);
     let q_v = scale_vec(vec_norm.sin(), n);
-    scale( coef, (q_s, q_v) )
+    scale( a.0.exp(), (q_s, q_v) )
 }
 
 /// 四元数の冪乗
@@ -414,11 +400,10 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn integration<T>(q: Quaternion<T>, omega: Vector3<T>, dt: T) -> Quaternion<T> 
 where T: Float {
-    let zero = T::zero();
     let half: T = num_traits::cast(0.5).unwrap();
     
     let tmp = scale_vec(dt * half, omega);
-    let dq  = exp( (zero, tmp) );
+    let dq  = exp_vec(tmp);
     mul(dq, q)
 }
 
