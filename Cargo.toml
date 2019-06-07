@@ -1,6 +1,6 @@
 [package]
 name = "quaternion"
-version = "0.8.7"
+version = "0.9.7"
 authors = ["HamaguRe <space-denpa.jp>"]
 edition = "2018"
 repository = "https://github.com/HamaguRe/quaternion.git"

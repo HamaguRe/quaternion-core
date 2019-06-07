@@ -45,7 +45,7 @@ where T: Float {
     let four: T = num_traits::cast(4.0).unwrap();
 
     let q0 = (m[0][0] + m[1][1] + m[2][2] + one).sqrt() * half;
-    let tmp = (four * q0).recip();
+    let tmp = (four * q0).recip();  // reciprocal
     let q1 = (m[1][2] - m[2][1]) * tmp;
     let q2 = (m[2][0] - m[0][2]) * tmp;
     let q3 = (m[0][1] - m[1][0]) * tmp;
@@ -193,6 +193,24 @@ where T: Float {
     ( a.0 + b.0, add_vec(a.1, b.1) )
 }
 
+// ベクトルの減算
+// Vector subtraction
+// Calculate "a - b"
+#[inline(always)]
+pub fn sub_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
+where T: Float {
+    [ a[0]-b[0], a[1]-b[1], a[2]-b[2] ]
+}
+
+// 四元数の減算
+// Quaternion subtraction
+// Calculate "a - b"
+#[inline(always)]
+pub fn sub<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
+where T: Float {
+    ( a.0 - b.0, sub_vec(a.1, b.1) )
+}
+
 /// ハミルトン積のために定義した，特別なベクトル同士の積
 /// ab ≡ -a・b + a×b
 #[inline(always)]
@@ -338,12 +356,11 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn ln<T>(a: Quaternion<T>) -> Quaternion<T> 
 where T: Float + FloatConst {
-    let vec_norm = norm_vec(a.1);
-    let q_s = vec_norm.ln();
-    let s = acos_safe(a.0 / vec_norm);
+    let norm = norm(a);
     let n = normalize_vec(a.1);
-    let q_v = scale_vec(s, n);
-    (q_s, q_v)
+    let tmp = acos_safe(a.0 / norm);
+    let q_v = scale_vec(tmp, n);
+    ( norm.ln(), q_v )
 }
 
 /// 位置ベクトルの回転
