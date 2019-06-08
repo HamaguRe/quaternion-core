@@ -265,7 +265,7 @@ where T: Float {
     dot(a, a).sqrt()
 }
 
-/// 正規化
+/// ノルムが1になるように正規化
 /// Normalization
 #[inline(always)]
 pub fn normalize_vec<T>(r: Vector3<T>) -> Vector3<T> 
@@ -344,10 +344,10 @@ where T: Float {
 pub fn power<T>(a: Quaternion<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
     let coef = norm(a).powf(t);
-    let omega = acos_safe(a.0);
     let n = normalize_vec(a.1);
-    let q_s = (t * omega).cos();
-    let q_v = scale_vec( (t * omega).sin(), n );
+    let tmp = t * acos_safe(a.0);
+    let q_s = tmp.cos();
+    let q_v = scale_vec( tmp.sin(), n );
     scale( coef, (q_s, q_v) )
 }
 

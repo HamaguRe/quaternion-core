@@ -9,8 +9,8 @@ fn test_generic() {
     let id_f32 = id::<f32>();  // turbofish!
     let id_f64 = id::<f64>();
 
-    assert_eq!( (1.0f32, [0.0f32; 3]) , id_f32 );
-    assert_eq!( (1.0f64, [0.0f64; 3]) , id_f64 );
+    assert_eq!( (1.0f32, [0.0f32; 3]), id_f32 );
+    assert_eq!( (1.0f64, [0.0f64; 3]), id_f64 );
 }
 
 #[test]
@@ -117,6 +117,23 @@ fn test_cross() {
 
     let r = cross_vec::<f64>(r1, r2);
     assert_eq!( [0.0, 0.0, 1.0] , r );
+}
+
+#[test]
+fn test_exp_ln() {
+    let q_0 = id();
+    let omega = [1.0, 2.0, 1.0];
+    let dt = 1.0f64;
+    let q_1 = integration(q_0, omega, dt);
+
+    // dt間の姿勢変化から角速度を復元
+    // 角速度は一定
+    let tmp = mul( q_1, conj(q_0) );
+    let omega_re = scale(2.0/dt, ln(tmp)).1;
+
+    for i in 0..3 {
+        assert!( (omega[i] - omega_re[i]).abs() < EPSILON );
+    }
 }
 
 /// 角速度を正しく積分出来ているかテスト
