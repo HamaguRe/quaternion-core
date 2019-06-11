@@ -165,7 +165,7 @@ where T: Float {
     a.0 * b.0 + dot_vec(a.1, b.1)
 }
 
-/// 外積
+/// ベクトル積（外積）
 /// Cross product
 /// a×b
 #[inline(always)]
@@ -338,6 +338,18 @@ where T: Float {
     scale( a.0.exp(), exp_vec(a.1) )
 }
 
+/// 四元数の自然対数
+/// Natural logarithm of quaternion
+#[inline(always)]
+pub fn ln<T>(a: Quaternion<T>) -> Quaternion<T> 
+where T: Float + FloatConst {
+    let norm = norm(a);
+    let n = normalize_vec(a.1);
+    let tmp = acos_safe(a.0 / norm);
+    let q_v = scale_vec(tmp, n);
+    ( norm.ln(), q_v )
+}
+
 /// 四元数の冪乗
 /// The power of quaternion.
 #[inline(always)]
@@ -349,18 +361,6 @@ where T: Float + FloatConst {
     let q_s = tmp.cos();
     let q_v = scale_vec( tmp.sin(), n );
     scale( coef, (q_s, q_v) )
-}
-
-/// 四元数の自然対数
-/// Natural logarithm of quaternion
-#[inline(always)]
-pub fn ln<T>(a: Quaternion<T>) -> Quaternion<T> 
-where T: Float + FloatConst {
-    let norm = norm(a);
-    let n = normalize_vec(a.1);
-    let tmp = acos_safe(a.0 / norm);
-    let q_v = scale_vec(tmp, n);
-    ( norm.ln(), q_v )
 }
 
 /// 位置ベクトルの回転
@@ -397,7 +397,7 @@ where T: Float {
 /// Find a quaternion to rotate from vector "a" to "b".
 /// 0 <= t <= 1
 #[inline(always)]
-pub fn rotation_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T> 
+pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
     let axis = cross_vec(a, b);
     let norm_a_b = norm_vec(a) * norm_vec(b);
