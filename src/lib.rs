@@ -21,15 +21,22 @@ where T: Float {
 
 /// 回転角と軸ベクトルを指定して四元数を生成．
 /// axisは単位ベクトルでなくても良い．
+/// 零ベクトルを入力した場合は，恒等四元数を返す．
 /// Generate quaternion by specifying rotation angle and axis vector.
 /// The "axis" need not be unit vector.
+/// If you enter a zero vector, it returns an identity quaternion.
 /// angle[rad]
 #[inline(always)]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T> 
 where T: Float {
+    let zero = T::zero();
     let half: T = num_traits::cast(0.5).unwrap();
 
-    let n = normalize_vec(axis);
+    let norm = norm_vec(axis);
+    if (norm == zero) | (angle == zero) {
+        return id();
+    }
+    let n = scale_vec( norm.recip(), axis );
     let f = (angle * half).sin_cos();
     ( f.1, scale_vec(f.0, n) )
 }
@@ -320,13 +327,12 @@ where T: Float {
 pub fn exp_vec<T>(a: Vector3<T>) -> Quaternion<T> 
 where T: Float {
     let zero = T::zero();
-    let one  = T::one();
 
     let norm = norm_vec(a);
     if norm == zero {
-        return (one, [zero; 3]);
+        return id();
     }
-    let n = normalize_vec(a);
+    let n = scale_vec( norm.recip(), a );
     let f = norm.sin_cos();
     ( f.1, scale_vec(f.0, n) )
 }
@@ -393,14 +399,17 @@ where T: Float {
 }
 
 /// ベクトル "a" を ベクトル "b" へ最短距離で回転させる四元数を求める．
+/// 零ベクトルを入力した場合は，恒等四元数を返す．
 /// Find a quaternion to rotate from vector "a" to "b".
+/// If you enter a zero vector, it returns an identity quaternion.
 /// 0 <= t <= 1
 #[inline(always)]
 pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T> 
 where T: Float + FloatConst {
+    let a = normalize_vec(a);
+    let b = normalize_vec(b);
     let axis = cross_vec(a, b);
-    let norm_a_b = norm_vec(a) * norm_vec(b);
-    let theta = acos_safe( dot_vec(a, b) / norm_a_b );
+    let theta = acos_safe( dot_vec(a, b) );
     from_axis_angle(axis, theta * t)
 }
 
