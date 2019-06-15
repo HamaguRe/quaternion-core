@@ -30,10 +30,8 @@ where T: Float {
     let half: T = num_traits::cast(0.5).unwrap();
 
     let n = normalize_vec(axis);
-    let q_s = (angle * half).cos();
-    let s   = (angle * half).sin();
-    let q_v = scale_vec(s, n);
-    (q_s, q_v)
+    let f = (angle * half).sin_cos();
+    ( f.1, scale_vec(f.0, n) )
 }
 
 /// 方向余弦行列から四元数を生成．
@@ -62,12 +60,9 @@ where T: Float {
     let beta  = pitch * half;
     let gamma = roll  * half;
     // Compute these value only once
-    let sin_alpha = alpha.sin();
-    let cos_alpha = alpha.cos();
-    let sin_beta  = beta.sin();
-    let cos_beta  = beta.cos();
-    let sin_gamma = gamma.sin();
-    let cos_gamma = gamma.cos();
+    let (sin_alpha, cos_alpha) = alpha.sin_cos();
+    let (sin_beta,  cos_beta)  = beta.sin_cos();
+    let (sin_gamma, cos_gamma) = gamma.sin_cos();
 
     let q0 = cos_alpha * cos_beta * cos_gamma + sin_alpha * sin_beta * sin_gamma;
     let q1 = cos_alpha * cos_beta * sin_gamma - sin_alpha * sin_beta * cos_gamma;
@@ -135,7 +130,7 @@ where T: Float {
     if q.0 == one {
         return [zero; 3];  // ゼロ除算回避
     }
-    scale_vec( (one - q.0 * q.0).sqrt().recip(), q.1)
+    scale_vec( (one - q.0 * q.0).sqrt().recip(), q.1 )
 }
 
 /// 回転を表す四元数から，軸周りの回転角[rad]を取り出す．
@@ -324,10 +319,16 @@ where T: Float {
 #[inline(always)]
 pub fn exp_vec<T>(a: Vector3<T>) -> Quaternion<T> 
 where T: Float {
+    let zero = T::zero();
+    let one  = T::one();
+
     let norm = norm_vec(a);
+    if norm == zero {
+        return (one, [zero; 3]);
+    }
     let n = normalize_vec(a);
-    let q_v = scale_vec(norm.sin(), n);
-    (norm.cos(), q_v)
+    let f = norm.sin_cos();
+    ( f.1, scale_vec(f.0, n) )
 }
 
 /// ネイピア数eの四元数冪
@@ -346,8 +347,7 @@ where T: Float + FloatConst {
     let norm = norm(a);
     let n = normalize_vec(a.1);
     let tmp = acos_safe(a.0 / norm);
-    let q_v = scale_vec(tmp, n);
-    ( norm.ln(), q_v )
+    ( norm.ln(), scale_vec(tmp, n) )
 }
 
 /// 四元数の冪乗
@@ -357,10 +357,9 @@ pub fn power<T>(a: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let coef = norm(a).powf(t);
     let n = normalize_vec(a.1);
-    let tmp = t * acos_safe(a.0);
-    let q_s = tmp.cos();
-    let q_v = scale_vec( tmp.sin(), n );
-    scale( coef, (q_s, q_v) )
+    let f = ( t * acos_safe(a.0) ).sin_cos();
+    let q_v = scale_vec(f.0, n);
+    scale( coef, (f.1, q_v) )
 }
 
 /// 位置ベクトルの回転
