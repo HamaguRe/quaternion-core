@@ -4,14 +4,6 @@ use quaternion::*;
 const PI: f64 = std::f64::consts::PI;
 const EPSILON: f64 = 1e-8;
 
-#[test]
-fn test_generic() {
-    let id_f32 = id::<f32>();  // turbofish!
-    let id_f64 = id::<f64>();
-
-    assert_eq!( (1.0f32, [0.0f32; 3]), id_f32 );
-    assert_eq!( (1.0f64, [0.0f64; 3]), id_f64 );
-}
 
 #[test]
 fn test_euler_quaternion() {
@@ -115,7 +107,7 @@ fn test_cross() {
     let r1 = [1.0, 0.0, 0.0];
     let r2 = [0.0, 1.0, 0.0];
 
-    let r = cross_vec::<f64>(r1, r2);
+    let r = cross_vec(r1, r2);
     assert_eq!( [0.0, 0.0, 1.0] , r );
 }
 
