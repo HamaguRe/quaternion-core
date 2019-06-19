@@ -33,7 +33,7 @@ where T: Float {
     let half: T = num_traits::cast(0.5).unwrap();
 
     let norm = norm_vec(axis);
-    if (norm == zero) | (angle == zero) {
+    if (norm == zero) || (angle == zero) {
         return id();
     }
     let n = scale_vec( norm.recip(), axis );
