@@ -257,14 +257,14 @@ pub fn negate(q: Quaternion<f64>) -> Quaternion<f64> {
 }
 
 /// 共役四元数を求める
-/// Compute conjugated quaternion
+/// Compute the conjugate quaternion
 #[inline(always)]
 pub fn conj(a: Quaternion<f64>) -> Quaternion<f64> {
     ( a.0, negate_vec(a.1) )
 }
 
 /// 逆四元数を求める
-/// Compute inverse quaternion
+/// Compute the inverse quaternion
 #[inline(always)]
 pub fn inverse(a: Quaternion<f64>) -> Quaternion<f64> {
     scale( dot(a, a).recip(), conj(a) )
