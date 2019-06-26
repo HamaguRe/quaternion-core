@@ -9,6 +9,7 @@ const PI: f64 = std::f64::consts::PI;
 const FRAC_PI_2: f64 = std::f64::consts::FRAC_PI_2;  // π/2
 const THRESHOLD: f64 = 0.9995;
 
+
 /// 恒等四元数を生成．
 /// Generate identity quaternion.
 #[inline(always)]
@@ -66,15 +67,15 @@ pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
 /// 四元数を方向余弦行列（回転行列）に変換
 #[inline(always)]
 pub fn to_direction_cosines((q0, [q1, q2, q3]): Quaternion<f64>) -> DirectionCosines<f64> {
-    let m11 = 2.0 * (q0*q0 + q1*q1) - 1.0;
-    let m12 = 2.0 * (q1*q2 + q0*q3);
-    let m13 = 2.0 * (q1*q3 - q0*q2);
-    let m21 = 2.0 * (q1*q2 - q0*q3);
-    let m22 = 2.0 * (q0*q0 + q2*q2) - 1.0;
-    let m23 = 2.0 * (q2*q3 + q0*q1);
-    let m31 = 2.0 * (q1*q3 + q0*q2);
-    let m32 = 2.0 * (q2*q3 - q0*q1);
-    let m33 = 2.0 * (q0*q0 + q3*q3) - 1.0;
+    let m11 = (q0*q0 + q1*q1).mul_add(2.0, -1.0);
+    let m12 = (q1*q2 + q0*q3) * 2.0;
+    let m13 = (q1*q3 - q0*q2) * 2.0;
+    let m21 = (q1*q2 - q0*q3) * 2.0;
+    let m22 = (q0*q0 + q2*q2).mul_add(2.0, -1.0);
+    let m23 = (q2*q3 + q0*q1) * 2.0;
+    let m31 = (q1*q3 + q0*q2) * 2.0;
+    let m32 = (q2*q3 - q0*q1) * 2.0;
+    let m33 = (q0*q0 + q3*q3).mul_add(2.0, -1.0);
 
     [
         [m11, m12, m13],
@@ -87,11 +88,11 @@ pub fn to_direction_cosines((q0, [q1, q2, q3]): Quaternion<f64>) -> DirectionCos
 /// Quaternion --> [roll, pitch, yaw]
 #[inline(always)]
 pub fn to_euler_angles((q0, [q1, q2, q3]): Quaternion<f64>) -> Vector3<f64> {
-    let m11 = 2.0 * (q0*q0 + q1*q1) - 1.0;
-    let m12 = 2.0 * (q1*q2 + q0*q3);
-    let m13 = 2.0 * (q1*q3 - q0*q2);
-    let m23 = 2.0 * (q2*q3 + q0*q1);
-    let m33 = 2.0 * (q0*q0 + q3*q3) - 1.0;
+    let m11 = (q0*q0 + q1*q1).mul_add(2.0, -1.0);
+    let m12 = (q1*q2 + q0*q3) * 2.0;
+    let m13 = (q1*q3 - q0*q2) * 2.0;
+    let m23 = (q2*q3 + q0*q1) * 2.0;
+    let m33 = (q0*q0 + q3*q3).mul_add(2.0, -1.0);
 
     let roll  = (m23 / m33).atan();
     let pitch = asin_safe(-m13);
@@ -110,7 +111,8 @@ pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
     if q.0 == 1.0 {
         return [0.0; 3];  // ゼロ除算回避
     }
-    scale_vec( (1.0 - q.0 * q.0).sqrt().recip(), q.1 )
+    let tmp = q.0.mul_add(q.0, -1.0);
+    scale_vec( ( tmp.abs() ).sqrt().recip(), q.1 )
 }
 
 /// 回転を表す四元数から，軸周りの回転角[rad]を取り出す．
@@ -140,9 +142,9 @@ pub fn dot(a: Quaternion<f64>, b: Quaternion<f64>) -> f64 {
 /// a×b
 #[inline(always)]
 pub fn cross_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
-    let vec0 = a[1]*b[2] - a[2]*b[1];
-    let vec1 = a[2]*b[0] - a[0]*b[2];
-    let vec2 = a[0]*b[1] - a[1]*b[0];
+    let vec0 = a[1].mul_add( b[2], -a[2]*b[1] );
+    let vec1 = a[2].mul_add( b[0], -a[0]*b[2] );
+    let vec2 = a[0].mul_add( b[1], -a[1]*b[0] );
     [vec0, vec1, vec2]
 }
 
@@ -176,26 +178,6 @@ pub fn sub(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     ( a.0 - b.0, sub_vec(a.1, b.1) )
 }
 
-/// ハミルトン積のために定義した，特別なベクトル同士の積
-/// ab ≡ -a・b + a×b
-#[inline(always)]
-pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
-    ( -dot_vec(a, b), cross_vec(a, b) )
-}
-
-/// ハミルトン積
-/// 積の順序は "ab"(!=ba)
-/// Hamilton product
-/// The product order is "ab"(!= ba)
-#[inline(always)]
-pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
-    let tmp0 = mul_vec(a.1, b.1);
-    let vec0 = scale_vec(a.0, b.1);
-    let vec1 = scale_vec(b.0, a.1);
-    let tmp1 = ( a.0 * b.0, add_vec(vec0, vec1) );
-    add(tmp0, tmp1)
-}
-
 /// スカラーとベクトルの積
 /// Multiplication of scalar and vector.
 #[inline(always)]
@@ -208,6 +190,31 @@ pub fn scale_vec(s: f64, v: Vector3<f64>) -> Vector3<f64> {
 #[inline(always)]
 pub fn scale(s: f64, a: Quaternion<f64>) -> Quaternion<f64> {
     ( s * a.0, scale_vec(s, a.1) )
+}
+
+/// compute "s*a + b"
+/// CPUがFMA命令をサポートしている場合，
+/// "add_vec(scale_vec(s, a), b)" よりも高速に計算出来る．
+/// If the CPU supports FMA instructions,
+/// this is faster than "add_vec(scale_vec(s, a), b)".
+#[inline(always)]
+pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
+    let vec0 = s.mul_add(a[0], b[0]);
+    let vec1 = s.mul_add(a[1], b[1]);
+    let vec2 = s.mul_add(a[2], b[2]);
+    [vec0, vec1, vec2]
+}
+
+/// compute "s*a + b"
+/// CPUがFMA命令をサポートしている場合，
+/// "add(scale(s, a), b)" よりも高速に計算出来る．
+/// If the CPU supports FMA instructions,
+/// this is faster than "add_vec(scale_vec(s, a), b)".
+#[inline(always)]
+pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
+    let q0 = s.mul_add(a.0, b.0);
+    let vec = scale_add_vec(s, a.1, b.1);
+    (q0, vec)
 }
 
 /// L2ノルムを計算
@@ -254,6 +261,25 @@ pub fn negate_vec(r: Vector3<f64>) -> Vector3<f64> {
 #[inline(always)]
 pub fn negate(q: Quaternion<f64>) -> Quaternion<f64> {
     ( -q.0, negate_vec(q.1) )
+}
+
+/// ハミルトン積のために定義した，特別なベクトル同士の積
+/// ab ≡ -a・b + a×b
+#[inline(always)]
+pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
+    ( -dot_vec(a, b), cross_vec(a, b) )
+}
+
+/// ハミルトン積
+/// 積の順序は "ab"(!=ba)
+/// Hamilton product
+/// The product order is "ab"(!= ba)
+#[inline(always)]
+pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
+    let q_s = a.0 * b.0 - dot_vec(a.1, b.1);
+    let tmp = add_vec( scale_vec(b.0, a.1), cross_vec(a.1, b.1) );
+    let q_v = scale_add_vec(a.0, b.1, tmp);
+    (q_s, q_v)
 }
 
 /// 共役四元数を求める
@@ -316,11 +342,11 @@ pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 #[inline(always)]
 pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let q = normalize(q);
-    let term1 = scale_vec( q.0 * q.0, r );
-    let term2 = scale_vec( 2.0 * q.0, cross_vec(q.1, r) );
-    let term3 = scale_vec( dot_vec(r, q.1), q.1 );
-    let term4 = cross_vec( q.1, cross_vec(q.1, r) );
-    add_vec( add_vec(term1, term2), add_vec(term3, term4) )
+    let tmp1  = scale_vec( 2.0 * q.0, cross_vec(q.1, r) );
+    let term1 = scale_add_vec(q.0*q.0, r, tmp1);
+    let tmp2  = cross_vec( q.1, cross_vec(q.1, r) );
+    let term2 = scale_add_vec( dot_vec(r, q.1), q.1, tmp2 );
+    add_vec(term1, term2)
 }
 
 /// 座標系の回転
@@ -328,11 +354,11 @@ pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
 #[inline(always)]
 pub fn coordinate_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let q = normalize(q);
-    let term1 = scale_vec( q.0 * q.0, r );
-    let term2 = scale_vec( 2.0 * q.0, cross_vec(r, q.1) );
-    let term3 = scale_vec( dot_vec(r, q.1), q.1 );
-    let term4 = cross_vec( q.1, cross_vec(q.1, r) );
-    add_vec( add_vec(term1, term2), add_vec(term3, term4) )
+    let tmp1  = scale_vec( 2.0 * q.0, cross_vec(r, q.1) );
+    let term1 = scale_add_vec(q.0*q.0, r, tmp1);
+    let tmp2  = cross_vec( q.1, cross_vec(q.1, r) );
+    let term2 = scale_add_vec( dot_vec(r, q.1), q.1, tmp2 );
+    add_vec(term1, term2)
 }
 
 /// ベクトル "a" を ベクトル "b" へ最短距離で回転させる四元数を求める．
@@ -371,8 +397,8 @@ pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaterni
 #[inline(always)]
 pub fn integration_euler(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
     let tmp = mul( (0.0, omega), q );
-    let dq = scale(dt * 0.5, tmp);
-    normalize( add(q, dq) )
+    let q_int = scale_add(dt * 0.5, tmp, q);
+    normalize( q_int )
 }
 
 /// 線形補間
@@ -383,11 +409,8 @@ pub fn integration_euler(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Qu
 /// The argument t(0 <= t <= 1) is the interpolation parameter.
 #[inline(always)]
 pub fn lerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
-    let a = normalize(a);
-    let b = normalize(b);
-    let q_1 = scale(1.0 - t, a);
-    let q_2 = scale(t, b);
-    normalize( add(q_1, q_2) )
+    let q = scale_add( 1.0 - t, a, scale(t, b) );
+    normalize(q)
 }
 
 /// 球状線形補間
@@ -413,12 +436,10 @@ pub fn slerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> 
     }
     // selrp
     let omega = acos_safe(dot);  // Angle between the two quaternion
-    let sin_omega_recip = omega.sin().recip();
-    let s_1 = ( (1.0 - t) * omega ).sin() * sin_omega_recip;
-    let q_1 = scale(s_1, a);
-    let s_2 = (t * omega).sin() * sin_omega_recip;
-    let q_2 = scale(s_2, b);
-    add(q_1, q_2)
+    let s1 = ( (1.0 - t) * omega ).sin();
+    let s2 = (t * omega).sin();
+    let tmp = scale_add( s1, a, scale(s2, b) );
+    scale( omega.sin().recip(), tmp )
 }
 
 /// 四元数の冪乗を用いたSlerp
