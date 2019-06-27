@@ -134,7 +134,7 @@ pub fn dot_vec(a: Vector3<f64>, b: Vector3<f64>) -> f64 {
 /// a・b
 #[inline(always)]
 pub fn dot(a: Quaternion<f64>, b: Quaternion<f64>) -> f64 {
-    a.0 * b.0 + dot_vec(a.1, b.1)
+    a.0.mul_add( b.0, dot_vec(a.1, b.1) )
 }
 
 /// ベクトル積（外積）
@@ -142,9 +142,9 @@ pub fn dot(a: Quaternion<f64>, b: Quaternion<f64>) -> f64 {
 /// a×b
 #[inline(always)]
 pub fn cross_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
-    let vec0 = a[1].mul_add( b[2], -a[2]*b[1] );
-    let vec1 = a[2].mul_add( b[0], -a[0]*b[2] );
-    let vec2 = a[0].mul_add( b[1], -a[1]*b[0] );
+    let vec0 = a[1]*b[2] - a[2]*b[1];
+    let vec1 = a[2]*b[0] - a[0]*b[2];
+    let vec2 = a[0]*b[1] - a[1]*b[0];
     [vec0, vec1, vec2]
 }
 
@@ -278,7 +278,7 @@ pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
 pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     let q_s = a.0 * b.0 - dot_vec(a.1, b.1);
     let tmp = scale_add_vec( b.0, a.1, cross_vec(a.1, b.1) );
-    let q_v = scale_add_vec(a.0, b.1, tmp);
+    let q_v = scale_add_vec( a.0, b.1, tmp );
     (q_s, q_v)
 }
 
@@ -397,7 +397,7 @@ pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaterni
 #[inline(always)]
 pub fn integration_euler(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
     let tmp = mul( (0.0, omega), q );
-    let q_int = scale_add(dt * 0.5, tmp, q);
+    let q_int = scale_add(dt*0.5, tmp, q);
     normalize( q_int )
 }
 
