@@ -277,7 +277,7 @@ pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     let q_s = a.0 * b.0 - dot_vec(a.1, b.1);
-    let tmp = add_vec( scale_vec(b.0, a.1), cross_vec(a.1, b.1) );
+    let tmp = scale_add_vec( b.0, a.1, cross_vec(a.1, b.1) );
     let q_v = scale_add_vec(a.0, b.1, tmp);
     (q_s, q_v)
 }
@@ -342,11 +342,11 @@ pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 #[inline(always)]
 pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let q = normalize(q);
-    let tmp1  = scale_vec( 2.0 * q.0, cross_vec(q.1, r) );
-    let term1 = scale_add_vec(q.0*q.0, r, tmp1);
+    let tmp1  = scale_vec( 2.0, cross_vec(q.1, r) );
+    let term1 = scale_add_vec(q.0, r, tmp1);
     let tmp2  = cross_vec( q.1, cross_vec(q.1, r) );
     let term2 = scale_add_vec( dot_vec(r, q.1), q.1, tmp2 );
-    add_vec(term1, term2)
+    scale_add_vec(q.0, term1, term2)
 }
 
 /// 座標系の回転
@@ -354,11 +354,11 @@ pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
 #[inline(always)]
 pub fn coordinate_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let q = normalize(q);
-    let tmp1  = scale_vec( 2.0 * q.0, cross_vec(r, q.1) );
-    let term1 = scale_add_vec(q.0*q.0, r, tmp1);
+    let tmp1  = scale_vec( 2.0, cross_vec(r, q.1) );
+    let term1 = scale_add_vec(q.0, r, tmp1);
     let tmp2  = cross_vec( q.1, cross_vec(q.1, r) );
     let term2 = scale_add_vec( dot_vec(r, q.1), q.1, tmp2 );
-    add_vec(term1, term2)
+    scale_add_vec(q.0, term1, term2)
 }
 
 /// ベクトル "a" を ベクトル "b" へ最短距離で回転させる四元数を求める．
