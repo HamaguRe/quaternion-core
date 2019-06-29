@@ -64,6 +64,16 @@ pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
     (q0, [q1, q2, q3])
 }
 
+/// 回転を表す四元数から，回転軸（単位ベクトル）と軸回りの回転角[rad]を取り出す．
+/// return "(angle, axis)""
+#[inline(always)]
+pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
+    let q = normalize(q);
+    let angle = 2.0 * acos_safe(q.0);
+    let axis = get_unit_vector(q);
+    (axis, angle)
+}
+
 /// 四元数を方向余弦行列（回転行列）に変換
 #[inline(always)]
 pub fn to_direction_cosines((q0, [q1, q2, q3]): Quaternion<f64>) -> DirectionCosines<f64> {
@@ -111,15 +121,8 @@ pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
     if q.0 == 1.0 {
         return [0.0; 3];  // ゼロ除算回避
     }
-    let tmp = ( q.0.mul_add(q.0, -1.0) ).abs();
+    let tmp = q.0.mul_add(-q.0, 1.0);
     scale_vec( tmp.sqrt().recip(), q.1 )
-}
-
-/// 回転を表す四元数から，軸周りの回転角[rad]を取り出す．
-#[inline(always)]
-pub fn get_angle(q: Quaternion<f64>) -> f64 {
-    let q = normalize(q);
-    2.0 * acos_safe(q.0)
 }
 
 /// ベクトルの内積
@@ -378,11 +381,11 @@ pub fn rotate_a_to_b(a: Vector3<f64>, b: Vector3<f64>, t: f64) -> Quaternion<f64
 /// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
 /// Integrate attitude change of body coordinate system, 
 /// and update Quaternion passed to the argument.
-/// omega[rad/sec]
+/// accel[rad/sec]
 /// dt[sec]
 #[inline(always)]
-pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {    
-    let tmp = scale_vec(dt * 0.5, omega);
+pub fn integration(q: Quaternion<f64>, accel: Vector3<f64>, dt: f64) -> Quaternion<f64> {    
+    let tmp = scale_vec(dt * 0.5, accel);
     let dq  = exp_vec(tmp);
     mul(dq, q)
 }
@@ -392,11 +395,11 @@ pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaterni
 /// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
 /// Integrate attitude change of body coordinate system, 
 /// and update Quaternion passed to the argument.
-/// omega[rad/sec]
+/// accel[rad/sec]
 /// dt[sec]
 #[inline(always)]
-pub fn integration_euler(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
-    let tmp = mul( (0.0, omega), q );
+pub fn integration_euler(q: Quaternion<f64>, accel: Vector3<f64>, dt: f64) -> Quaternion<f64> {
+    let tmp = mul( (0.0, accel), q );
     let q_int = scale_add(dt*0.5, tmp, q);
     normalize( q_int )
 }
@@ -461,9 +464,8 @@ pub fn slerp_1(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64
         return lerp(a, b, t);
     }
     // slerp
-    let tmp = mul( conj(a), b );
-    let tmp = power(tmp, t);
-    mul(a, tmp)
+    let tmp = power( mul( b, conj(a) ), t );
+    mul(tmp, a)
 }
 
 /// 定義域外の値をカットして未定義動作を防ぐ

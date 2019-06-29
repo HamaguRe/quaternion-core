@@ -113,15 +113,20 @@ fn test_get_unit_vector() {
     }
 }
 
-// 回転角を取り出す
+// 回転軸と回転角を取り出す
 #[test]
-fn test_get_angle() {
+fn test_to_axis_angle() {
     let axis = [1.0, 4.0, 2.0];
     let angle = PI;
     let q: Quaternion<f64> = from_axis_angle(axis, angle);
 
-    let get_angle = get_angle(q);
-    assert!( (get_angle - angle).abs() < EPSILON );
+    // 軸の方向は分かるが，元の大きさはわからない．
+    let n = normalize_vec(axis);
+    let f = to_axis_angle(q);
+    assert!( (f.1 - angle).abs() < EPSILON );
+    for i in 0..3 {
+        assert!( (f.0[i] - n[i]).abs() < EPSILON );
+    }
 }
 
 #[test]
