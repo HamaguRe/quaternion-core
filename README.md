@@ -1,10 +1,10 @@
 # Quaternion library
 #### 【日本語】
-  Rustで作成したクォータニオン計算用のライブラリです。
+  Rustで作成した四元数（クォータニオン）計算用のライブラリです。
 
   関数の動作については、ドキュメンテーションコメントを参照してください。
 
-  また、クォータニオン自体について知りたい方は、以下のページを参照してください。
+  また、四元数自体について詳しく知りたい方は、以下のページをご覧ください。
 
   * [四元数まとめ資料を書いた（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
 
@@ -17,10 +17,10 @@
 #### Cargo.toml
 ```
 [dependencies]
-quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="d0a504af8068a60c6b7ad2d8ae875eab7ba8e9e8"}
+quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="f0100da10378f36b7079b0452485460577e0ae04"}
 ```
 
-#### quaternion_example.rs
+#### src/main.rs
 ```
 extern crate quaternion;
 use quaternion as quat;

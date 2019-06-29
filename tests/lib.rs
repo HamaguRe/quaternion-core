@@ -15,19 +15,41 @@ fn test_euler_quaternion() {
     let eulers = to_euler_angles(q);
     
     // 値チェック
-    assert!( (eulers[0] - roll_ori).abs() < EPSILON );
+    assert!( (eulers[0] - roll_ori).abs()  < EPSILON );
     assert!( (eulers[1] - pitch_ori).abs() < EPSILON );
-    assert!( (eulers[2] - yaw_ori).abs() < EPSILON );
-    println!("roll: {}, ori: {}", eulers[0], roll_ori);
+    assert!( (eulers[2] - yaw_ori).abs()   < EPSILON );
+    println!("roll: {}, ori: {}",  eulers[0], roll_ori);
     println!("pitch: {}, ori: {}", eulers[1], pitch_ori);
-    println!("yaw: {}, ori: {}", eulers[2], yaw_ori);
+    println!("yaw: {}, ori: {}",   eulers[2], yaw_ori);
 }
 
 #[test]
 fn test_add() {
     let a = (0.5, [1.0, 1.0, 1.0]);
     let b = (0.5, [1.0, 1.0, 1.0]);
-    assert_eq!( add(a, b), (1.0, [2.0, 2.0, 2.0]) );
+    assert_eq!( add(a, b), (1.0, [2.0; 3]) );
+}
+
+#[test]
+fn test_sub() {
+    let a = (0.5, [1.0, 1.0, 1.0]);
+    let b = (0.5, [1.0, 1.0, 1.0]);
+    assert_eq!( sub(a, b), (0.0, [0.0; 3]) );
+}
+
+#[test]
+fn test_scale_add() {
+    let s = 2.0;
+    let a = (0.5, [1.0, 1.0, 1.0]);
+    let b = (0.5, [1.0, 1.0, 1.0]);
+
+    let result_1 = scale_add(s, a, b);
+    let result_2 = add( scale(s, a), b );
+    let diff = sub(result_1, result_2);
+    assert!( diff.0.abs() < EPSILON );
+    assert!( diff.1[0].abs() < EPSILON );
+    assert!( diff.1[1].abs() < EPSILON );
+    assert!( diff.1[2].abs() < EPSILON );
 }
 
 #[test]

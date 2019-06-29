@@ -111,8 +111,8 @@ pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
     if q.0 == 1.0 {
         return [0.0; 3];  // ゼロ除算回避
     }
-    let tmp = q.0.mul_add(q.0, -1.0);
-    scale_vec( ( tmp.abs() ).sqrt().recip(), q.1 )
+    let tmp = ( q.0.mul_add(q.0, -1.0) ).abs();
+    scale_vec( tmp.sqrt().recip(), q.1 )
 }
 
 /// 回転を表す四元数から，軸周りの回転角[rad]を取り出す．
