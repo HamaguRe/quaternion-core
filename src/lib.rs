@@ -65,12 +65,12 @@ pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
 }
 
 /// 回転を表す四元数から，回転軸（単位ベクトル）と軸回りの回転角[rad]を取り出す．
-/// return "(angle, axis)""
+/// return "(axis, angle)"
 #[inline(always)]
 pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     let q = normalize(q);
-    let angle = 2.0 * acos_safe(q.0);
     let axis = get_unit_vector(q);
+    let angle = 2.0 * acos_safe(q.0);
     (axis, angle)
 }
 

@@ -22,8 +22,7 @@ quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="f0100da1037
 
 #### src/main.rs
 ```
-extern crate quaternion;
-use quaternion as quat;
+extern crate quaternion as quat;
 
 const PI: f64 = std::f64::consts::PI;
 const EPSILON: f64 = 1e-8;
