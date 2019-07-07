@@ -36,6 +36,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 }
 
 /// 方向余弦行列から四元数を生成．
+/// Generate quaternion from direction cosine matrix.
 #[inline(always)]
 pub fn from_direction_cosines(m: DirectionCosines<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
@@ -46,7 +47,8 @@ pub fn from_direction_cosines(m: DirectionCosines<f64>) -> Quaternion<f64> {
     (q0, [q1, q2, q3])
 }
 
-/// オイラー角[rad]から四元数を生成．
+/// オイラー角から四元数を生成．
+/// Generate quaternions from Euler angles[rad].
 #[inline(always)]
 pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
     let alpha = yaw   * 0.5;
@@ -65,6 +67,8 @@ pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
 }
 
 /// 回転を表す四元数から，回転軸（単位ベクトル）と軸回りの回転角[rad]を取り出す．
+/// Compute the rotation axis (unit vector) and the rotation angle[rad] 
+/// around the axis from the quaternion representing the rotation.
 /// return "(axis, angle)"
 #[inline(always)]
 pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
@@ -74,7 +78,8 @@ pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     (axis, angle)
 }
 
-/// 四元数を方向余弦行列（回転行列）に変換
+/// 四元数を方向余弦行列（回転行列）に変換．
+/// Convert quaternion to directional cosine matrix.
 #[inline(always)]
 pub fn to_direction_cosines((q0, [q1, q2, q3]): Quaternion<f64>) -> DirectionCosines<f64> {
     let m11 = (q0*q0 + q1*q1).mul_add(2.0, -1.0);
@@ -94,7 +99,7 @@ pub fn to_direction_cosines((q0, [q1, q2, q3]): Quaternion<f64>) -> DirectionCos
     ]
 }
 
-/// 四元数をオイラー角[rad]に変換
+/// 四元数をオイラー角[rad]に変換．
 /// Quaternion --> [roll, pitch, yaw]
 #[inline(always)]
 pub fn to_euler_angles((q0, [q1, q2, q3]): Quaternion<f64>) -> Vector3<f64> {
@@ -266,8 +271,9 @@ pub fn negate(q: Quaternion<f64>) -> Quaternion<f64> {
     ( -q.0, negate_vec(q.1) )
 }
 
-/// ハミルトン積のために定義した，特別なベクトル同士の積
-/// ab ≡ -a・b + a×b
+/// ハミルトン積のために定義した，特別なベクトル同士の積（非可換）．
+/// この積は，二つのベクトルを純虚四元数と見なした場合のハミルトン積と等しい．
+/// "ab ≡ -a・b + a×b" (!= ba)
 #[inline(always)]
 pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
     ( -dot_vec(a, b), cross_vec(a, b) )
@@ -279,7 +285,7 @@ pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
 /// The product order is "ab"(!= ba)
 #[inline(always)]
 pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
-    let q_s = a.0 * b.0 - dot_vec(a.1, b.1);
+    let q_s = a.0.mul_add( b.0, -dot_vec(a.1, b.1) );
     let tmp = scale_add_vec( b.0, a.1, cross_vec(a.1, b.1) );
     let q_v = scale_add_vec( a.0, b.1, tmp );
     (q_s, q_v)
@@ -320,7 +326,7 @@ pub fn exp(a: Quaternion<f64>) -> Quaternion<f64> {
 }
 
 /// 四元数の自然対数
-/// Natural logarithm of quaternion
+/// Natural logarithm of quaternion.
 #[inline(always)]
 pub fn ln(a: Quaternion<f64>) -> Quaternion<f64> {
     let norm = norm(a);
@@ -374,8 +380,8 @@ pub fn rotate_a_to_b(a: Vector3<f64>, b: Vector3<f64>, t: f64) -> Quaternion<f64
     let a = normalize_vec(a);
     let b = normalize_vec(b);
     let axis = cross_vec(a, b);
-    let theta = acos_safe( dot_vec(a, b) );
-    from_axis_angle(axis, theta * t)
+    let angle = acos_safe( dot_vec(a, b) );
+    from_axis_angle(axis, angle * t)
 }
 
 /// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
