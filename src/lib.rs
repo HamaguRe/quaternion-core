@@ -41,10 +41,10 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 pub fn from_direction_cosines(m: DirectionCosines<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let tmp = (4.0 * q0).recip();  // reciprocal
-    let q1 = (m[1][2] - m[2][1]) * tmp;
-    let q2 = (m[2][0] - m[0][2]) * tmp;
-    let q3 = (m[0][1] - m[1][0]) * tmp;
-    (q0, [q1, q2, q3])
+    let q1 = m[1][2] - m[2][1];
+    let q2 = m[2][0] - m[0][2];
+    let q3 = m[0][1] - m[1][0];
+    ( q0, scale_vec(tmp, [q1, q2, q3]) )
 }
 
 /// オイラー角から四元数を生成．
@@ -201,9 +201,9 @@ pub fn scale(s: f64, a: Quaternion<f64>) -> Quaternion<f64> {
 }
 
 /// compute "s*a + b"
-/// CPUがFMA命令をサポートしている場合，
+/// CPUがFMA(Fused multiply–add)命令をサポートしている場合，
 /// "add_vec(scale_vec(s, a), b)" よりも高速に計算出来る．
-/// If the CPU supports FMA instructions,
+/// If the CPU supports FMA(Fused multiply–add) instructions,
 /// this is faster than "add_vec(scale_vec(s, a), b)".
 #[inline(always)]
 pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
@@ -214,10 +214,10 @@ pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
 }
 
 /// compute "s*a + b"
-/// CPUがFMA命令をサポートしている場合，
+/// CPUがFMA(Fused multiply–add)命令をサポートしている場合，
 /// "add(scale(s, a), b)" よりも高速に計算出来る．
-/// If the CPU supports FMA instructions,
-/// this is faster than "add_vec(scale_vec(s, a), b)".
+/// If the CPU supports FMA(Fused multiply–add) instructions,
+/// this is faster than "add(scale(s, a), b)".
 #[inline(always)]
 pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     let q0 = s.mul_add(a.0, b.0);
@@ -285,9 +285,11 @@ pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
 /// The product order is "ab"(!= ba)
 #[inline(always)]
 pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
-    let q_s = a.0.mul_add( b.0, -dot_vec(a.1, b.1) );
-    let tmp = scale_add_vec( b.0, a.1, cross_vec(a.1, b.1) );
-    let q_v = scale_add_vec( a.0, b.1, tmp );
+    let q_s  = a.0.mul_add( b.0, -dot_vec(a.1, b.1) );
+    let tmp0 = scale_vec(a.0, b.1);
+    let tmp1 = scale_vec(b.0, a.1);
+    let tmp2 = cross_vec(a.1, b.1);
+    let q_v  = add_vec( add_vec(tmp0, tmp1), tmp2 );
     (q_s, q_v)
 }
 
@@ -351,9 +353,10 @@ pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 #[inline(always)]
 pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let q = normalize(q);
-    let tmp1  = scale_vec( 2.0, cross_vec(q.1, r) );
+    let cross = cross_vec(q.1, r);
+    let tmp1  = scale_vec(2.0, cross);
     let term1 = scale_add_vec(q.0, r, tmp1);
-    let tmp2  = cross_vec( q.1, cross_vec(q.1, r) );
+    let tmp2  = cross_vec(q.1, cross);
     let term2 = scale_add_vec( dot_vec(r, q.1), q.1, tmp2 );
     scale_add_vec(q.0, term1, term2)
 }
@@ -363,9 +366,10 @@ pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
 #[inline(always)]
 pub fn coordinate_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let q = normalize(q);
-    let tmp1  = scale_vec( 2.0, cross_vec(r, q.1) );
+    let cross = cross_vec(q.1, r);
+    let tmp1  = scale_vec(-2.0, cross);
     let term1 = scale_add_vec(q.0, r, tmp1);
-    let tmp2  = cross_vec( q.1, cross_vec(q.1, r) );
+    let tmp2  = cross_vec(q.1, cross);
     let term2 = scale_add_vec( dot_vec(r, q.1), q.1, tmp2 );
     scale_add_vec(q.0, term1, term2)
 }
@@ -433,8 +437,7 @@ pub fn slerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> 
     // Normalize to avoid undefined behavior.
     let a = normalize(a);
     let mut b = normalize(b);
-    // 最短経路で補間する．
-    let mut dot = dot(a, b);
+    let mut dot = dot(a, b);  // 最短経路で補間する．
     if dot.is_sign_negative() == true {
         b = negate(b);
         dot = -dot;
@@ -459,8 +462,7 @@ pub fn slerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> 
 pub fn slerp_1(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let a = normalize(a);
     let mut b = normalize(b);
-    // 最短経路で補完
-    let mut dot = dot(a, b);
+    let mut dot = dot(a, b);  // 最短経路で補完
     if dot.is_sign_negative() == true {
         b = negate(b);
         dot = -dot;

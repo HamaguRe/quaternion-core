@@ -9,7 +9,7 @@
   * [四元数まとめ資料を書いた（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
 
 #### 【English】
-  It's a quaternion library written in Rust.
+  It's a Quaternion library written in Rust.
 
   Refer to the documentation comments for function behavior.
 
@@ -17,7 +17,7 @@
 #### Cargo.toml
 ```
 [dependencies]
-quaternion = {git="https://github.com/HamaguRe/quaternion.git", rev="f0100da10378f36b7079b0452485460577e0ae04"}
+quaternion = { git="https://github.com/HamaguRe/quaternion.git" }
 ```
 
 #### src/main.rs
