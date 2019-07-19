@@ -35,18 +35,6 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     ( f.1, scale_vec(f.0, n) )
 }
 
-/// 方向余弦行列から四元数を生成．
-/// Generate quaternion from direction cosine matrix.
-#[inline(always)]
-pub fn from_direction_cosines(m: DirectionCosines<f64>) -> Quaternion<f64> {
-    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
-    let tmp = (4.0 * q0).recip();  // reciprocal
-    let q1 = m[1][2] - m[2][1];
-    let q2 = m[2][0] - m[0][2];
-    let q3 = m[0][1] - m[1][0];
-    ( q0, scale_vec(tmp, [q1, q2, q3]) )
-}
-
 /// オイラー角から四元数を生成．
 /// Generate quaternions from Euler angles[rad].
 #[inline(always)]
@@ -54,7 +42,7 @@ pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
     let alpha = yaw   * 0.5;
     let beta  = pitch * 0.5;
     let gamma = roll  * 0.5;
-    // Compute these value only once
+    // Compute these value only once.
     let (sin_alpha, cos_alpha) = alpha.sin_cos();
     let (sin_beta,  cos_beta)  = beta.sin_cos();
     let (sin_gamma, cos_gamma) = gamma.sin_cos();
@@ -63,7 +51,19 @@ pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
     let q1 = cos_alpha * cos_beta * sin_gamma - sin_alpha * sin_beta * cos_gamma;
     let q2 = cos_alpha * sin_beta * cos_gamma + sin_alpha * cos_beta * sin_gamma;
     let q3 = sin_alpha * cos_beta * cos_gamma - cos_alpha * sin_beta * sin_gamma;
-    (q0, [q1, q2, q3])
+    normalize( (q0, [q1, q2, q3]) )
+}
+
+/// 方向余弦行列から四元数を生成．
+/// Generate quaternion from direction cosine matrix.
+#[inline(always)]
+pub fn from_direction_cosines(m: DirectionCosines<f64>) -> Quaternion<f64> {
+    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
+    let q1 = m[1][2] - m[2][1];
+    let q2 = m[2][0] - m[0][2];
+    let q3 = m[0][1] - m[1][0];
+    let tmp = (4.0 * q0).recip();  // reciprocal
+    normalize( ( q0, scale_vec(tmp, [q1, q2, q3]) ) )
 }
 
 /// 回転を表す四元数から，回転軸（単位ベクトル）と軸回りの回転角[rad]を取り出す．
@@ -78,31 +78,12 @@ pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     (axis, angle)
 }
 
-/// 四元数を方向余弦行列（回転行列）に変換．
-/// Convert quaternion to directional cosine matrix.
-#[inline(always)]
-pub fn to_direction_cosines((q0, [q1, q2, q3]): Quaternion<f64>) -> DirectionCosines<f64> {
-    let m11 = (q0*q0 + q1*q1).mul_add(2.0, -1.0);
-    let m12 = (q1*q2 + q0*q3) * 2.0;
-    let m13 = (q1*q3 - q0*q2) * 2.0;
-    let m21 = (q1*q2 - q0*q3) * 2.0;
-    let m22 = (q0*q0 + q2*q2).mul_add(2.0, -1.0);
-    let m23 = (q2*q3 + q0*q1) * 2.0;
-    let m31 = (q1*q3 + q0*q2) * 2.0;
-    let m32 = (q2*q3 - q0*q1) * 2.0;
-    let m33 = (q0*q0 + q3*q3).mul_add(2.0, -1.0);
-
-    [
-        [m11, m12, m13],
-        [m21, m22, m23],
-        [m31, m32, m33]
-    ]
-}
-
 /// 四元数をオイラー角[rad]に変換．
 /// Quaternion --> [roll, pitch, yaw]
 #[inline(always)]
-pub fn to_euler_angles((q0, [q1, q2, q3]): Quaternion<f64>) -> Vector3<f64> {
+pub fn to_euler_angles(q: Quaternion<f64>) -> Vector3<f64> {
+    let (q0, [q1, q2, q3]) = normalize(q);
+
     let m11 = (q0*q0 + q1*q1).mul_add(2.0, -1.0);
     let m12 = (q1*q2 + q0*q3) * 2.0;
     let m13 = (q1*q3 - q0*q2) * 2.0;
@@ -114,6 +95,77 @@ pub fn to_euler_angles((q0, [q1, q2, q3]): Quaternion<f64>) -> Vector3<f64> {
     let yaw   = (m12 / m11).atan();
 
     [roll, pitch, yaw]
+}
+
+/// 位置ベクトルの回転を表す四元数を方向余弦行列（回転行列）に変換．
+#[inline(always)]
+pub fn to_direction_cosines_vector(q: Quaternion<f64>) -> DirectionCosines<f64> {
+    let (q0, [q1, q2, q3]) = normalize(q);
+    // Compute these value only once.
+    let q0_q0 = q0 * q0;
+    let q0_q1 = q0 * q1;
+    let q0_q2 = q0 * q2;
+    let q0_q3 = q0 * q3;
+    let q1_q2 = q1 * q2;
+    let q1_q3 = q1 * q3;
+    let q2_q3 = q2 * q3;
+
+    let m11 = (q0_q0 + q1*q1).mul_add(2.0, -1.0);
+    let m12 = (q1_q2 - q0_q3) * 2.0;
+    let m13 = (q1_q3 + q0_q2) * 2.0;
+    let m21 = (q1_q2 + q0_q3) * 2.0;
+    let m22 = (q0_q0 + q2*q2).mul_add(2.0, -1.0);
+    let m23 = (q2_q3 - q0_q1) * 2.0;
+    let m31 = (q1_q3 - q0_q2) * 2.0;
+    let m32 = (q2_q3 + q0_q1) * 2.0;
+    let m33 = (q0_q0 + q3*q3).mul_add(2.0, -1.0);
+
+    [
+        [m11, m12, m13],
+        [m21, m22, m23],
+        [m31, m32, m33]
+    ]
+}
+
+/// 座標系の回転を表す四元数を方向余弦行列（回転行列）に変換．
+#[inline(always)]
+pub fn to_direction_cosines_frame(q: Quaternion<f64>) -> DirectionCosines<f64> {
+    let (q0, [q1, q2, q3]) = normalize(q);
+    // Compute these value only once.
+    let q0_q0 = q0 * q0;
+    let q0_q1 = q0 * q1;
+    let q0_q2 = q0 * q2;
+    let q0_q3 = q0 * q3;
+    let q1_q2 = q1 * q2;
+    let q1_q3 = q1 * q3;
+    let q2_q3 = q2 * q3;
+
+    let m11 = (q0_q0 + q1*q1).mul_add(2.0, -1.0);
+    let m12 = (q1_q2 + q0_q3) * 2.0;
+    let m13 = (q1_q3 - q0_q2) * 2.0;
+    let m21 = (q1_q2 - q0_q3) * 2.0;
+    let m22 = (q0_q0 + q2*q2).mul_add(2.0, -1.0);
+    let m23 = (q2_q3 + q0_q1) * 2.0;
+    let m31 = (q1_q3 + q0_q2) * 2.0;
+    let m32 = (q2_q3 - q0_q1) * 2.0;
+    let m33 = (q0_q0 + q3*q3).mul_add(2.0, -1.0);
+
+    [
+        [m11, m12, m13],
+        [m21, m22, m23],
+        [m31, m32, m33]
+    ]
+}
+
+/// 方向余弦行列（回転行列）を用いてベクトルを回転させる．
+/// 四元数を用いる場合よりも計算量が少ないため，多くのベクトルに対して回転を適用する場合には
+/// 一度方向余弦行列に変換してからベクトルを回転させたほうが速度面で有利になるかもしれない．
+#[inline(always)]
+pub fn matrix_product(m: DirectionCosines<f64>, r: Vector3<f64>) -> Vector3<f64> {
+    let x = dot_vec(m[0], r);
+    let y = dot_vec(m[1], r);
+    let z = dot_vec(m[2], r);
+    [x, y, z]
 }
 
 /// 回転を表す四元数から，単位ベクトル（回転軸）を取り出す．
@@ -285,7 +337,7 @@ pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
 /// The product order is "ab"(!= ba)
 #[inline(always)]
 pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
-    let q_s  = a.0.mul_add( b.0, -dot_vec(a.1, b.1) );
+    let q_s  = a.0 * b.0 - dot_vec(a.1, b.1);
     let tmp0 = scale_vec(a.0, b.1);
     let tmp1 = scale_vec(b.0, a.1);
     let tmp2 = cross_vec(a.1, b.1);
@@ -349,10 +401,11 @@ pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 }
 
 /// 位置ベクトルの回転
-/// r' = q r q*
+/// r' = q r q*  (||q|| = 1)
+/// 引数"q"のノルムは1でなければならない．
+/// The norm of argument "q" must be 1.
 #[inline(always)]
 pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
-    let q = normalize(q);
     let cross = cross_vec(q.1, r);
     let tmp1  = scale_vec(2.0, cross);
     let term1 = scale_add_vec(q.0, r, tmp1);
@@ -362,10 +415,11 @@ pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
 }
 
 /// 座標系の回転
-/// r' = q* r q
+/// r' = q* r q  (||q|| = 1)
+/// 引数"q"のノルムは1でなければならない．
+/// The norm of argument "q" must be 1.
 #[inline(always)]
-pub fn coordinate_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
-    let q = normalize(q);
+pub fn frame_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let cross = cross_vec(q.1, r);
     let tmp1  = scale_vec(-2.0, cross);
     let term1 = scale_add_vec(q.0, r, tmp1);
@@ -389,7 +443,7 @@ pub fn rotate_a_to_b(a: Vector3<f64>, b: Vector3<f64>, t: f64) -> Quaternion<f64
 }
 
 /// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
-/// Integrate attitude change of body coordinate system, 
+/// Integrate attitude change of body coordinate frame, 
 /// and update Quaternion passed to the argument.
 /// accel[rad/sec]
 /// dt[sec]
@@ -403,7 +457,7 @@ pub fn integration(q: Quaternion<f64>, accel: Vector3<f64>, dt: f64) -> Quaterni
 /// オイラー法
 /// Euler method
 /// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
-/// Integrate attitude change of body coordinate system, 
+/// Integrate attitude change of body coordinate frame, 
 /// and update Quaternion passed to the argument.
 /// accel[rad/sec]
 /// dt[sec]
@@ -454,9 +508,10 @@ pub fn slerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> 
     scale( omega.sin().recip(), tmp )
 }
 
-/// 四元数の冪乗を用いたSlerp
-/// Sherical linear interpolation. 
-/// Use quaternion's exponential.
+/// 四元数の冪乗を用いたSlerpアルゴリズム．
+/// 計算結果はslerp関数と同じ．
+/// Slerp algorithm using quaternion powers.
+/// The calculation result is the same as the slerp function.
 /// "a" --> "b".
 #[inline(always)]
 pub fn slerp_1(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> {

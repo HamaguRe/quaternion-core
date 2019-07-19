@@ -73,6 +73,27 @@ fn test_negate() {
     assert_eq!( p, (1.0, [-1.0, -2.0, 1.0]) )
 }
 
+// 回転行列に変換してからベクトルを回転させる．
+#[test]
+fn test_rotate_by_direction_cosines() {
+    let r: Vector3<f64> = [2.0, 2.0, 0.0];
+    let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
+
+    // 位置ベクトルの回転
+    let m = to_direction_cosines_vector(q);
+    let result = matrix_product(m, r);
+    assert!( (result[0] - 0.0).abs() < EPSILON);
+    assert!( (result[1] - 2.0).abs() < EPSILON);
+    assert!( (result[2] + 2.0).abs() < EPSILON);
+
+    // 座標系の回転
+    let m = to_direction_cosines_frame(q);
+    let result = matrix_product(m, r);
+    assert!( (result[0] - 0.0).abs() < EPSILON);
+    assert!( (result[1] - 2.0).abs() < EPSILON);
+    assert!( (result[2] - 2.0).abs() < EPSILON);
+}
+
 // 手計算した結果で動作確認
 #[test]
 fn test_vector_rotation() {
@@ -85,10 +106,10 @@ fn test_vector_rotation() {
 }
 
 #[test]
-fn test_coordinate_rotation() {
+fn test_frame_rotation() {
     let r = [2.0, 2.0, 0.0];
     let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
-    let result = coordinate_rotation(q, r);
+    let result = frame_rotation(q, r);
     assert!( (result[0] - 0.0).abs() < EPSILON);
     assert!( (result[1] - 2.0).abs() < EPSILON);
     assert!( (result[2] - 2.0).abs() < EPSILON);
@@ -164,7 +185,7 @@ fn test_integration() {
     let mut r: Vector3<f64> = [2.0, 2.0, 0.0];
 
     let q = integration(q0, omega, dt);
-    r = coordinate_rotation(q, r);
+    r = frame_rotation(q, r);
     assert!( (r[0] - 0.0).abs() < EPSILON );
     assert!( (r[1] - 2.0).abs() < EPSILON );
     assert!( (r[2] - 2.0).abs() < EPSILON );
