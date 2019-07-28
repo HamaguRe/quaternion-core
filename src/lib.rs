@@ -62,8 +62,8 @@ pub fn from_direction_cosines(m: DirectionCosines<f64>) -> Quaternion<f64> {
     let q1 = m[1][2] - m[2][1];
     let q2 = m[2][0] - m[0][2];
     let q3 = m[0][1] - m[1][0];
-    let tmp = (4.0 * q0).recip();  // reciprocal
-    normalize( ( q0, scale_vec(tmp, [q1, q2, q3]) ) )
+    let coef = (4.0 * q0).recip();  // reciprocal
+    normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
 }
 
 /// 回転を表す四元数から，回転軸（単位ベクトル）と軸回りの回転角[rad]を取り出す．
@@ -97,7 +97,8 @@ pub fn to_euler_angles(q: Quaternion<f64>) -> Vector3<f64> {
     [roll, pitch, yaw]
 }
 
-/// 位置ベクトルの回転を表す四元数を方向余弦行列（回転行列）に変換．
+/// 位置ベクトルの回転を表す四元数を，方向余弦行列（回転行列）に変換．
+/// q r q* と同じ回転を表す．
 #[inline(always)]
 pub fn to_direction_cosines_vector(q: Quaternion<f64>) -> DirectionCosines<f64> {
     let (q0, [q1, q2, q3]) = normalize(q);
@@ -127,7 +128,8 @@ pub fn to_direction_cosines_vector(q: Quaternion<f64>) -> DirectionCosines<f64> 
     ]
 }
 
-/// 座標系の回転を表す四元数を方向余弦行列（回転行列）に変換．
+/// 座標系の回転を表す四元数を，方向余弦行列（回転行列）に変換．
+/// q* r q と同じ回転を表す．
 #[inline(always)]
 pub fn to_direction_cosines_frame(q: Quaternion<f64>) -> DirectionCosines<f64> {
     let (q0, [q1, q2, q3]) = normalize(q);
@@ -173,13 +175,14 @@ pub fn matrix_product(m: DirectionCosines<f64>, r: Vector3<f64>) -> Vector3<f64>
 /// norm(q)==1であることを前提とする．
 /// 引数に渡す四元数のノルムが保証できない場合には
 /// normalize_vec関数を用いるべき．
+/// 単位四元数を入力した場合には零ベクトルを返す．
 #[inline(always)]
 pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
-    if q.0 == 1.0 {
+    let coef = ( q.0.mul_add(-q.0, 1.0) ).sqrt();
+    if coef == 0.0 {
         return [0.0; 3];  // ゼロ除算回避
     }
-    let tmp = q.0.mul_add(-q.0, 1.0);
-    scale_vec( tmp.sqrt().recip(), q.1 )
+    scale_vec( coef.recip(), q.1 )
 }
 
 /// ベクトルの内積
@@ -194,7 +197,7 @@ pub fn dot_vec(a: Vector3<f64>, b: Vector3<f64>) -> f64 {
 /// a・b
 #[inline(always)]
 pub fn dot(a: Quaternion<f64>, b: Quaternion<f64>) -> f64 {
-    a.0.mul_add( b.0, dot_vec(a.1, b.1) )
+    a.0 * b.0 + dot_vec(a.1, b.1)
 }
 
 /// ベクトル積（外積）
@@ -272,9 +275,9 @@ pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
 /// this is faster than "add(scale(s, a), b)".
 #[inline(always)]
 pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
-    let q0 = s.mul_add(a.0, b.0);
-    let vec = scale_add_vec(s, a.1, b.1);
-    (q0, vec)
+    let q_s = s.mul_add(a.0, b.0);
+    let q_v = scale_add_vec(s, a.1, b.1);
+    (q_s, q_v)
 }
 
 /// L2ノルムを計算
@@ -292,7 +295,9 @@ pub fn norm(a: Quaternion<f64>) -> f64 {
 }
 
 /// ノルムが1になるように正規化
+/// 零ベクトルを入力した場合は零ベクトルを返す．
 /// Normalization
+/// If you enter a zero vector, it returns a zero vector.
 #[inline(always)]
 pub fn normalize_vec(r: Vector3<f64>) -> Vector3<f64> {
     let norm = norm_vec(r);
@@ -337,12 +342,11 @@ pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
 /// The product order is "ab"(!= ba)
 #[inline(always)]
 pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
-    let q_s  = a.0 * b.0 - dot_vec(a.1, b.1);
     let tmp0 = scale_vec(a.0, b.1);
     let tmp1 = scale_vec(b.0, a.1);
-    let tmp2 = cross_vec(a.1, b.1);
-    let q_v  = add_vec( add_vec(tmp0, tmp1), tmp2 );
-    (q_s, q_v)
+    let term1 = ( a.0 * b.0, add_vec(tmp0, tmp1) );
+    let term2 = mul_vec(a.1, b.1);
+    add(term1, term2)
 }
 
 /// 共役四元数を求める
@@ -464,34 +468,36 @@ pub fn integration(q: Quaternion<f64>, accel: Vector3<f64>, dt: f64) -> Quaterni
 #[inline(always)]
 pub fn integration_euler(q: Quaternion<f64>, accel: Vector3<f64>, dt: f64) -> Quaternion<f64> {
     let tmp = mul( (0.0, accel), q );
-    let q_int = scale_add(dt*0.5, tmp, q);
-    normalize( q_int )
+    normalize( scale_add(dt*0.5, tmp, q) )
 }
 
 /// 線形補間
 /// 引数"a"から"b"への経路を補完する四元数を生成する．
 /// 引数t(0 <= t <= 1) は補間パラメータ．
+/// "a"と"b"のノルムは必ず1でなければならない．
 /// Linear interpolation
 /// Generate a quaternion that interpolate the route from "a" to "b".
 /// The argument t(0 <= t <= 1) is the interpolation parameter.
+/// The norm of "a" and "b" must be 1.
 #[inline(always)]
 pub fn lerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
-    let q = scale_add( 1.0 - t, a, scale(t, b) );
-    normalize(q)
+    let term1 = scale(1.0 - t, a);
+    let term2 = scale(t, b);
+    normalize( add(term1, term2) )
 }
 
 /// 球状線形補間
 /// "a"から"b"への経路を補完する四元数を生成する．
 /// 引数t(0 <= t <= 1) は補間パラメータ．
+/// "a"と"b"のノルムは必ず1でなければならない．
 /// Spherical linear interpolation
 /// Generate a quaternion that interpolate the route from "a" to "b".
+/// The norm of "a" and "b" must be 1.
 /// The argument t(0 <= t <= 1) is the interpolation parameter.
 #[inline(always)]
-pub fn slerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
-    // Normalize to avoid undefined behavior.
-    let a = normalize(a);
-    let mut b = normalize(b);
-    let mut dot = dot(a, b);  // 最短経路で補間する．
+pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
+    // 最短経路で補間
+    let mut dot = dot(a, b);
     if dot.is_sign_negative() == true {
         b = negate(b);
         dot = -dot;
@@ -504,20 +510,22 @@ pub fn slerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> 
     let omega = acos_safe(dot);  // Angle between the two quaternion
     let s1 = ( (1.0 - t) * omega ).sin();
     let s2 = (t * omega).sin();
-    let tmp = scale_add( s1, a, scale(s2, b) );
-    scale( omega.sin().recip(), tmp )
+    let term1 = scale(s1, a);
+    let term2 = scale(s2, b);
+    scale( omega.sin().recip(), add(term1, term2) )
 }
 
 /// 四元数の冪乗を用いたSlerpアルゴリズム．
 /// 計算結果はslerp関数と同じ．
+/// "a"と"b"のノルムは必ず1でなければならない．
 /// Slerp algorithm using quaternion powers.
-/// The calculation result is the same as the slerp function.
-/// "a" --> "b".
+/// The calculation result is the same as the slerp() function.
+/// The norm of "a" and "b" must be 1.
+/// "a" --> "b"
 #[inline(always)]
-pub fn slerp_1(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
-    let a = normalize(a);
-    let mut b = normalize(b);
-    let mut dot = dot(a, b);  // 最短経路で補完
+pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
+    // 最短経路で補間
+    let mut dot = dot(a, b);
     if dot.is_sign_negative() == true {
         b = negate(b);
         dot = -dot;
