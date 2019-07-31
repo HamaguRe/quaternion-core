@@ -8,34 +8,27 @@ pub type DirectionCosines<T> = [Vector3<T>; 3];
 const PI: f64 = std::f64::consts::PI;
 const FRAC_PI_2: f64 = std::f64::consts::FRAC_PI_2;  // π/2
 const THRESHOLD: f64 = 0.9995;
+pub const IDENTITY: Quaternion<f64> = (1.0, [0.0; 3]);  // Identity Quaternion
 
 
-/// 恒等四元数を生成．
-/// Generate identity quaternion.
-#[inline(always)]
-pub fn id() -> Quaternion<f64> {
-    (1.0, [0.0; 3])
-}
-
-/// 回転角と軸ベクトルを指定して四元数を生成．
+/// 回転角[rad]と軸ベクトルを指定して四元数を生成．
 /// axisは単位ベクトルでなくても良い．
 /// 零ベクトルを入力した場合は，恒等四元数を返す．
-/// Generate quaternion by specifying rotation angle and axis vector.
+/// Generate quaternion by specifying rotation angle[rad] and axis vector.
 /// The "axis" need not be unit vector.
 /// If you enter a zero vector, it returns an identity quaternion.
-/// angle[rad]
 #[inline(always)]
 pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     let norm = norm_vec(axis);
     if (norm == 0.0) || (angle == 0.0) {
-        return id();
+        return IDENTITY;
     }
     let n = scale_vec( norm.recip(), axis );
     let f = (angle * 0.5).sin_cos();
     ( f.1, scale_vec(f.0, n) )
 }
 
-/// オイラー角から四元数を生成．
+/// オイラー角[rad]から四元数を生成．
 /// Generate quaternions from Euler angles[rad].
 #[inline(always)]
 pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
@@ -164,10 +157,11 @@ pub fn to_direction_cosines_frame(q: Quaternion<f64>) -> DirectionCosines<f64> {
 /// 一度方向余弦行列に変換してからベクトルを回転させたほうが速度面で有利になるかもしれない．
 #[inline(always)]
 pub fn matrix_product(m: DirectionCosines<f64>, r: Vector3<f64>) -> Vector3<f64> {
-    let x = dot_vec(m[0], r);
-    let y = dot_vec(m[1], r);
-    let z = dot_vec(m[2], r);
-    [x, y, z]
+    [
+        dot_vec(m[0], r),
+        dot_vec(m[1], r),
+        dot_vec(m[2], r)
+    ]
 }
 
 /// 回転を表す四元数から，単位ベクトル（回転軸）を取り出す．
@@ -185,14 +179,14 @@ pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
     scale_vec( coef.recip(), q.1 )
 }
 
-/// ベクトルの内積
+/// ベクトルのスカラー積（内積）
 /// Dot product of vector
 #[inline(always)]
 pub fn dot_vec(a: Vector3<f64>, b: Vector3<f64>) -> f64 {
     a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 }
 
-/// 四元数の内積
+/// 四元数のスカラー積（内積）
 /// Dot product of quaternion
 /// a・b
 #[inline(always)]
@@ -205,10 +199,11 @@ pub fn dot(a: Quaternion<f64>, b: Quaternion<f64>) -> f64 {
 /// a×b
 #[inline(always)]
 pub fn cross_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
-    let vec0 = a[1]*b[2] - a[2]*b[1];
-    let vec1 = a[2]*b[0] - a[0]*b[2];
-    let vec2 = a[0]*b[1] - a[1]*b[0];
-    [vec0, vec1, vec2]
+    [
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0]
+    ]
 }
 
 /// 二つのベクトルを加算する
@@ -262,10 +257,11 @@ pub fn scale(s: f64, a: Quaternion<f64>) -> Quaternion<f64> {
 /// this is faster than "add_vec(scale_vec(s, a), b)".
 #[inline(always)]
 pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
-    let vec0 = s.mul_add(a[0], b[0]);
-    let vec1 = s.mul_add(a[1], b[1]);
-    let vec2 = s.mul_add(a[2], b[2]);
-    [vec0, vec1, vec2]
+    [
+        s.mul_add(a[0], b[0]),
+        s.mul_add(a[1], b[1]),
+        s.mul_add(a[2], b[2])
+    ]
 }
 
 /// compute "s*a + b"
@@ -369,7 +365,7 @@ pub fn inverse(a: Quaternion<f64>) -> Quaternion<f64> {
 pub fn exp_vec(a: Vector3<f64>) -> Quaternion<f64> {
     let norm = norm_vec(a);
     if norm == 0.0 {
-        return id();
+        return IDENTITY;
     }
     let n = scale_vec( norm.recip(), a );
     let f = norm.sin_cos();

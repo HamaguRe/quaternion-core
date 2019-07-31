@@ -161,7 +161,7 @@ fn test_cross() {
 
 #[test]
 fn test_exp_ln() {
-    let q_0 = id();
+    let q_0 = IDENTITY;
     let omega = [1.0, 2.0, 1.0];
     let dt = 1.0f64;
     let q_1 = integration(q_0, omega, dt);
@@ -179,7 +179,7 @@ fn test_exp_ln() {
 /// 角速度を正しく積分出来ているかテスト
 #[test]
 fn test_integration() {
-    let q0 = id();
+    let q0 = IDENTITY;
     let omega: Vector3<f64> = [0.0, PI/2.0, 0.0];  // [rad/s]
     let dt = 1.0;  // [s]
     let mut r: Vector3<f64> = [2.0, 2.0, 0.0];
@@ -197,8 +197,8 @@ fn test_integration_method() {
     let omega: Vector3<f64> = [PI/6.0, PI/2.0, PI/4.0];  // [rad/s]
     let dt = 0.001;  // [s]
 
-    let mut q_1 = id();
-    let mut q_2 = id();
+    let mut q_1 = IDENTITY;
+    let mut q_2 = IDENTITY;
     for _ in 0..1000 {
         // 理論的には正確な積分を行う．
         // dt間の角速度が一定であれば，dtを大きくしても正確に積分できる．
