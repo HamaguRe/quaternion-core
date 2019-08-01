@@ -8,7 +8,9 @@ pub type DirectionCosines<T> = [Vector3<T>; 3];
 const PI: f64 = std::f64::consts::PI;
 const FRAC_PI_2: f64 = std::f64::consts::FRAC_PI_2;  // π/2
 const THRESHOLD: f64 = 0.9995;
-pub const IDENTITY: Quaternion<f64> = (1.0, [0.0; 3]);  // Identity Quaternion
+const ZERO_VECTOR: [f64; 3] = [0.0; 3];
+
+pub const IDENTITY: Quaternion<f64> = (1.0, ZERO_VECTOR);  // Identity Quaternion
 
 
 /// 回転角[rad]と軸ベクトルを指定して四元数を生成．
@@ -23,9 +25,8 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     if (norm == 0.0) || (angle == 0.0) {
         return IDENTITY;
     }
-    let n = scale_vec( norm.recip(), axis );
     let f = (angle * 0.5).sin_cos();
-    ( f.1, scale_vec(f.0, n) )
+    ( f.1, scale_vec( f.0 / norm, axis ) )
 }
 
 /// オイラー角[rad]から四元数を生成．
@@ -174,7 +175,7 @@ pub fn matrix_product(m: DirectionCosines<f64>, r: Vector3<f64>) -> Vector3<f64>
 pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
     let coef = ( q.0.mul_add(-q.0, 1.0) ).sqrt();
     if coef == 0.0 {
-        return [0.0; 3];  // ゼロ除算回避
+        return ZERO_VECTOR;  // ゼロ除算回避
     }
     scale_vec( coef.recip(), q.1 )
 }
@@ -298,7 +299,7 @@ pub fn norm(a: Quaternion<f64>) -> f64 {
 pub fn normalize_vec(r: Vector3<f64>) -> Vector3<f64> {
     let norm = norm_vec(r);
     if norm == 0.0 {
-        return [0.0; 3];  // ゼロ除算回避
+        return ZERO_VECTOR;  // ゼロ除算回避
     }
     scale_vec( norm.recip(), r )
 }
@@ -367,9 +368,8 @@ pub fn exp_vec(a: Vector3<f64>) -> Quaternion<f64> {
     if norm == 0.0 {
         return IDENTITY;
     }
-    let n = scale_vec( norm.recip(), a );
     let f = norm.sin_cos();
-    ( f.1, scale_vec(f.0, n) )
+    ( f.1, scale_vec( f.0 / norm, a ) )
 }
 
 /// ネイピア数eの四元数冪
@@ -384,9 +384,12 @@ pub fn exp(a: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn ln(a: Quaternion<f64>) -> Quaternion<f64> {
     let norm = norm(a);
-    let n = normalize_vec(a.1);
+    let norm_vec = norm_vec(a.1);
+    if norm_vec == 0.0 {
+        return ( norm.ln(), ZERO_VECTOR );
+    }
     let tmp = acos_safe(a.0 / norm);
-    ( norm.ln(), scale_vec(tmp, n) )
+    ( norm.ln(), scale_vec(tmp / norm_vec, a.1) )
 }
 
 /// 四元数の冪乗
@@ -394,9 +397,12 @@ pub fn ln(a: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let coef = norm(a).powf(t);
-    let n = normalize_vec(a.1);
     let f = ( t * acos_safe(a.0) ).sin_cos();
-    let q_v = scale_vec(f.0, n);
+    let norm_vec = norm_vec(a.1);
+    if norm_vec == 0.0 {
+        return scale( coef, (f.1, ZERO_VECTOR) );
+    }
+    let q_v = scale_vec(f.0 / norm_vec, a.1);
     scale( coef, (f.1, q_v) )
 }
 
