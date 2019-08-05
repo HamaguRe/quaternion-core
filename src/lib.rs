@@ -8,7 +8,7 @@ pub type DirectionCosines<T> = [Vector3<T>; 3];
 const PI: f64 = std::f64::consts::PI;
 const FRAC_PI_2: f64 = std::f64::consts::FRAC_PI_2;  // π/2
 const THRESHOLD: f64 = 0.9995;
-const ZERO_VECTOR: [f64; 3] = [0.0; 3];
+const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
 
 pub const IDENTITY: Quaternion<f64> = (1.0, ZERO_VECTOR);  // Identity Quaternion
 
@@ -33,9 +33,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 /// Generate quaternions from Euler angles[rad].
 #[inline(always)]
 pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
-    let alpha = yaw   * 0.5;
-    let beta  = pitch * 0.5;
-    let gamma = roll  * 0.5;
+    let [alpha, beta, gamma] = scale_vec( 0.5, [yaw, pitch, roll] );
     // Compute these value only once.
     let (sin_alpha, cos_alpha) = alpha.sin_cos();
     let (sin_beta,  cos_beta)  = beta.sin_cos();
@@ -386,7 +384,7 @@ pub fn ln(a: Quaternion<f64>) -> Quaternion<f64> {
     let norm = norm(a);
     let norm_vec = norm_vec(a.1);
     if norm_vec == 0.0 {
-        return ( norm.ln(), ZERO_VECTOR );
+        return (norm.ln(), ZERO_VECTOR);
     }
     let tmp = acos_safe(a.0 / norm);
     ( norm.ln(), scale_vec(tmp / norm_vec, a.1) )
@@ -400,7 +398,7 @@ pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let f = ( t * acos_safe(a.0) ).sin_cos();
     let norm_vec = norm_vec(a.1);
     if norm_vec == 0.0 {
-        return scale( coef, (f.1, ZERO_VECTOR) );
+        return (coef * f.1, ZERO_VECTOR);
     }
     let q_v = scale_vec(f.0 / norm_vec, a.1);
     scale( coef, (f.1, q_v) )
