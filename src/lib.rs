@@ -9,7 +9,6 @@ const PI: f64 = std::f64::consts::PI;
 const FRAC_PI_2: f64 = std::f64::consts::FRAC_PI_2;  // π/2
 const THRESHOLD: f64 = 0.9995;
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
-
 pub const IDENTITY: Quaternion<f64> = (1.0, ZERO_VECTOR);  // Identity Quaternion
 
 
@@ -46,10 +45,20 @@ pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
     normalize( (q0, [q1, q2, q3]) )
 }
 
-/// 方向余弦行列から四元数を生成．
+/// 位置ベクトルの回転を表す方向余弦行列から四元数を生成．
+pub fn from_direction_cosines_vector(m: DirectionCosines<f64>) -> Quaternion<f64> {
+    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
+    let q1 = m[2][1] - m[1][2];
+    let q2 = m[0][2] - m[2][0];
+    let q3 = m[1][0] - m[0][1];
+    let coef = (4.0 * q0).recip();
+    normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
+}
+
+/// 座標系回転を表す方向余弦行列から四元数を生成．
 /// Generate quaternion from direction cosine matrix.
 #[inline(always)]
-pub fn from_direction_cosines(m: DirectionCosines<f64>) -> Quaternion<f64> {
+pub fn from_direction_cosines_frame(m: DirectionCosines<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let q1 = m[1][2] - m[2][1];
     let q2 = m[2][0] - m[0][2];
@@ -516,7 +525,7 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
 }
 
 /// 四元数の冪乗を用いたSlerpアルゴリズム．
-/// 計算結果はslerp関数と同じ．
+/// 実装方法が違うだけで，計算結果はslerp関数と同じ．
 /// "a"と"b"のノルムは必ず1でなければならない．
 /// Slerp algorithm using quaternion powers.
 /// The calculation result is the same as the slerp() function.
