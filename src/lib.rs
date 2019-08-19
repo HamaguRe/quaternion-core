@@ -516,7 +516,7 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
         return lerp(a, b, t);
     }
     // selrp
-    let omega = acos_safe(dot);  // Angle between the two quaternion
+    let omega = dot.acos();  // Angle between the two quaternion
     let s1 = ( (1.0 - t) * omega ).sin();
     let s2 = (t * omega).sin();
     let term1 = scale(s1, a);
