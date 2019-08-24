@@ -6,24 +6,6 @@ const EPSILON: f64 = 1e-8;
 
 
 #[test]
-fn test_euler_quaternion() {
-    let roll_ori  = 20.0_f64.to_radians();
-    let pitch_ori = 15.0_f64.to_radians();  // 180度を超えると値がおかしくなる
-    let yaw_ori   = 0.0_f64.to_radians();  // 180度，360度で符号が反転する．
-
-    let q = from_euler_angles(roll_ori, pitch_ori, yaw_ori);
-    let eulers = to_euler_angles(q);
-    
-    // 値チェック
-    assert!( (eulers[0] - roll_ori).abs()  < EPSILON );
-    assert!( (eulers[1] - pitch_ori).abs() < EPSILON );
-    assert!( (eulers[2] - yaw_ori).abs()   < EPSILON );
-    println!("roll: {}, ori: {}",  eulers[0], roll_ori);
-    println!("pitch: {}, ori: {}", eulers[1], pitch_ori);
-    println!("yaw: {}, ori: {}",   eulers[2], yaw_ori);
-}
-
-#[test]
 fn test_add() {
     let a = (0.5, [1.0, 1.0, 1.0]);
     let b = (0.5, [1.0, 1.0, 1.0]);

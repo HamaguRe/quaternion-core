@@ -6,7 +6,6 @@ pub type Quaternion<T> = (T, Vector3<T>);
 pub type DirectionCosines<T> = [Vector3<T>; 3];
 
 const PI: f64 = std::f64::consts::PI;
-const FRAC_PI_2: f64 = std::f64::consts::FRAC_PI_2;  // π/2
 const THRESHOLD: f64 = 0.9995;
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
 pub const IDENTITY: Quaternion<f64> = (1.0, ZERO_VECTOR);  // Identity Quaternion
@@ -21,28 +20,11 @@ pub const IDENTITY: Quaternion<f64> = (1.0, ZERO_VECTOR);  // Identity Quaternio
 #[inline(always)]
 pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     let norm = norm_vec(axis);
-    if (norm == 0.0) || (angle == 0.0) {
+    if (norm == 0.0) | (angle == 0.0) {
         return IDENTITY;
     }
     let f = (angle * 0.5).sin_cos();
     ( f.1, scale_vec( f.0 / norm, axis ) )
-}
-
-/// オイラー角[rad]から四元数を生成．
-/// Generate quaternions from Euler angles[rad].
-#[inline(always)]
-pub fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> Quaternion<f64> {
-    let [alpha, beta, gamma] = scale_vec( 0.5, [yaw, pitch, roll] );
-    // Compute these value only once.
-    let (sin_alpha, cos_alpha) = alpha.sin_cos();
-    let (sin_beta,  cos_beta)  = beta.sin_cos();
-    let (sin_gamma, cos_gamma) = gamma.sin_cos();
-
-    let q0 = cos_alpha * cos_beta * cos_gamma + sin_alpha * sin_beta * sin_gamma;
-    let q1 = cos_alpha * cos_beta * sin_gamma - sin_alpha * sin_beta * cos_gamma;
-    let q2 = cos_alpha * sin_beta * cos_gamma + sin_alpha * cos_beta * sin_gamma;
-    let q3 = sin_alpha * cos_beta * cos_gamma - cos_alpha * sin_beta * sin_gamma;
-    normalize( (q0, [q1, q2, q3]) )
 }
 
 /// 位置ベクトルの回転を表す方向余弦行列から四元数を生成．
@@ -77,25 +59,6 @@ pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     let axis = get_unit_vector(q);
     let angle = 2.0 * acos_safe(q.0);
     (axis, angle)
-}
-
-/// 四元数をオイラー角[rad]に変換．
-/// Quaternion --> [roll, pitch, yaw]
-#[inline(always)]
-pub fn to_euler_angles(q: Quaternion<f64>) -> Vector3<f64> {
-    let (q0, [q1, q2, q3]) = normalize(q);
-
-    let m11 = (q0*q0 + q1*q1).mul_add(2.0, -1.0);
-    let m12 = (q1*q2 + q0*q3) * 2.0;
-    let m13 = (q1*q3 - q0*q2) * 2.0;
-    let m23 = (q2*q3 + q0*q1) * 2.0;
-    let m33 = (q0*q0 + q3*q3).mul_add(2.0, -1.0);
-
-    let roll  = (m23 / m33).atan();
-    let pitch = asin_safe(-m13);
-    let yaw   = (m12 / m11).atan();
-
-    [roll, pitch, yaw]
 }
 
 /// 位置ベクトルの回転を表す四元数を，方向余弦行列（回転行列）に変換．
@@ -546,17 +509,6 @@ pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion
     // slerp
     let tmp = power( mul( b, conj(a) ), t );
     mul(tmp, a)
-}
-
-/// 定義域外の値をカットして未定義動作を防ぐ
-#[inline(always)]
-fn asin_safe(s: f64) -> f64 {
-    if s >= 1.0 {  // Avoid undefined behavior
-        return  FRAC_PI_2;
-    } else if s <= -1.0 {
-        return -FRAC_PI_2;
-    }
-    s.asin()
 }
 
 /// 定義域外の値をカットして未定義動作を防ぐ
