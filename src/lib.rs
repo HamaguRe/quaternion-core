@@ -1,5 +1,7 @@
 // Quaternion Libraly
 // f64 only
+//
+// get_unit_vector() は計算に特異点を持つ．
 
 pub type Vector3<T> = [T; 3];
 pub type Quaternion<T> = (T, Vector3<T>);
@@ -28,6 +30,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 }
 
 /// 位置ベクトルの回転を表す方向余弦行列から四元数を生成．
+#[inline(always)]
 pub fn from_direction_cosines_vector(m: DirectionCosines<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let q1 = m[2][1] - m[1][2];
@@ -191,17 +194,17 @@ pub fn add(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     ( a.0 + b.0, add_vec(a.1, b.1) )
 }
 
-// ベクトルの減算
-// Vector subtraction
-// Calculate "a - b"
+/// ベクトルの減算
+/// Vector subtraction
+/// Calculate "a - b"
 #[inline(always)]
 pub fn sub_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
     [ a[0]-b[0], a[1]-b[1], a[2]-b[2] ]
 }
 
-// 四元数の減算
-// Quaternion subtraction
-// Calculate "a - b"
+/// 四元数の減算
+/// Quaternion subtraction
+/// Calculate "a - b"
 #[inline(always)]
 pub fn sub(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     ( a.0 - b.0, sub_vec(a.1, b.1) )
@@ -242,9 +245,7 @@ pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
 /// this is faster than "add(scale(s, a), b)".
 #[inline(always)]
 pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
-    let q_s = s.mul_add(a.0, b.0);
-    let q_v = scale_add_vec(s, a.1, b.1);
-    (q_s, q_v)
+    ( s.mul_add(a.0, b.0), scale_add_vec(s, a.1, b.1) )
 }
 
 /// L2ノルムを計算
@@ -382,11 +383,10 @@ pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 /// The norm of argument "q" must be 1.
 #[inline(always)]
 pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
+    let dot = dot_vec(q.1, r);
     let cross = cross_vec(q.1, r);
-    let tmp1  = scale_vec(2.0, cross);
-    let term1 = scale_add_vec(q.0, r, tmp1);
-    let tmp2  = cross_vec(q.1, cross);
-    let term2 = scale_add_vec( dot_vec(r, q.1), q.1, tmp2 );
+    let term1 = add_vec( scale_vec(q.0, r),   scale_vec(2.0, cross) );
+    let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
 
@@ -396,11 +396,10 @@ pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
 /// The norm of argument "q" must be 1.
 #[inline(always)]
 pub fn frame_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
+    let dot = dot_vec(q.1, r);
     let cross = cross_vec(q.1, r);
-    let tmp1  = scale_vec(-2.0, cross);
-    let term1 = scale_add_vec(q.0, r, tmp1);
-    let tmp2  = cross_vec(q.1, cross);
-    let term2 = scale_add_vec( dot_vec(r, q.1), q.1, tmp2 );
+    let term1 = add_vec( scale_vec(q.0, r),  scale_vec(-2.0, cross) );
+    let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
 
