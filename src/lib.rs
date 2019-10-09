@@ -420,12 +420,11 @@ pub fn rotate_a_to_b(a: Vector3<f64>, b: Vector3<f64>, t: f64) -> Quaternion<f64
 /// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
 /// Integrate attitude change of body coordinate frame, 
 /// and update Quaternion passed to the argument.
-/// accel[rad/sec]
+/// omega[rad/sec]: Angular velocity
 /// dt[sec]
 #[inline(always)]
-pub fn integration(q: Quaternion<f64>, accel: Vector3<f64>, dt: f64) -> Quaternion<f64> {    
-    let tmp = scale_vec(dt * 0.5, accel);
-    let dq  = exp_vec(tmp);
+pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {    
+    let dq  = exp_vec( scale_vec(dt*0.5, omega) );
     mul(dq, q)
 }
 
@@ -434,11 +433,12 @@ pub fn integration(q: Quaternion<f64>, accel: Vector3<f64>, dt: f64) -> Quaterni
 /// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
 /// Integrate attitude change of body coordinate frame, 
 /// and update Quaternion passed to the argument.
-/// accel[rad/sec]
+/// omega[rad/sec]: Angular velocity
 /// dt[sec]
 #[inline(always)]
-pub fn integration_euler(q: Quaternion<f64>, accel: Vector3<f64>, dt: f64) -> Quaternion<f64> {
-    let tmp = mul( (0.0, accel), q );
+pub fn integration_euler(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
+    let f = mul_vec(omega, q.1);
+    let tmp = ( f.0, add_vec( scale_vec(q.0, omega), f.1) );
     normalize( scale_add(dt*0.5, tmp, q) )
 }
 
@@ -483,7 +483,8 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
     let s2 = (t * omega).sin();
     let term1 = scale(s1, a);
     let term2 = scale(s2, b);
-    scale( omega.sin().recip(), add(term1, term2) )
+    let coef = ( dot.mul_add(-dot, 1.0) ).sqrt().recip();
+    scale( coef, add(term1, term2) )
 }
 
 /// 四元数の冪乗を用いたSlerpアルゴリズム．
