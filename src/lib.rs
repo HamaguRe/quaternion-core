@@ -32,7 +32,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 /// 位置ベクトルの回転を表す方向余弦行列から四元数を生成．
 #[inline(always)]
 pub fn from_direction_cosines_vector(m: DirectionCosines<f64>) -> Quaternion<f64> {
-    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
+    let q0 = sqrt(m[0][0] + m[1][1] + m[2][2] + 1.0) * 0.5;
     let q1 = m[2][1] - m[1][2];
     let q2 = m[0][2] - m[2][0];
     let q3 = m[1][0] - m[0][1];
@@ -44,11 +44,11 @@ pub fn from_direction_cosines_vector(m: DirectionCosines<f64>) -> Quaternion<f64
 /// Generate quaternion from direction cosine matrix.
 #[inline(always)]
 pub fn from_direction_cosines_frame(m: DirectionCosines<f64>) -> Quaternion<f64> {
-    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
+    let q0 = sqrt(m[0][0] + m[1][1] + m[2][2] + 1.0) * 0.5;
     let q1 = m[1][2] - m[2][1];
     let q2 = m[2][0] - m[0][2];
     let q3 = m[0][1] - m[1][0];
-    let coef = (4.0 * q0).recip();  // reciprocal
+    let coef = (4.0 * q0).recip();
     normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
 }
 
@@ -146,11 +146,11 @@ pub fn matrix_product(m: DirectionCosines<f64>, r: Vector3<f64>) -> Vector3<f64>
 /// 単位四元数を入力した場合には零ベクトルを返す．
 #[inline(always)]
 pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
-    let coef = ( q.0.mul_add(-q.0, 1.0) ).sqrt();
-    if coef == 0.0 {
-        return ZERO_VECTOR;  // ゼロ除算回避
+    if q.0 == 1.0 {
+        return ZERO_VECTOR;
     }
-    scale_vec( coef.recip(), q.1 )
+    let coef = inv_sqrt( q.0.mul_add(-q.0, 1.0) );
+    scale_vec(coef, q.1)
 }
 
 /// ベクトルのスカラー積（内積）
@@ -252,14 +252,14 @@ pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f
 /// Calculate L2 norm
 #[inline(always)]
 pub fn norm_vec(r: Vector3<f64>) -> f64 {
-    dot_vec(r, r).sqrt()
+    sqrt( dot_vec(r, r) )
 }
 
 /// L2ノルムを計算
 /// Calculate L2 norm
 #[inline(always)]
 pub fn norm(a: Quaternion<f64>) -> f64 {
-    dot(a, a).sqrt()
+    sqrt( dot(a, a) )
 }
 
 /// ノルムが1になるように正規化
@@ -438,7 +438,7 @@ pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaterni
 #[inline(always)]
 pub fn integration_euler(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
     let f = mul_vec(omega, q.1);
-    let tmp = ( f.0, add_vec( scale_vec(q.0, omega), f.1) );
+    let tmp = ( f.0, scale_add_vec(q.0, omega, f.1) );
     normalize( scale_add(dt*0.5, tmp, q) )
 }
 
@@ -483,7 +483,7 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
     let s2 = (t * omega).sin();
     let term1 = scale(s1, a);
     let term2 = scale(s2, b);
-    let coef = ( dot.mul_add(-dot, 1.0) ).sqrt().recip();
+    let coef = inv_sqrt( dot.mul_add(-dot, 1.0) );
     scale( coef, add(term1, term2) )
 }
 
@@ -520,4 +520,24 @@ fn acos_safe(s: f64) -> f64 {
         return PI;
     }
     s.acos()
+}
+
+/// 高速逆平方根計算アルゴリズム(IEEE-754)
+/// 若干の高速化と自己満足のための実装
+#[inline(always)]
+fn inv_sqrt(c: f64) -> f64 {
+    let half_c = 0.5 * c;
+    let i = c.to_bits();
+    //let j = 0x5F3759DF - (i >> 1);  // Magic number for f32
+    let j = 0x5FE6EB50C7B537A9 - (i >> 1);  // Magic number for f64
+    let mut x = f64::from_bits(j);
+    for _ in 0..5 {
+        x *= 1.5 - x * x * half_c;
+    }
+    x
+}
+
+#[inline(always)]
+fn sqrt(c: f64) -> f64 {
+    c * inv_sqrt(c)
 }
