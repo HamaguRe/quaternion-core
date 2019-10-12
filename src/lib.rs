@@ -59,7 +59,7 @@ pub fn from_direction_cosines_frame(m: DirectionCosines<f64>) -> Quaternion<f64>
 #[inline(always)]
 pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     let q = normalize(q);
-    let axis = get_unit_vector(q);
+    let axis = normalize_vec(q.1);
     let angle = 2.0 * acos_safe(q.0);
     (axis, angle)
 }
@@ -279,7 +279,7 @@ pub fn normalize_vec(r: Vector3<f64>) -> Vector3<f64> {
 /// Normalized so that norm is 1
 #[inline(always)]
 pub fn normalize(a: Quaternion<f64>) -> Quaternion<f64> {
-    scale( norm(a).recip(), a )
+    scale( inv_sqrt( dot(a, a) ), a)
 }
 
 /// 符号反転
@@ -424,7 +424,7 @@ pub fn rotate_a_to_b(a: Vector3<f64>, b: Vector3<f64>, t: f64) -> Quaternion<f64
 /// dt[sec]
 #[inline(always)]
 pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {    
-    let dq  = exp_vec( scale_vec(dt*0.5, omega) );
+    let dq = exp_vec( scale_vec(dt*0.5, omega) );
     mul(dq, q)
 }
 

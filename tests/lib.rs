@@ -1,8 +1,7 @@
-extern crate quaternion;
 use quaternion::*;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 1e-8;
+const EPSILON: f64 = 1e-10;
 
 
 #[test]
@@ -151,7 +150,7 @@ fn test_exp_ln() {
     // dt間の姿勢変化から角速度を復元
     // 角速度は一定
     let tmp = mul( q_1, conj(q_0) );
-    let omega_re = scale(2.0/dt, ln(tmp)).1;
+    let omega_re = scale( 2.0/dt, ln(tmp) ).1;
 
     for i in 0..3 {
         assert!( (omega[i] - omega_re[i]).abs() < EPSILON );
@@ -161,12 +160,12 @@ fn test_exp_ln() {
 /// 角速度を正しく積分出来ているかテスト
 #[test]
 fn test_integration() {
-    let q0 = IDENTITY;
+    let q_0 = IDENTITY;
     let omega: Vector3<f64> = [0.0, PI/2.0, 0.0];  // [rad/s]
     let dt = 1.0;  // [s]
     let mut r: Vector3<f64> = [2.0, 2.0, 0.0];
 
-    let q = integration(q0, omega, dt);
+    let q = integration(q_0, omega, dt);
     r = frame_rotation(q, r);
     assert!( (r[0] - 0.0).abs() < EPSILON );
     assert!( (r[1] - 2.0).abs() < EPSILON );
@@ -198,7 +197,7 @@ fn test_integration_method() {
     println!("q_1: {:?}", q_1);
     println!("q_2: {:?}", q_2);
 
-    let epsilon = 0.0001;
+    let epsilon = 1e-6;
     assert!( (q_1.0 - q_2.0).abs() < epsilon );
     assert!( (q_1.1[0] - q_2.1[0]).abs() < epsilon );
     assert!( (q_1.1[1] - q_2.1[1]).abs() < epsilon );
@@ -210,8 +209,8 @@ fn test_integration_method() {
 fn test_slerp_eq() {
     let p = from_axis_angle([2.0, 1.2, 3.5], PI);
     let q = from_axis_angle([3.0, 4.5, 1.0], PI/2.0);
-    let mut t = 0.1;
-    for _i in 0..10 {
+    let mut t = 0.0;
+    for _ in 0..10 {
         let p_t = slerp(p, q, t);
         let q_t = slerp_1(p, q, t);
         println!("p_slerp: {:?}", p_t);
