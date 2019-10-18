@@ -6,8 +6,8 @@ const EPSILON: f64 = 1e-10;
 
 #[test]
 fn test_add() {
-    let a = (0.5, [1.0, 1.0, 1.0]);
-    let b = (0.5, [1.0, 1.0, 1.0]);
+    let a: Quaternion<f64> = (0.5, [1.0, 1.0, 1.0]);
+    let b: Quaternion<f64> = (0.5, [1.0, 1.0, 1.0]);
     assert_eq!( add(a, b), (1.0, [2.0; 3]) );
 }
 
@@ -100,7 +100,7 @@ fn test_frame_rotation() {
 #[test]
 fn test_get_unit_vector() {
     let axis = [1.0, 4.0, 2.0];
-    let q: Quaternion<f64> = from_axis_angle(axis, PI);
+    let q = from_axis_angle(axis, PI);
     assert!( (norm(q) - 1.0).abs() < EPSILON );
 
     // 一番計算量が少ないが，引数が単位四元数であることを前提とする．
@@ -120,7 +120,7 @@ fn test_get_unit_vector() {
 fn test_to_axis_angle() {
     let axis = [1.0, 4.0, 2.0];
     let angle = PI;
-    let q: Quaternion<f64> = from_axis_angle(axis, angle);
+    let q = from_axis_angle(axis, angle);
 
     // 軸の方向は分かるが，元の大きさはわからない．
     let n = normalize_vec(axis);
@@ -161,9 +161,9 @@ fn test_exp_ln() {
 #[test]
 fn test_integration() {
     let q_0 = IDENTITY;
-    let omega: Vector3<f64> = [0.0, PI/2.0, 0.0];  // [rad/s]
+    let omega = [0.0, PI/2.0, 0.0];  // [rad/s]
     let dt = 1.0;  // [s]
-    let mut r: Vector3<f64> = [2.0, 2.0, 0.0];
+    let mut r = [2.0, 2.0, 0.0];
 
     let q = integration(q_0, omega, dt);
     r = frame_rotation(q, r);
@@ -175,7 +175,7 @@ fn test_integration() {
 // 二つの積分方法を試す
 #[test]
 fn test_integration_method() {
-    let omega: Vector3<f64> = [PI/6.0, PI/2.0, PI/4.0];  // [rad/s]
+    let omega = [PI/6.0, PI/2.0, PI/4.0];  // [rad/s]
     let dt = 0.001;  // [s]
 
     let mut q_1 = IDENTITY;

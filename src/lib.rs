@@ -398,7 +398,7 @@ pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
 pub fn frame_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     let dot = dot_vec(q.1, r);
     let cross = cross_vec(q.1, r);
-    let term1 = add_vec( scale_vec(q.0, r),  scale_vec(-2.0, cross) );
+    let term1 = sub_vec( scale_vec(q.0, r),   scale_vec(2.0, cross) );
     let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
