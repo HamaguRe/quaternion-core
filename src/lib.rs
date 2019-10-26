@@ -32,7 +32,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 /// 位置ベクトルの回転を表す方向余弦行列から四元数を生成．
 #[inline(always)]
 pub fn from_direction_cosines_vector(m: DirectionCosines<f64>) -> Quaternion<f64> {
-    let q0 = sqrt(m[0][0] + m[1][1] + m[2][2] + 1.0) * 0.5;
+    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let q1 = m[2][1] - m[1][2];
     let q2 = m[0][2] - m[2][0];
     let q3 = m[1][0] - m[0][1];
@@ -44,7 +44,7 @@ pub fn from_direction_cosines_vector(m: DirectionCosines<f64>) -> Quaternion<f64
 /// Generate quaternion from direction cosine matrix.
 #[inline(always)]
 pub fn from_direction_cosines_frame(m: DirectionCosines<f64>) -> Quaternion<f64> {
-    let q0 = sqrt(m[0][0] + m[1][1] + m[2][2] + 1.0) * 0.5;
+    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let q1 = m[1][2] - m[2][1];
     let q2 = m[2][0] - m[0][2];
     let q3 = m[0][1] - m[1][0];
@@ -57,10 +57,14 @@ pub fn from_direction_cosines_frame(m: DirectionCosines<f64>) -> Quaternion<f64>
 /// around the axis from the quaternion representing the rotation.
 /// return "(axis, angle)"
 #[inline(always)]
-pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
-    let q = normalize(q);
-    let axis = normalize_vec(q.1);
-    let angle = 2.0 * acos_safe(q.0);
+pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
+    q = normalize(q);
+    let norm = norm_vec(q.1);
+    if norm == 0.0 {
+        return (ZERO_VECTOR, 0.0);
+    }
+    let axis = scale_vec( norm.recip(), q.1 );
+    let angle = 2.0 * norm.atan2(q.0);
     (axis, angle)
 }
 
@@ -149,7 +153,7 @@ pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
     if q.0 == 1.0 {
         return ZERO_VECTOR;
     }
-    let coef = inv_sqrt( q.0.mul_add(-q.0, 1.0) );
+    let coef = inv_sqrt(1.0 - q.0*q.0);
     scale_vec(coef, q.1)
 }
 
@@ -252,14 +256,14 @@ pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f
 /// Calculate L2 norm
 #[inline(always)]
 pub fn norm_vec(r: Vector3<f64>) -> f64 {
-    sqrt( dot_vec(r, r) )
+    dot_vec(r, r).sqrt()
 }
 
 /// L2ノルムを計算
 /// Calculate L2 norm
 #[inline(always)]
 pub fn norm(a: Quaternion<f64>) -> f64 {
-    sqrt( dot(a, a) )
+    dot(a, a).sqrt()
 }
 
 /// ノルムが1になるように正規化
@@ -367,9 +371,9 @@ pub fn ln(a: Quaternion<f64>) -> Quaternion<f64> {
 /// The power of quaternion.
 #[inline(always)]
 pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
-    let coef = norm(a).powf(t);
-    let f = ( t * acos_safe(a.0) ).sin_cos();
     let norm_vec = norm_vec(a.1);
+    let f = ( t * norm_vec.atan2(a.0) ).sin_cos();
+    let coef = norm(a).powf(t);
     if norm_vec == 0.0 {
         return (coef * f.1, ZERO_VECTOR);
     }
@@ -409,9 +413,9 @@ pub fn frame_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
 /// If you enter a zero vector, it returns an identity quaternion.
 /// 0 <= t <= 1
 #[inline(always)]
-pub fn rotate_a_to_b(a: Vector3<f64>, b: Vector3<f64>, t: f64) -> Quaternion<f64> {
-    let a = normalize_vec(a);
-    let b = normalize_vec(b);
+pub fn rotate_a_to_b(mut a: Vector3<f64>, mut b: Vector3<f64>, t: f64) -> Quaternion<f64> {
+    a = normalize_vec(a);
+    b = normalize_vec(b);
     let axis = cross_vec(a, b);
     let angle = acos_safe( dot_vec(a, b) );
     from_axis_angle(axis, angle * t)
@@ -469,7 +473,7 @@ pub fn lerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     // 最短経路で補間
     let mut dot = dot(a, b);
-    if dot.is_sign_negative() == true {
+    if dot.is_sign_negative() {
         b = negate(b);
         dot = -dot;
     }
@@ -483,7 +487,7 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
     let s2 = (t * omega).sin();
     let term1 = scale(s1, a);
     let term2 = scale(s2, b);
-    let coef = inv_sqrt( dot.mul_add(-dot, 1.0) );
+    let coef = inv_sqrt(1.0 - dot*dot);
     scale( coef, add(term1, term2) )
 }
 
@@ -498,7 +502,7 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
 pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     // 最短経路で補間
     let mut dot = dot(a, b);
-    if dot.is_sign_negative() == true {
+    if dot.is_sign_negative() {
         b = negate(b);
         dot = -dot;
     }
@@ -513,16 +517,36 @@ pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion
 
 /// 定義域外の値をカットして未定義動作を防ぐ
 #[inline(always)]
-fn acos_safe(s: f64) -> f64 {
-    if s >= 1.0 {  // Avoid undefined behavior
-        return 0.0;
-    } else if s <= -1.0 {
-        return PI;
+fn acos_safe(x: f64) -> f64 {
+    if x.abs() >= 1.0 {
+        if x.is_sign_positive() {
+            return 0.0;
+        } else {
+            return PI;
+        }
     }
-    s.acos()
+    x.acos()
 }
 
-/// 高速逆平方根計算アルゴリズム(IEEE-754)
+/// x.acos()は x=1,-1 付近において精度が若干低下するため，
+/// 引数の全ての範囲において精度を保ちたい場合に用いる．
+/// ただ，速度面では明らかに不利であり，x>0.965の場合には
+/// リリースビルドでも実行時間がおおよそ24倍になる．
+#[inline(always)]
+pub fn acos_alt(x: f64) -> f64 {
+    if x.abs() >= 1.0 {  // Avoid undefined behavior
+        if x.is_sign_positive() {
+            return 0.0;
+        } else {
+            return PI;
+        }
+    } else if x.abs() <= 0.965 {
+        return x.acos();
+    }
+    2.0 * (1.0 - x*x).sqrt().atan2(1.0 + x)
+}
+
+/// 高速逆平方根計算アルゴリズム(IEEE 754)
 /// 若干の高速化と自己満足のための実装
 #[inline(always)]
 fn inv_sqrt(c: f64) -> f64 {
@@ -535,9 +559,4 @@ fn inv_sqrt(c: f64) -> f64 {
         x *= 1.5 - x * x * half_c;
     }
     x
-}
-
-#[inline(always)]
-fn sqrt(c: f64) -> f64 {
-    c * inv_sqrt(c)
 }
