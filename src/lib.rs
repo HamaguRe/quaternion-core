@@ -1,7 +1,5 @@
 // Quaternion Libraly
 // f64 only
-//
-// get_unit_vector() は計算に特異点を持つ．
 
 pub type Vector3<T> = [T; 3];
 pub type Quaternion<T> = (T, Vector3<T>);
@@ -10,7 +8,7 @@ pub type DirectionCosines<T> = [Vector3<T>; 3];
 const PI: f64 = std::f64::consts::PI;
 const THRESHOLD: f64 = 0.9995;
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
-pub const IDENTITY: Quaternion<f64> = (1.0, ZERO_VECTOR);  // Identity Quaternion
+pub const IDENTITY: Quaternion<f64> = (1.0, [0.0; 3]);  // Identity Quaternion
 
 
 /// 回転角[rad]と軸ベクトルを指定して四元数を生成．
@@ -528,24 +526,6 @@ fn acos_safe(x: f64) -> f64 {
     x.acos()
 }
 
-/// x.acos()は x=1,-1 付近において精度が若干低下するため，
-/// 引数の全ての範囲において精度を保ちたい場合に用いる．
-/// ただ，速度面では明らかに不利であり，x>0.965の場合には
-/// リリースビルドでも実行時間がおおよそ24倍になる．
-#[inline(always)]
-pub fn acos_alt(x: f64) -> f64 {
-    if x.abs() >= 1.0 {  // Avoid undefined behavior
-        if x.is_sign_positive() {
-            return 0.0;
-        } else {
-            return PI;
-        }
-    } else if x.abs() <= 0.965 {
-        return x.acos();
-    }
-    2.0 * (1.0 - x*x).sqrt().atan2(1.0 + x)
-}
-
 /// 高速逆平方根計算アルゴリズム(IEEE 754)
 /// 若干の高速化と自己満足のための実装
 #[inline(always)]
@@ -555,7 +535,7 @@ fn inv_sqrt(c: f64) -> f64 {
     //let j = 0x5F3759DF - (i >> 1);  // Magic number for f32
     let j = 0x5FE6EB50C7B537A9 - (i >> 1);  // Magic number for f64
     let mut x = f64::from_bits(j);
-    for _ in 0..5 {
+    for _ in 0..5 {  // f64: 0..5，f32: 0..3
         x *= 1.5 - x * x * half_c;
     }
     x

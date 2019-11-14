@@ -96,7 +96,7 @@ fn test_frame_rotation() {
     assert!( (result[2] - 2.0).abs() < EPSILON);
 }
 
-// 回転を表すクォータニオンの単位ベクトル（回転軸）を求める．
+// 回転を表す四元数の単位ベクトル（回転軸）を求める．
 #[test]
 fn test_get_unit_vector() {
     let axis = [1.0, 4.0, 2.0];
