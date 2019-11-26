@@ -62,7 +62,7 @@ pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
         return (ZERO_VECTOR, 0.0);
     }
     let axis = scale_vec( norm.recip(), q.1 );
-    let angle = 2.0 * norm.atan2(q.0);
+    let angle = 2.0 * acos_safe(q.0);
     (axis, angle)
 }
 
@@ -298,8 +298,7 @@ pub fn negate(q: Quaternion<f64>) -> Quaternion<f64> {
     ( -q.0, negate_vec(q.1) )
 }
 
-/// ハミルトン積のために定義した，特別なベクトル同士の積（非可換）．
-/// この積は，二つのベクトルを純虚四元数と見なした場合のハミルトン積と等しい．
+/// 純虚四元数同士のハミルトン積
 /// "ab ≡ -a・b + a×b" (!= ba)
 #[inline(always)]
 pub fn mul_vec(a: Vector3<f64>, b: Vector3<f64>) -> Quaternion<f64> {
@@ -370,7 +369,7 @@ pub fn ln(a: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let norm_vec = norm_vec(a.1);
-    let f = ( t * norm_vec.atan2(a.0) ).sin_cos();
+    let f = ( t * acos_safe(a.0) ).sin_cos();
     let coef = norm(a).powf(t);
     if norm_vec == 0.0 {
         return (coef * f.1, ZERO_VECTOR);
