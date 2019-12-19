@@ -3,7 +3,7 @@
 
 pub type Vector3<T> = [T; 3];
 pub type Quaternion<T> = (T, Vector3<T>);
-pub type DirectionCosines<T> = [Vector3<T>; 3];
+pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosines Matrix
 
 const PI: f64 = std::f64::consts::PI;
 const THRESHOLD: f64 = 0.9995;
@@ -29,7 +29,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 
 /// 位置ベクトルの回転を表す方向余弦行列から四元数を生成．
 #[inline(always)]
-pub fn from_direction_cosines_vector(m: DirectionCosines<f64>) -> Quaternion<f64> {
+pub fn from_direction_cosines_vector(m: DCM<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let q1 = m[2][1] - m[1][2];
     let q2 = m[0][2] - m[2][0];
@@ -41,7 +41,7 @@ pub fn from_direction_cosines_vector(m: DirectionCosines<f64>) -> Quaternion<f64
 /// 座標系回転を表す方向余弦行列から四元数を生成．
 /// Generate quaternion from direction cosine matrix.
 #[inline(always)]
-pub fn from_direction_cosines_frame(m: DirectionCosines<f64>) -> Quaternion<f64> {
+pub fn from_direction_cosines_frame(m: DCM<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let q1 = m[1][2] - m[2][1];
     let q2 = m[2][0] - m[0][2];
@@ -69,7 +69,7 @@ pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
 /// 位置ベクトルの回転を表す四元数を，方向余弦行列（回転行列）に変換．
 /// q r q* と同じ回転を表す．
 #[inline(always)]
-pub fn to_direction_cosines_vector(q: Quaternion<f64>) -> DirectionCosines<f64> {
+pub fn to_direction_cosines_vector(q: Quaternion<f64>) -> DCM<f64> {
     let (q0, [q1, q2, q3]) = normalize(q);
     // Compute these value only once.
     let q0_q0 = q0 * q0;
@@ -100,7 +100,7 @@ pub fn to_direction_cosines_vector(q: Quaternion<f64>) -> DirectionCosines<f64> 
 /// 座標系の回転を表す四元数を，方向余弦行列（回転行列）に変換．
 /// q* r q と同じ回転を表す．
 #[inline(always)]
-pub fn to_direction_cosines_frame(q: Quaternion<f64>) -> DirectionCosines<f64> {
+pub fn to_direction_cosines_frame(q: Quaternion<f64>) -> DCM<f64> {
     let (q0, [q1, q2, q3]) = normalize(q);
     // Compute these value only once.
     let q0_q0 = q0 * q0;
@@ -128,11 +128,11 @@ pub fn to_direction_cosines_frame(q: Quaternion<f64>) -> DirectionCosines<f64> {
     ]
 }
 
-/// 方向余弦行列（回転行列）を用いてベクトルを回転させる．
+/// DCM（方向余弦行列）を用いてベクトルを回転させる．
 /// 四元数を用いる場合よりも計算量が少ないため，多くのベクトルに対して回転を適用する場合には
-/// 一度方向余弦行列に変換してからベクトルを回転させたほうが速度面で有利になるかもしれない．
+/// 一度DCMに変換してからベクトルを回転させたほうが速度面で有利になるかもしれない．
 #[inline(always)]
-pub fn matrix_product(m: DirectionCosines<f64>, r: Vector3<f64>) -> Vector3<f64> {
+pub fn matrix_product(m: DCM<f64>, r: Vector3<f64>) -> Vector3<f64> {
     [
         dot_vec(m[0], r),
         dot_vec(m[1], r),
@@ -439,8 +439,8 @@ pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaterni
 #[inline(always)]
 pub fn integration_euler(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
     let f = mul_vec(omega, q.1);
-    let tmp = ( f.0, scale_add_vec(q.0, omega, f.1) );
-    normalize( scale_add(dt*0.5, tmp, q) )
+    let omega_q = ( f.0, scale_add_vec(q.0, omega, f.1) );
+    normalize( scale_add(dt*0.5, omega_q, q) )
 }
 
 /// 線形補間
