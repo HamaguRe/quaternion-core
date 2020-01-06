@@ -56,19 +56,19 @@ fn test_negate() {
 
 // 回転行列に変換してからベクトルを回転させる．
 #[test]
-fn test_rotate_by_direction_cosines() {
+fn test_rotate_by_dcm() {
     let r: Vector3<f64> = [2.0, 2.0, 0.0];
     let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
 
     // 位置ベクトルの回転
-    let m = to_direction_cosines_vector(q);
+    let m = to_dcm_vector(q);
     let result = matrix_product(m, r);
     assert!( (result[0] - 0.0).abs() < EPSILON);
     assert!( (result[1] - 2.0).abs() < EPSILON);
     assert!( (result[2] + 2.0).abs() < EPSILON);
 
     // 座標系の回転
-    let m = to_direction_cosines_frame(q);
+    let m = to_dcm_frame(q);
     let result = matrix_product(m, r);
     assert!( (result[0] - 0.0).abs() < EPSILON);
     assert!( (result[1] - 2.0).abs() < EPSILON);

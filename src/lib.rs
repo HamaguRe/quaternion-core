@@ -6,7 +6,7 @@ pub type Quaternion<T> = (T, Vector3<T>);
 pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosines Matrix
 
 const PI: f64 = std::f64::consts::PI;
-const THRESHOLD: f64 = 0.9995;
+const THRESHOLD: f64 = 0.9995;  // Used in Slerp
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
 pub const IDENTITY: Quaternion<f64> = (1.0, [0.0; 3]);  // Identity Quaternion
 
@@ -29,7 +29,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 
 /// 位置ベクトルの回転を表す方向余弦行列から四元数を生成．
 #[inline(always)]
-pub fn from_direction_cosines_vector(m: DCM<f64>) -> Quaternion<f64> {
+pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let q1 = m[2][1] - m[1][2];
     let q2 = m[0][2] - m[2][0];
@@ -38,10 +38,11 @@ pub fn from_direction_cosines_vector(m: DCM<f64>) -> Quaternion<f64> {
     normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
 }
 
+// from_dcm_vectorとの違いはベクトル部の符号が逆になっているだけでは？
 /// 座標系回転を表す方向余弦行列から四元数を生成．
 /// Generate quaternion from direction cosine matrix.
 #[inline(always)]
-pub fn from_direction_cosines_frame(m: DCM<f64>) -> Quaternion<f64> {
+pub fn from_dcm_frame(m: DCM<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
     let q1 = m[1][2] - m[2][1];
     let q2 = m[2][0] - m[0][2];
@@ -66,10 +67,10 @@ pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     (axis, angle)
 }
 
-/// 位置ベクトルの回転を表す四元数を，方向余弦行列（回転行列）に変換．
+/// 位置ベクトル回転を表す四元数を，方向余弦行列（回転行列）に変換．
 /// q r q* と同じ回転を表す．
 #[inline(always)]
-pub fn to_direction_cosines_vector(q: Quaternion<f64>) -> DCM<f64> {
+pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
     let (q0, [q1, q2, q3]) = normalize(q);
     // Compute these value only once.
     let q0_q0 = q0 * q0;
@@ -97,10 +98,11 @@ pub fn to_direction_cosines_vector(q: Quaternion<f64>) -> DCM<f64> {
     ]
 }
 
-/// 座標系の回転を表す四元数を，方向余弦行列（回転行列）に変換．
+// to_dcm_vectorとの違いは，引数として受け取る四元数のベクトル部の符号だけでは？
+/// 座標系回転を表す四元数を，方向余弦行列（回転行列）に変換．
 /// q* r q と同じ回転を表す．
 #[inline(always)]
-pub fn to_direction_cosines_frame(q: Quaternion<f64>) -> DCM<f64> {
+pub fn to_dcm_frame(q: Quaternion<f64>) -> DCM<f64> {
     let (q0, [q1, q2, q3]) = normalize(q);
     // Compute these value only once.
     let q0_q0 = q0 * q0;
@@ -328,7 +330,7 @@ pub fn conj(a: Quaternion<f64>) -> Quaternion<f64> {
 /// 逆四元数を求める
 /// Compute the inverse quaternion
 #[inline(always)]
-pub fn inverse(a: Quaternion<f64>) -> Quaternion<f64> {
+pub fn inv(a: Quaternion<f64>) -> Quaternion<f64> {
     scale( dot(a, a).recip(), conj(a) )
 }
 
@@ -360,14 +362,27 @@ pub fn ln(a: Quaternion<f64>) -> Quaternion<f64> {
     if norm_vec == 0.0 {
         return (norm.ln(), ZERO_VECTOR);
     }
-    let tmp = acos_safe(a.0 / norm);
-    ( norm.ln(), scale_vec(tmp / norm_vec, a.1) )
+    let coef = acos_safe(a.0 / norm) / norm_vec;
+    ( norm.ln(), scale_vec(coef, a.1) )
+}
+
+/// 単位四元数(Versor)の自然対数
+/// Versorであることが保証されている場合にはln関数よりも計算量を減らせる．
+/// 実部は必ず0になるので省略．
+#[inline(always)]
+pub fn ln_versor(q: Quaternion<f64>) -> Vector3<f64> {
+    let norm_vec = norm_vec(q.1);
+    if norm_vec == 0.0 {
+        return ZERO_VECTOR;
+    }
+    let coef = acos_safe(q.0) / norm_vec;
+    scale_vec(coef, q.1)
 }
 
 /// 四元数の冪乗
 /// The power of quaternion.
 #[inline(always)]
-pub fn power(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
+pub fn pow(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let norm_vec = norm_vec(a.1);
     let f = ( t * acos_safe(a.0) ).sin_cos();
     let coef = norm(a).powf(t);
@@ -404,7 +419,7 @@ pub fn frame_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
     scale_add_vec(q.0, term1, term2)
 }
 
-/// ベクトル "a" を ベクトル "b" へ最短距離で回転させる四元数を求める．
+/// 位置ベクトル "a" を 位置ベクトル "b" と同じ場所へ最短距離で回転させる四元数を求める．
 /// 零ベクトルを入力した場合は，恒等四元数を返す．
 /// Find a quaternion to rotate from vector "a" to "b".
 /// If you enter a zero vector, it returns an identity quaternion.
@@ -508,7 +523,7 @@ pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion
         return lerp(a, b, t);
     }
     // slerp
-    let tmp = power( mul( b, conj(a) ), t );
+    let tmp = pow( mul( b, conj(a) ), t );
     mul(tmp, a)
 }
 
