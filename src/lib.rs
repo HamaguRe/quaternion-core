@@ -1,12 +1,15 @@
 // Quaternion Libraly
 // f64 only
+//
+// Versorは「回転子」を意味し，ノルムは1に制限される．
+// Versor means the "rotator", the norm is limited to 1.
 
 pub type Vector3<T> = [T; 3];
 pub type Quaternion<T> = (T, Vector3<T>);
 pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosines Matrix
 
 const PI: f64 = std::f64::consts::PI;
-const THRESHOLD: f64 = 0.9995;  // Used in Slerp
+const THRESHOLD: f64 = 0.9995;  // Used in slerp
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
 pub const IDENTITY: Quaternion<f64> = (1.0, [0.0; 3]);  // Identity Quaternion
 
@@ -27,7 +30,9 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     ( f.1, scale_vec( f.0 / norm, axis ) )
 }
 
-/// 位置ベクトルの回転を表す方向余弦行列から四元数を生成．
+/// 位置ベクトルの回転を表す方向余弦行列からversorを生成．
+/// Generate versor from direction cosine matrix 
+/// representing rotation of position vector.
 #[inline(always)]
 pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
     let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
@@ -38,22 +43,17 @@ pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
     normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
 }
 
-// from_dcm_vectorとの違いはベクトル部の符号が逆になっているだけでは？
-/// 座標系回転を表す方向余弦行列から四元数を生成．
-/// Generate quaternion from direction cosine matrix.
+/// 座標系回転を表す方向余弦行列からversorを生成．
+/// Generate versor from direction cosine matrix 
+/// representing coordinate system rotation.
 #[inline(always)]
 pub fn from_dcm_frame(m: DCM<f64>) -> Quaternion<f64> {
-    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
-    let q1 = m[1][2] - m[2][1];
-    let q2 = m[2][0] - m[0][2];
-    let q3 = m[0][1] - m[1][0];
-    let coef = (4.0 * q0).recip();
-    normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
+    conj( from_dcm_vector(m) )
 }
 
-/// 回転を表す四元数から，回転軸（単位ベクトル）と軸回りの回転角[rad]を取り出す．
+/// Versorから回転軸（単位ベクトル）と軸回りの回転角[rad]を求める．
 /// Compute the rotation axis (unit vector) and the rotation angle[rad] 
-/// around the axis from the quaternion representing the rotation.
+/// around the axis from the versor.
 /// return "(axis, angle)"
 #[inline(always)]
 pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
@@ -68,7 +68,7 @@ pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
 }
 
 /// 位置ベクトル回転を表す四元数を，方向余弦行列（回転行列）に変換．
-/// q r q* と同じ回転を表す．
+/// q v q* と同じ回転を表す．
 #[inline(always)]
 pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
     let (q0, [q1, q2, q3]) = normalize(q);
@@ -98,56 +98,29 @@ pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
     ]
 }
 
-// to_dcm_vectorとの違いは，引数として受け取る四元数のベクトル部の符号だけでは？
 /// 座標系回転を表す四元数を，方向余弦行列（回転行列）に変換．
-/// q* r q と同じ回転を表す．
+/// q* v q と同じ回転を表す．
 #[inline(always)]
 pub fn to_dcm_frame(q: Quaternion<f64>) -> DCM<f64> {
-    let (q0, [q1, q2, q3]) = normalize(q);
-    // Compute these value only once.
-    let q0_q0 = q0 * q0;
-    let q0_q1 = q0 * q1;
-    let q0_q2 = q0 * q2;
-    let q0_q3 = q0 * q3;
-    let q1_q2 = q1 * q2;
-    let q1_q3 = q1 * q3;
-    let q2_q3 = q2 * q3;
-
-    let m11 = (q0_q0 + q1*q1).mul_add(2.0, -1.0);
-    let m12 = (q1_q2 + q0_q3) * 2.0;
-    let m13 = (q1_q3 - q0_q2) * 2.0;
-    let m21 = (q1_q2 - q0_q3) * 2.0;
-    let m22 = (q0_q0 + q2*q2).mul_add(2.0, -1.0);
-    let m23 = (q2_q3 + q0_q1) * 2.0;
-    let m31 = (q1_q3 + q0_q2) * 2.0;
-    let m32 = (q2_q3 - q0_q1) * 2.0;
-    let m33 = (q0_q0 + q3*q3).mul_add(2.0, -1.0);
-
-    [
-        [m11, m12, m13],
-        [m21, m22, m23],
-        [m31, m32, m33]
-    ]
+    to_dcm_vector( conj(q) )
 }
 
-/// DCM（方向余弦行列）を用いてベクトルを回転させる．
-/// 四元数を用いる場合よりも計算量が少ないため，多くのベクトルに対して回転を適用する場合には
-/// 一度DCMに変換してからベクトルを回転させたほうが速度面で有利になるかもしれない．
+/// 方向余弦行列を用いてベクトルを回転させる．
 #[inline(always)]
-pub fn matrix_product(m: DCM<f64>, r: Vector3<f64>) -> Vector3<f64> {
+pub fn matrix_product(m: DCM<f64>, v: Vector3<f64>) -> Vector3<f64> {
     [
-        dot_vec(m[0], r),
-        dot_vec(m[1], r),
-        dot_vec(m[2], r)
+        dot_vec(m[0], v),
+        dot_vec(m[1], v),
+        dot_vec(m[2], v)
     ]
 }
 
-/// 回転を表す四元数から，単位ベクトル（回転軸）を取り出す．
+/// Versorから単位ベクトル（回転軸）を取り出す．
 /// normalize_vec関数よりも計算量が少ないが，
-/// norm(q)==1であることを前提とする．
+/// ||q||=1であることを前提とする．
 /// 引数に渡す四元数のノルムが保証できない場合には
 /// normalize_vec関数を用いるべき．
-/// 単位四元数を入力した場合には零ベクトルを返す．
+/// 恒等四元数を入力した場合には零ベクトルを返す．
 #[inline(always)]
 pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
     if q.0 == 1.0 {
@@ -184,30 +157,24 @@ pub fn cross_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
     ]
 }
 
-/// 二つのベクトルを加算する
-/// Add two vectors
+/// Calcurate "a + b"
 #[inline(always)]
 pub fn add_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
     [ a[0]+b[0], a[1]+b[1], a[2]+b[2] ]
 }
 
-/// 二つの四元数を加算する
-/// Add two quaternions.
+/// Calcurate "a + b"
 #[inline(always)]
 pub fn add(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     ( a.0 + b.0, add_vec(a.1, b.1) )
 }
 
-/// ベクトルの減算
-/// Vector subtraction
 /// Calculate "a - b"
 #[inline(always)]
 pub fn sub_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
     [ a[0]-b[0], a[1]-b[1], a[2]-b[2] ]
 }
 
-/// 四元数の減算
-/// Quaternion subtraction
 /// Calculate "a - b"
 #[inline(always)]
 pub fn sub(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
@@ -224,11 +191,11 @@ pub fn scale_vec(s: f64, v: Vector3<f64>) -> Vector3<f64> {
 /// スカラーと四元数の積
 /// Multiplication of scalar and quaternion.
 #[inline(always)]
-pub fn scale(s: f64, a: Quaternion<f64>) -> Quaternion<f64> {
-    ( s * a.0, scale_vec(s, a.1) )
+pub fn scale(s: f64, q: Quaternion<f64>) -> Quaternion<f64> {
+    ( s * q.0, scale_vec(s, q.1) )
 }
 
-/// compute "s*a + b"
+/// Compute "s*a + b"
 /// CPUがFMA(Fused multiply–add)命令をサポートしている場合，
 /// "add_vec(scale_vec(s, a), b)" よりも高速に計算出来る．
 /// If the CPU supports FMA(Fused multiply–add) instructions,
@@ -242,7 +209,7 @@ pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
     ]
 }
 
-/// compute "s*a + b"
+/// Compute "s*a + b"
 /// CPUがFMA(Fused multiply–add)命令をサポートしている場合，
 /// "add(scale(s, a), b)" よりも高速に計算出来る．
 /// If the CPU supports FMA(Fused multiply–add) instructions,
@@ -255,15 +222,15 @@ pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f
 /// L2ノルムを計算
 /// Calculate L2 norm
 #[inline(always)]
-pub fn norm_vec(r: Vector3<f64>) -> f64 {
-    dot_vec(r, r).sqrt()
+pub fn norm_vec(v: Vector3<f64>) -> f64 {
+    dot_vec(v, v).sqrt()
 }
 
 /// L2ノルムを計算
 /// Calculate L2 norm
 #[inline(always)]
-pub fn norm(a: Quaternion<f64>) -> f64 {
-    dot(a, a).sqrt()
+pub fn norm(q: Quaternion<f64>) -> f64 {
+    dot(q, q).sqrt()
 }
 
 /// ノルムが1になるように正規化
@@ -271,26 +238,26 @@ pub fn norm(a: Quaternion<f64>) -> f64 {
 /// Normalization
 /// If you enter a zero vector, it returns a zero vector.
 #[inline(always)]
-pub fn normalize_vec(r: Vector3<f64>) -> Vector3<f64> {
-    let norm = norm_vec(r);
+pub fn normalize_vec(v: Vector3<f64>) -> Vector3<f64> {
+    let norm = norm_vec(v);
     if norm == 0.0 {
         return ZERO_VECTOR;  // ゼロ除算回避
     }
-    scale_vec( norm.recip(), r )
+    scale_vec( norm.recip(), v )
 }
 
 /// ノルムが1になるように正規化
 /// Normalized so that norm is 1
 #[inline(always)]
-pub fn normalize(a: Quaternion<f64>) -> Quaternion<f64> {
-    scale( inv_sqrt( dot(a, a) ), a)
+pub fn normalize(q: Quaternion<f64>) -> Quaternion<f64> {
+    scale( inv_sqrt( dot(q, q) ), q )
 }
 
 /// 符号反転
-/// return "-r"
+/// return "-v"
 #[inline(always)]
-pub fn negate_vec(r: Vector3<f64>) -> Vector3<f64> {
-    [ -r[0], -r[1], -r[2] ]
+pub fn negate_vec(v: Vector3<f64>) -> Vector3<f64> {
+    [ -v[0], -v[1], -v[2] ]
 }
 
 /// 符号反転
@@ -323,50 +290,50 @@ pub fn mul(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
 /// 共役四元数を求める
 /// Compute the conjugate quaternion
 #[inline(always)]
-pub fn conj(a: Quaternion<f64>) -> Quaternion<f64> {
-    ( a.0, negate_vec(a.1) )
+pub fn conj(q: Quaternion<f64>) -> Quaternion<f64> {
+    ( q.0, negate_vec(q.1) )
 }
 
 /// 逆四元数を求める
 /// Compute the inverse quaternion
 #[inline(always)]
-pub fn inv(a: Quaternion<f64>) -> Quaternion<f64> {
-    scale( dot(a, a).recip(), conj(a) )
+pub fn inv(q: Quaternion<f64>) -> Quaternion<f64> {
+    scale( dot(q, q).recip(), conj(q) )
 }
 
-/// ネイピア数eのベクトル冪
-/// Exponential of Vector3.
+/// ネイピア数を底とする指数函数
+/// Exponential function of Vector3.
 #[inline(always)]
-pub fn exp_vec(a: Vector3<f64>) -> Quaternion<f64> {
-    let norm = norm_vec(a);
+pub fn exp_vec(v: Vector3<f64>) -> Quaternion<f64> {
+    let norm = norm_vec(v);
     if norm == 0.0 {
         return IDENTITY;
     }
     let f = norm.sin_cos();
-    ( f.1, scale_vec( f.0 / norm, a ) )
+    ( f.1, scale_vec( f.0 / norm, v ) )
 }
 
-/// ネイピア数eの四元数冪
+/// ネイピア数を底とする指数函数
 /// Exponential of Quaternion.
 #[inline(always)]
-pub fn exp(a: Quaternion<f64>) -> Quaternion<f64> {
-    scale( a.0.exp(), exp_vec(a.1) )
+pub fn exp(q: Quaternion<f64>) -> Quaternion<f64> {
+    scale( q.0.exp(), exp_vec(q.1) )
 }
 
 /// 四元数の自然対数
 /// Natural logarithm of quaternion.
 #[inline(always)]
-pub fn ln(a: Quaternion<f64>) -> Quaternion<f64> {
-    let norm = norm(a);
-    let norm_vec = norm_vec(a.1);
+pub fn ln(q: Quaternion<f64>) -> Quaternion<f64> {
+    let norm = norm(q);
+    let norm_vec = norm_vec(q.1);
     if norm_vec == 0.0 {
         return (norm.ln(), ZERO_VECTOR);
     }
-    let coef = acos_safe(a.0 / norm) / norm_vec;
-    ( norm.ln(), scale_vec(coef, a.1) )
+    let coef = acos_safe(q.0 / norm) / norm_vec;
+    ( norm.ln(), scale_vec(coef, q.1) )
 }
 
-/// 単位四元数(Versor)の自然対数
+/// Versor(単位四元数)の自然対数
 /// Versorであることが保証されている場合にはln関数よりも計算量を減らせる．
 /// 実部は必ず0になるので省略．
 #[inline(always)]
@@ -379,49 +346,49 @@ pub fn ln_versor(q: Quaternion<f64>) -> Vector3<f64> {
     scale_vec(coef, q.1)
 }
 
-/// 四元数の冪乗
-/// The power of quaternion.
+/// 四元数の冪函数
+/// The power function of quaternion.
 #[inline(always)]
-pub fn pow(a: Quaternion<f64>, t: f64) -> Quaternion<f64> {
-    let norm_vec = norm_vec(a.1);
-    let f = ( t * acos_safe(a.0) ).sin_cos();
-    let coef = norm(a).powf(t);
+pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
+    let norm_vec = norm_vec(q.1);
+    let f = ( t * acos_safe(q.0) ).sin_cos();
+    let coef = norm(q).powf(t);
     if norm_vec == 0.0 {
         return (coef * f.1, ZERO_VECTOR);
     }
-    let q_v = scale_vec(f.0 / norm_vec, a.1);
+    let q_v = scale_vec(f.0 / norm_vec, q.1);
     scale( coef, (f.1, q_v) )
 }
 
 /// 位置ベクトルの回転
-/// r' = q r q*  (||q|| = 1)
-/// 引数"q"のノルムは1でなければならない．
-/// The norm of argument "q" must be 1.
+/// v' = q v q*  (||q|| = 1)
+/// 引数は必ずVersor(単位四元数)でなければならない．
+/// Argument must be Versor(unit quaternion).
 #[inline(always)]
-pub fn vector_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
-    let dot = dot_vec(q.1, r);
-    let cross = cross_vec(q.1, r);
-    let term1 = add_vec( scale_vec(q.0, r),   scale_vec(2.0, cross) );
+pub fn vector_rotation(q: Quaternion<f64>, v: Vector3<f64>) -> Vector3<f64> {
+    let dot = dot_vec(q.1, v);
+    let cross = cross_vec(q.1, v);
+    let term1 = add_vec( scale_vec(q.0, v),   scale_vec(2.0, cross) );
     let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
 
 /// 座標系の回転
-/// r' = q* r q  (||q|| = 1)
-/// 引数"q"のノルムは1でなければならない．
-/// The norm of argument "q" must be 1.
+/// v' = q* v q  (||q|| = 1)
+/// 引数は必ずVersor(単位四元数)でなければならない．
+/// Argument must be Versor(unit quaternion).
 #[inline(always)]
-pub fn frame_rotation(q: Quaternion<f64>, r: Vector3<f64>) -> Vector3<f64> {
-    let dot = dot_vec(q.1, r);
-    let cross = cross_vec(q.1, r);
-    let term1 = sub_vec( scale_vec(q.0, r),   scale_vec(2.0, cross) );
+pub fn frame_rotation(q: Quaternion<f64>, v: Vector3<f64>) -> Vector3<f64> {
+    let dot = dot_vec(q.1, v);
+    let cross = cross_vec(q.1, v);
+    let term1 = sub_vec( scale_vec(q.0, v),   scale_vec(2.0, cross) );
     let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
 
-/// 位置ベクトル "a" を 位置ベクトル "b" と同じ場所へ最短距離で回転させる四元数を求める．
+/// 位置ベクトル "a" を 位置ベクトル "b" と同じ場所へ最短距離で回転させるVersorを求める．
 /// 零ベクトルを入力した場合は，恒等四元数を返す．
-/// Find a quaternion to rotate from vector "a" to "b".
+/// Find a versor to rotate from vector "a" to "b".
 /// If you enter a zero vector, it returns an identity quaternion.
 /// 0 <= t <= 1
 #[inline(always)]
@@ -437,32 +404,30 @@ pub fn rotate_a_to_b(mut a: Vector3<f64>, mut b: Vector3<f64>, t: f64) -> Quater
 /// Integrate attitude change of body coordinate frame, 
 /// and update Quaternion passed to the argument.
 /// omega[rad/sec]: Angular velocity
-/// dt[sec]
+/// dt[sec]: Time step width
 #[inline(always)]
 pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {    
     let dq = exp_vec( scale_vec(dt*0.5, omega) );
     mul(dq, q)
 }
 
-/// オイラー法
-/// Euler method
+/// 近似式(Approximate expression)
 /// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
 /// Integrate attitude change of body coordinate frame, 
-/// and update Quaternion passed to the argument.
+/// and update quaternion passed to the argument.
 /// omega[rad/sec]: Angular velocity
-/// dt[sec]
+/// dt[sec]: Time step width
 #[inline(always)]
-pub fn integration_euler(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
+pub fn integration_approx(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
     let f = mul_vec(omega, q.1);
     let omega_q = ( f.0, scale_add_vec(q.0, omega, f.1) );
     normalize( scale_add(dt*0.5, omega_q, q) )
 }
 
-/// 線形補間
+/// 線形補間(Linear interpolation)
 /// 引数"a"から"b"への経路を補完する四元数を生成する．
 /// 引数t(0 <= t <= 1) は補間パラメータ．
 /// "a"と"b"のノルムは必ず1でなければならない．
-/// Linear interpolation
 /// Generate a quaternion that interpolate the route from "a" to "b".
 /// The argument t(0 <= t <= 1) is the interpolation parameter.
 /// The norm of "a" and "b" must be 1.
@@ -473,11 +438,10 @@ pub fn lerp(a: Quaternion<f64>, b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     normalize( add(term1, term2) )
 }
 
-/// 球状線形補間
+/// 球状線形補間(Spherical linear interpolation)
 /// "a"から"b"への経路を補完する四元数を生成する．
 /// 引数t(0 <= t <= 1) は補間パラメータ．
 /// "a"と"b"のノルムは必ず1でなければならない．
-/// Spherical linear interpolation
 /// Generate a quaternion that interpolate the route from "a" to "b".
 /// The norm of "a" and "b" must be 1.
 /// The argument t(0 <= t <= 1) is the interpolation parameter.
@@ -489,12 +453,12 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
         b = negate(b);
         dot = -dot;
     }
-    // If the inputs are too close for comfort, linearly interpolate.
+    // If the distance between quaternions is close enough, use lerp.
     if dot > THRESHOLD {
         return lerp(a, b, t);
     }
     // selrp
-    let omega = dot.acos();  // Angle between the two quaternion
+    let omega = dot.acos();  // Angle between the two quaternions.
     let s1 = ( (1.0 - t) * omega ).sin();
     let s2 = (t * omega).sin();
     let term1 = scale(s1, a);
@@ -503,11 +467,12 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
     scale( coef, add(term1, term2) )
 }
 
-/// 四元数の冪乗を用いたSlerpアルゴリズム．
+/// 四元数の冪函数を用いたSlerpアルゴリズム．
 /// 実装方法が違うだけで，計算結果はslerp関数と同じ．
 /// "a"と"b"のノルムは必ず1でなければならない．
 /// Slerp algorithm using quaternion powers.
-/// The calculation result is the same as the slerp() function.
+/// The calculation result is the same as slerp function, 
+/// only the implementation method is different.
 /// The norm of "a" and "b" must be 1.
 /// "a" --> "b"
 #[inline(always)]
@@ -541,7 +506,6 @@ fn acos_safe(x: f64) -> f64 {
 }
 
 /// 高速逆平方根計算アルゴリズム(IEEE 754)
-/// 若干の高速化と自己満足のための実装
 #[inline(always)]
 fn inv_sqrt(c: f64) -> f64 {
     let half_c = 0.5 * c;

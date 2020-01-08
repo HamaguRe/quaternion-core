@@ -192,7 +192,7 @@ fn test_integration_method() {
         // ↓
         // 同一軸での回転を表す四元数を合成した場合，積の順序に関わらず結果は等しくなるため．
         // 途中で角速度を変えればズレるはず．
-        q_2 = integration_euler(q_2, omega, dt);
+        q_2 = integration_approx(q_2, omega, dt);
     }
     println!("q_1: {:?}", q_1);
     println!("q_2: {:?}", q_2);
