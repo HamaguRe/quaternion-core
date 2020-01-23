@@ -5,13 +5,17 @@
 // Versor means the "rotator", the norm is limited to 1.
 
 pub type Vector3<T> = [T; 3];
-pub type Quaternion<T> = (T, Vector3<T>);
+pub type Quaternion<T> = (T, Vector3<T>);  // (1, [i, j, k])
 pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosines Matrix
 
 const PI: f64 = std::f64::consts::PI;
 const THRESHOLD: f64 = 0.9995;  // Used in slerp
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
 pub const IDENTITY: Quaternion<f64> = (1.0, [0.0; 3]);  // Identity Quaternion
+
+// SIMD実装
+mod to_fast;
+pub use to_fast::*;
 
 
 /// 回転角[rad]と軸ベクトルを指定して四元数を生成．
@@ -141,6 +145,7 @@ pub fn dot_vec(a: Vector3<f64>, b: Vector3<f64>) -> f64 {
 /// Dot product of quaternion
 /// a・b
 #[inline(always)]
+#[cfg(not(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "avx")))]
 pub fn dot(a: Quaternion<f64>, b: Quaternion<f64>) -> f64 {
     a.0 * b.0 + dot_vec(a.1, b.1)
 }
@@ -165,6 +170,7 @@ pub fn add_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
 
 /// Calcurate "a + b"
 #[inline(always)]
+#[cfg(not(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "avx")))]
 pub fn add(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     ( a.0 + b.0, add_vec(a.1, b.1) )
 }
@@ -177,6 +183,7 @@ pub fn sub_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
 
 /// Calculate "a - b"
 #[inline(always)]
+#[cfg(not(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "avx")))]
 pub fn sub(a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     ( a.0 - b.0, sub_vec(a.1, b.1) )
 }
@@ -191,6 +198,7 @@ pub fn scale_vec(s: f64, v: Vector3<f64>) -> Vector3<f64> {
 /// スカラーと四元数の積
 /// Multiplication of scalar and quaternion.
 #[inline(always)]
+#[cfg(not(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "avx")))]
 pub fn scale(s: f64, q: Quaternion<f64>) -> Quaternion<f64> {
     ( s * q.0, scale_vec(s, q.1) )
 }
@@ -215,6 +223,7 @@ pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
 /// If the CPU supports FMA(Fused multiply–add) instructions,
 /// this is faster than "add(scale(s, a), b)".
 #[inline(always)]
+#[cfg(not(all(target_arch = "x86_64", target_feature = "fma")))]
 pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     ( s.mul_add(a.0, b.0), scale_add_vec(s, a.1, b.1) )
 }
@@ -361,7 +370,7 @@ pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 }
 
 /// 位置ベクトルの回転
-/// v' = q v q*  (||q|| = 1)
+/// q v q*  (||q|| = 1)
 /// 引数は必ずVersor(単位四元数)でなければならない．
 /// Argument must be Versor(unit quaternion).
 #[inline(always)]
@@ -374,7 +383,7 @@ pub fn vector_rotation(q: Quaternion<f64>, v: Vector3<f64>) -> Vector3<f64> {
 }
 
 /// 座標系の回転
-/// v' = q* v q  (||q|| = 1)
+/// q* v q  (||q|| = 1)
 /// 引数は必ずVersor(単位四元数)でなければならない．
 /// Argument must be Versor(unit quaternion).
 #[inline(always)]
@@ -497,12 +506,13 @@ pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion
 fn acos_safe(x: f64) -> f64 {
     if x.abs() >= 1.0 {
         if x.is_sign_positive() {
-            return 0.0;
+            0.0
         } else {
-            return PI;
+            PI
         }
+    } else {
+        x.acos()
     }
-    x.acos()
 }
 
 /// 高速逆平方根計算アルゴリズム(IEEE 754)
