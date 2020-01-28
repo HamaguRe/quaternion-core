@@ -64,7 +64,7 @@ pub fn scale(s: f64, q: Quaternion<f64>) -> Quaternion<f64> {
 }
 
 #[inline(always)]
-#[cfg(all(target_arch = "x86_64", target_feature = "fma"))]
+#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "fma"))]
 pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     unsafe {
         let s = _mm256_set1_pd(s);

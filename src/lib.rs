@@ -119,6 +119,13 @@ pub fn matrix_product(m: DCM<f64>, v: Vector3<f64>) -> Vector3<f64> {
     ]
 }
 
+/// 右手系と左手系の四元数を変換
+#[inline(always)]
+pub fn system_trans(q: Quaternion<f64>) -> Quaternion<f64> {
+    // 実部と，ベクトル部の要素どれか一つの符号を反転させれば良い
+    ( -q.0, [ q.1[0], -q.1[1], q.1[2] ] )
+}
+
 /// Versorから単位ベクトル（回転軸）を取り出す．
 /// normalize_vec関数よりも計算量が少ないが，
 /// ||q||=1であることを前提とする．
@@ -223,7 +230,7 @@ pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
 /// If the CPU supports FMA(Fused multiply–add) instructions,
 /// this is faster than "add(scale(s, a), b)".
 #[inline(always)]
-#[cfg(not(all(target_arch = "x86_64", target_feature = "fma")))]
+#[cfg(not(all(any(target_arch = "x86", target_arch = "x86_64"), target_feature = "fma")))]
 pub fn scale_add(s: f64, a: Quaternion<f64>, b: Quaternion<f64>) -> Quaternion<f64> {
     ( s.mul_add(a.0, b.0), scale_add_vec(s, a.1, b.1) )
 }
@@ -359,19 +366,34 @@ pub fn ln_versor(q: Quaternion<f64>) -> Vector3<f64> {
 /// The power function of quaternion.
 #[inline(always)]
 pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
+    let norm = norm(q);
     let norm_vec = norm_vec(q.1);
-    let f = ( t * acos_safe(q.0) ).sin_cos();
-    let coef = norm(q).powf(t);
+    let omega = acos_safe(q.0 / norm);
+    let f = (t * omega).sin_cos();
+    let coef = norm.powf(t);
     if norm_vec == 0.0 {
         return (coef * f.1, ZERO_VECTOR);
     }
-    let q_v = scale_vec(f.0 / norm_vec, q.1);
-    scale( coef, (f.1, q_v) )
+    let n = scale_vec(f.0 / norm_vec, q.1);
+    scale( coef, (f.1, n) )
+}
+
+/// Versor(単位四元数)の冪函数
+/// Versorであることが保証されている場合にはpow関数よりも計算量を減らせる．
+/// The power function of Versor.
+#[inline(always)]
+pub fn pow_versor(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
+    let norm_vec = norm_vec(q.1);
+    if norm_vec == 0.0 {
+        return IDENTITY;
+    }
+    let f = ( t * acos_safe(q.0) ).sin_cos();
+    ( f.1, scale_vec(f.0 / norm_vec, q.1) )
 }
 
 /// 位置ベクトルの回転
 /// q v q*  (||q|| = 1)
-/// 引数は必ずVersor(単位四元数)でなければならない．
+/// 引数qは必ずVersor(単位四元数)でなければならない．
 /// Argument must be Versor(unit quaternion).
 #[inline(always)]
 pub fn vector_rotation(q: Quaternion<f64>, v: Vector3<f64>) -> Vector3<f64> {
@@ -384,8 +406,8 @@ pub fn vector_rotation(q: Quaternion<f64>, v: Vector3<f64>) -> Vector3<f64> {
 
 /// 座標系の回転
 /// q* v q  (||q|| = 1)
-/// 引数は必ずVersor(単位四元数)でなければならない．
-/// Argument must be Versor(unit quaternion).
+/// 引数qは必ずVersor(単位四元数)でなければならない．
+/// Argument q must be Versor(unit quaternion).
 #[inline(always)]
 pub fn frame_rotation(q: Quaternion<f64>, v: Vector3<f64>) -> Vector3<f64> {
     let dot = dot_vec(q.1, v);
@@ -497,7 +519,7 @@ pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion
         return lerp(a, b, t);
     }
     // slerp
-    let tmp = pow( mul( b, conj(a) ), t );
+    let tmp = pow_versor( mul( b, conj(a) ), t );
     mul(tmp, a)
 }
 
