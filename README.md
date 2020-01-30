@@ -28,7 +28,7 @@ use quaternion as quat;
 use quat::Vector3;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 1e-8;
+const EPSILON: f64 = 1e-10;
 
 fn main() {
     // Position vector

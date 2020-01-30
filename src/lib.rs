@@ -8,6 +8,7 @@ pub type Vector3<T> = [T; 3];
 pub type Quaternion<T> = (T, Vector3<T>);  // (1, [i, j, k])
 pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosines Matrix
 
+const EPSILON: f64 = std::f64::EPSILON;
 const PI: f64 = std::f64::consts::PI;
 const THRESHOLD: f64 = 0.9995;  // Used in slerp
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
@@ -27,7 +28,7 @@ pub use to_fast::*;
 #[inline(always)]
 pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     let norm = norm_vec(axis);
-    if (norm == 0.0) | (angle == 0.0) {
+    if comp_zero(norm) | comp_zero(angle) {
         return IDENTITY;
     }
     let f = (angle * 0.5).sin_cos();
@@ -63,7 +64,7 @@ pub fn from_dcm_frame(m: DCM<f64>) -> Quaternion<f64> {
 pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     q = normalize(q);
     let norm = norm_vec(q.1);
-    if norm == 0.0 {
+    if comp_zero(norm) {
         return (ZERO_VECTOR, 0.0);
     }
     let axis = scale_vec( norm.recip(), q.1 );
@@ -134,7 +135,7 @@ pub fn system_trans(q: Quaternion<f64>) -> Quaternion<f64> {
 /// 恒等四元数を入力した場合には零ベクトルを返す．
 #[inline(always)]
 pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
-    if q.0 == 1.0 {
+    if comp_zero(q.0 - 1.0) {
         return ZERO_VECTOR;
     }
     let coef = inv_sqrt(1.0 - q.0*q.0);
@@ -256,7 +257,7 @@ pub fn norm(q: Quaternion<f64>) -> f64 {
 #[inline(always)]
 pub fn normalize_vec(v: Vector3<f64>) -> Vector3<f64> {
     let norm = norm_vec(v);
-    if norm == 0.0 {
+    if comp_zero(norm) {
         return ZERO_VECTOR;  // ゼロ除算回避
     }
     scale_vec( norm.recip(), v )
@@ -322,7 +323,7 @@ pub fn inv(q: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn exp_vec(v: Vector3<f64>) -> Quaternion<f64> {
     let norm = norm_vec(v);
-    if norm == 0.0 {
+    if comp_zero(norm) {
         return IDENTITY;
     }
     let f = norm.sin_cos();
@@ -342,7 +343,7 @@ pub fn exp(q: Quaternion<f64>) -> Quaternion<f64> {
 pub fn ln(q: Quaternion<f64>) -> Quaternion<f64> {
     let norm = norm(q);
     let norm_vec = norm_vec(q.1);
-    if norm_vec == 0.0 {
+    if comp_zero(norm_vec) {
         return (norm.ln(), ZERO_VECTOR);
     }
     let coef = acos_safe(q.0 / norm) / norm_vec;
@@ -355,7 +356,7 @@ pub fn ln(q: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn ln_versor(q: Quaternion<f64>) -> Vector3<f64> {
     let norm_vec = norm_vec(q.1);
-    if norm_vec == 0.0 {
+    if comp_zero(norm_vec) {
         return ZERO_VECTOR;
     }
     let coef = acos_safe(q.0) / norm_vec;
@@ -371,7 +372,7 @@ pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let omega = acos_safe(q.0 / norm);
     let f = (t * omega).sin_cos();
     let coef = norm.powf(t);
-    if norm_vec == 0.0 {
+    if comp_zero(norm_vec) {
         return (coef * f.1, ZERO_VECTOR);
     }
     let n = scale_vec(f.0 / norm_vec, q.1);
@@ -384,7 +385,7 @@ pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 #[inline(always)]
 pub fn pow_versor(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let norm_vec = norm_vec(q.1);
-    if norm_vec == 0.0 {
+    if comp_zero(norm_vec) {
         return IDENTITY;
     }
     let f = ( t * acos_safe(q.0) ).sin_cos();
@@ -549,4 +550,11 @@ fn inv_sqrt(c: f64) -> f64 {
         x *= 1.5 - x * x * half_c;
     }
     x
+}
+
+/// 誤差を考慮した比較
+/// a == 0 とみなせればtrue
+#[inline(always)]
+fn comp_zero(a: f64) -> bool {
+    a.abs() <= EPSILON
 }
