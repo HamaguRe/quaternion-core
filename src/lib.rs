@@ -28,7 +28,7 @@ pub use to_fast::*;
 #[inline(always)]
 pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     let norm = norm_vec(axis);
-    if comp_zero(norm) | comp_zero(angle) {
+    if comp_zero(norm) {
         return IDENTITY;
     }
     let f = (angle * 0.5).sin_cos();
@@ -539,6 +539,7 @@ fn acos_safe(x: f64) -> f64 {
 }
 
 /// 高速逆平方根計算アルゴリズム(IEEE 754)
+/// c >= 0
 #[inline(always)]
 fn inv_sqrt(c: f64) -> f64 {
     let half_c = 0.5 * c;
