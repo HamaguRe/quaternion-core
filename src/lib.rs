@@ -19,7 +19,7 @@ mod to_fast;
 pub use to_fast::*;
 
 
-/// 回転角[rad]と軸ベクトルを指定して四元数を生成．
+/// 回転角[rad]と軸ベクトルを指定して四元数を生成する．
 /// axisは単位ベクトルでなくても良い．
 /// 零ベクトルを入力した場合は，恒等四元数を返す．
 /// Generate quaternion by specifying rotation angle[rad] and axis vector.
@@ -28,11 +28,29 @@ pub use to_fast::*;
 #[inline(always)]
 pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     let norm = norm_vec(axis);
-    if comp_zero(norm) {
-        return IDENTITY;
+    if norm <= EPSILON {  // ゼロ除算回避
+        IDENTITY
+    } else {
+        let f = (angle * 0.5).sin_cos();
+        ( f.1, scale_vec(f.0 / norm, axis) )
     }
-    let f = (angle * 0.5).sin_cos();
-    ( f.1, scale_vec( f.0 / norm, axis ) )
+}
+
+/// Versorから回転軸（単位ベクトル）と軸回りの回転角[rad]を求める．
+/// Compute the rotation axis (unit vector) and the rotation angle[rad] 
+/// around the axis from the versor.
+/// return "(axis, angle)"
+#[inline(always)]
+pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
+    q = normalize(q);
+    let norm = norm_vec(q.1);
+    if norm <= EPSILON {
+        (ZERO_VECTOR, 0.0)
+    } else {
+        let axis = scale_vec( norm.recip(), q.1 );
+        let angle = 2.0 * acos_safe(q.0);
+        (axis, angle)
+    }
 }
 
 /// 位置ベクトルの回転を表す方向余弦行列からversorを生成．
@@ -46,30 +64,6 @@ pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
     let q3 = m[1][0] - m[0][1];
     let coef = (4.0 * q0).recip();
     normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
-}
-
-/// 座標系回転を表す方向余弦行列からversorを生成．
-/// Generate versor from direction cosine matrix 
-/// representing coordinate system rotation.
-#[inline(always)]
-pub fn from_dcm_frame(m: DCM<f64>) -> Quaternion<f64> {
-    conj( from_dcm_vector(m) )
-}
-
-/// Versorから回転軸（単位ベクトル）と軸回りの回転角[rad]を求める．
-/// Compute the rotation axis (unit vector) and the rotation angle[rad] 
-/// around the axis from the versor.
-/// return "(axis, angle)"
-#[inline(always)]
-pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
-    q = normalize(q);
-    let norm = norm_vec(q.1);
-    if comp_zero(norm) {
-        return (ZERO_VECTOR, 0.0);
-    }
-    let axis = scale_vec( norm.recip(), q.1 );
-    let angle = 2.0 * acos_safe(q.0);
-    (axis, angle)
 }
 
 /// 位置ベクトル回転を表す四元数を，方向余弦行列（回転行列）に変換．
@@ -103,6 +97,14 @@ pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
     ]
 }
 
+/// 座標系回転を表す方向余弦行列からversorを生成．
+/// Generate versor from direction cosine matrix 
+/// representing coordinate system rotation.
+#[inline(always)]
+pub fn from_dcm_frame(m: DCM<f64>) -> Quaternion<f64> {
+    conj( from_dcm_vector(m) )
+}
+
 /// 座標系回転を表す四元数を，方向余弦行列（回転行列）に変換．
 /// q* v q と同じ回転を表す．
 #[inline(always)]
@@ -121,6 +123,7 @@ pub fn matrix_product(m: DCM<f64>, v: Vector3<f64>) -> Vector3<f64> {
 }
 
 /// 右手系と左手系の四元数を変換
+/// x, z軸はそのままで，y軸と全ての軸回りの回転方向を反転
 #[inline(always)]
 pub fn system_trans(q: Quaternion<f64>) -> Quaternion<f64> {
     // 実部と，ベクトル部の要素どれか一つの符号を反転させれば良い
@@ -135,11 +138,12 @@ pub fn system_trans(q: Quaternion<f64>) -> Quaternion<f64> {
 /// 恒等四元数を入力した場合には零ベクトルを返す．
 #[inline(always)]
 pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
-    if comp_zero(q.0 - 1.0) {
-        return ZERO_VECTOR;
+    if (q.0 - 1.0).abs() <= EPSILON {
+        ZERO_VECTOR
+    } else {
+        let coef = (1.0 - q.0*q.0).sqrt().recip();
+        scale_vec(coef, q.1)
     }
-    let coef = inv_sqrt(1.0 - q.0*q.0);
-    scale_vec(coef, q.1)
 }
 
 /// ベクトルのスカラー積（内積）
@@ -257,17 +261,18 @@ pub fn norm(q: Quaternion<f64>) -> f64 {
 #[inline(always)]
 pub fn normalize_vec(v: Vector3<f64>) -> Vector3<f64> {
     let norm = norm_vec(v);
-    if comp_zero(norm) {
-        return ZERO_VECTOR;  // ゼロ除算回避
+    if norm <= EPSILON {
+        ZERO_VECTOR
+    } else {
+        scale_vec( norm.recip(), v )
     }
-    scale_vec( norm.recip(), v )
 }
 
 /// ノルムが1になるように正規化
 /// Normalized so that norm is 1
 #[inline(always)]
 pub fn normalize(q: Quaternion<f64>) -> Quaternion<f64> {
-    scale( inv_sqrt( dot(q, q) ), q )
+    scale( dot(q, q).sqrt().recip(), q )
 }
 
 /// 符号反転
@@ -323,11 +328,12 @@ pub fn inv(q: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn exp_vec(v: Vector3<f64>) -> Quaternion<f64> {
     let norm = norm_vec(v);
-    if comp_zero(norm) {
-        return IDENTITY;
+    if norm <= EPSILON {
+        IDENTITY
+    } else {
+        let f = norm.sin_cos();
+        ( f.1, scale_vec(f.0 / norm, v) )
     }
-    let f = norm.sin_cos();
-    ( f.1, scale_vec( f.0 / norm, v ) )
 }
 
 /// ネイピア数を底とする指数函数
@@ -343,11 +349,12 @@ pub fn exp(q: Quaternion<f64>) -> Quaternion<f64> {
 pub fn ln(q: Quaternion<f64>) -> Quaternion<f64> {
     let norm = norm(q);
     let norm_vec = norm_vec(q.1);
-    if comp_zero(norm_vec) {
-        return (norm.ln(), ZERO_VECTOR);
+    if norm_vec <= EPSILON {
+        ( norm.ln(), ZERO_VECTOR )
+    } else {
+        let coef = acos_safe(q.0 / norm) / norm_vec;
+        ( norm.ln(), scale_vec(coef, q.1) )
     }
-    let coef = acos_safe(q.0 / norm) / norm_vec;
-    ( norm.ln(), scale_vec(coef, q.1) )
 }
 
 /// Versor(単位四元数)の自然対数
@@ -356,11 +363,12 @@ pub fn ln(q: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn ln_versor(q: Quaternion<f64>) -> Vector3<f64> {
     let norm_vec = norm_vec(q.1);
-    if comp_zero(norm_vec) {
-        return ZERO_VECTOR;
+    if norm_vec <= EPSILON {
+        ZERO_VECTOR
+    } else {
+        let coef = acos_safe(q.0) / norm_vec;
+        scale_vec(coef, q.1)
     }
-    let coef = acos_safe(q.0) / norm_vec;
-    scale_vec(coef, q.1)
 }
 
 /// 四元数の冪函数
@@ -372,11 +380,12 @@ pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let omega = acos_safe(q.0 / norm);
     let f = (t * omega).sin_cos();
     let coef = norm.powf(t);
-    if comp_zero(norm_vec) {
-        return (coef * f.1, ZERO_VECTOR);
+    if norm_vec <= EPSILON {
+        (coef * f.1, ZERO_VECTOR)
+    } else {
+        let n = scale_vec(f.0 / norm_vec, q.1);
+        scale( coef, (f.1, n) )
     }
-    let n = scale_vec(f.0 / norm_vec, q.1);
-    scale( coef, (f.1, n) )
 }
 
 /// Versor(単位四元数)の冪函数
@@ -385,11 +394,12 @@ pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 #[inline(always)]
 pub fn pow_versor(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let norm_vec = norm_vec(q.1);
-    if comp_zero(norm_vec) {
-        return IDENTITY;
+    if norm_vec <= EPSILON {
+        IDENTITY
+    } else {
+        let f = ( t * acos_safe(q.0) ).sin_cos();
+        ( f.1, scale_vec(f.0 / norm_vec, q.1) )
     }
-    let f = ( t * acos_safe(q.0) ).sin_cos();
-    ( f.1, scale_vec(f.0 / norm_vec, q.1) )
 }
 
 /// 位置ベクトルの回転
@@ -487,16 +497,17 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
     }
     // If the distance between quaternions is close enough, use lerp.
     if dot > THRESHOLD {
-        return lerp(a, b, t);
+        lerp(a, b, t)
+    } else {
+        let omega = dot.acos();  // Angle between the two quaternions.
+        let tmp = t * omega;
+        let s1 = (omega - tmp).sin();
+        let s2 = tmp.sin();
+        let term1 = scale(s1, a);
+        let term2 = scale(s2, b);
+        let coef = (1.0 - dot*dot).sqrt().recip();
+        scale( coef, add(term1, term2) )
     }
-    // selrp
-    let omega = dot.acos();  // Angle between the two quaternions.
-    let s1 = ( (1.0 - t) * omega ).sin();
-    let s2 = (t * omega).sin();
-    let term1 = scale(s1, a);
-    let term2 = scale(s2, b);
-    let coef = inv_sqrt(1.0 - dot*dot);
-    scale( coef, add(term1, term2) )
 }
 
 /// 四元数の冪函数を用いたSlerpアルゴリズム．
@@ -515,13 +526,13 @@ pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion
         b = negate(b);
         dot = -dot;
     }
-    // lerp
+    // If the distance between quaternions is close enough, use lerp.
     if dot > THRESHOLD {
-        return lerp(a, b, t);
+        lerp(a, b, t)
+    } else {
+        let tmp = pow_versor( mul( b, conj(a) ), t );
+        mul(tmp, a)
     }
-    // slerp
-    let tmp = pow_versor( mul( b, conj(a) ), t );
-    mul(tmp, a)
 }
 
 /// 定義域外の値をカットして未定義動作を防ぐ
@@ -536,26 +547,4 @@ fn acos_safe(x: f64) -> f64 {
     } else {
         x.acos()
     }
-}
-
-/// 高速逆平方根計算アルゴリズム(IEEE 754)
-/// c >= 0
-#[inline(always)]
-fn inv_sqrt(c: f64) -> f64 {
-    let half_c = 0.5 * c;
-    let i = c.to_bits();
-    //let j = 0x5F3759DF - (i >> 1);  // Magic number for f32
-    let j = 0x5FE6EB50C7B537A9 - (i >> 1);  // Magic number for f64
-    let mut x = f64::from_bits(j);
-    for _ in 0..5 {  // f64: 0..5，f32: 0..3
-        x *= 1.5 - x * x * half_c;
-    }
-    x
-}
-
-/// 誤差を考慮した比較
-/// a == 0 とみなせればtrue
-#[inline(always)]
-fn comp_zero(a: f64) -> bool {
-    a.abs() <= EPSILON
 }
