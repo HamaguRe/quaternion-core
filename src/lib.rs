@@ -41,8 +41,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 /// around the axis from the versor.
 /// return "(axis, angle)"
 #[inline(always)]
-pub fn to_axis_angle(mut q: Quaternion<f64>) -> (Vector3<f64>, f64) {
-    q = normalize(q);
+pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     let norm = norm_vec(q.1);
     if norm <= EPSILON {
         (ZERO_VECTOR, 0.0)
@@ -66,11 +65,11 @@ pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
     normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
 }
 
-/// 位置ベクトル回転を表す四元数を，方向余弦行列（回転行列）に変換．
+/// 位置ベクトル回転を表すVersorを，方向余弦行列（回転行列）に変換．
 /// q v q* と同じ回転を表す．
 #[inline(always)]
 pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
-    let (q0, [q1, q2, q3]) = normalize(q);
+    let (q0, [q1, q2, q3]) = q;
     // Compute these value only once.
     let q0_q0 = q0 * q0;
     let q0_q1 = q0 * q1;
@@ -97,7 +96,7 @@ pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
     ]
 }
 
-/// 座標系回転を表す方向余弦行列からversorを生成．
+/// 座標系回転を表す方向余弦行列からVersorを生成．
 /// Generate versor from direction cosine matrix 
 /// representing coordinate system rotation.
 #[inline(always)]
@@ -105,7 +104,7 @@ pub fn from_dcm_frame(m: DCM<f64>) -> Quaternion<f64> {
     conj( from_dcm_vector(m) )
 }
 
-/// 座標系回転を表す四元数を，方向余弦行列（回転行列）に変換．
+/// 座標系回転を表すVersorを，方向余弦行列（回転行列）に変換．
 /// q* v q と同じ回転を表す．
 #[inline(always)]
 pub fn to_dcm_frame(q: Quaternion<f64>) -> DCM<f64> {
@@ -394,10 +393,10 @@ pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 #[inline(always)]
 pub fn pow_versor(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let norm_vec = norm_vec(q.1);
+    let f = ( t * acos_safe(q.0) ).sin_cos();
     if norm_vec <= EPSILON {
-        IDENTITY
+        ( f.1, ZERO_VECTOR )
     } else {
-        let f = ( t * acos_safe(q.0) ).sin_cos();
         ( f.1, scale_vec(f.0 / norm_vec, q.1) )
     }
 }
@@ -512,12 +511,12 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
 
 /// 四元数の冪函数を用いたSlerpアルゴリズム．
 /// 実装方法が違うだけで，計算結果はslerp関数と同じ．
+/// 特に理由がなければ，この関数ではなくslerp関数の仕様を推奨する．
 /// "a"と"b"のノルムは必ず1でなければならない．
 /// Slerp algorithm using quaternion powers.
 /// The calculation result is the same as slerp function, 
 /// only the implementation method is different.
 /// The norm of "a" and "b" must be 1.
-/// "a" --> "b"
 #[inline(always)]
 pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     // 最短経路で補間
