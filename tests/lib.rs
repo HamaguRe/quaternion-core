@@ -21,8 +21,8 @@ fn test_sub() {
 #[test]
 fn test_scale_add() {
     let s = 2.0;
-    let a = (0.5, [1.0, 1.0, 1.0]);
-    let b = (0.5, [1.0, 1.0, 1.0]);
+    let a = (0.5, [1.0, 2.5, 1.2]);
+    let b = (2.2, [6.5, 1.0, 3.4]);
 
     let result_1 = scale_add(s, a, b);
     let result_2 = add( scale(s, a), b );
@@ -96,30 +96,11 @@ fn test_frame_rotation() {
     assert!( (result[2] - 2.0).abs() < EPSILON);
 }
 
-// 回転を表す四元数の単位ベクトル（回転軸）を求める．
-#[test]
-fn test_get_unit_vector() {
-    let axis = [1.0, 4.0, 2.0];
-    let q = from_axis_angle(axis, PI);
-    assert!( (norm(q) - 1.0).abs() < EPSILON );
-
-    // 一番計算量が少ないが，引数が単位四元数であることを前提とする．
-    let n_1 = get_unit_vector(q);
-    // n_1より少し計算量が多いが，必ず単位ベクトルを返す．
-    let n_2 = normalize_vec(q.1);
-
-    let n = normalize_vec(axis);
-    for i in 0..3 {
-        assert!( (n_1[i] - n[i]).abs() < EPSILON );
-        assert!( (n_2[i] - n[i]).abs() < EPSILON );
-    }
-}
-
 // 回転軸と回転角を取り出す
 #[test]
 fn test_to_axis_angle() {
     let axis = [1.0, 4.0, 2.0];
-    let angle = PI;
+    let angle = PI/4.0;
     let q = from_axis_angle(axis, angle);
 
     // 軸の方向は分かるが，元の大きさはわからない．
@@ -129,6 +110,29 @@ fn test_to_axis_angle() {
     for i in 0..3 {
         assert!( (f.0[i] - n[i]).abs() < EPSILON );
     }
+}
+
+// 二つの異なる方法でVersorの軸回りの回転角を求める．
+#[test]
+fn test_get_angle() {
+    // 適当なVersorを作る
+    let axis = [1.0, 4.0, 2.0];
+    let angle = -0.5 * PI;
+    let q = from_axis_angle(axis, angle);
+
+    // 方法1
+    // 実部のみを使うので計算量が少ない．
+    // 計算精度が一つの変数に依存してしまうのは良くない...？
+    // 0 <= angle1 <= 2π
+    let angle1 = 2.0 * q.0.acos();
+    // 方法2
+    // 実部の符号を反映することで幾何学的には方法1と同じ結果が得られる．
+    // 実部と虚部両方の値を使っているのでなんとなく気持ちが良い．
+    // -π <= angle2 <= π
+    let angle2 = ( 2.0 * norm_vec(q.1).asin() ).copysign(q.0);
+
+    // -1から1の範囲に直してしまえば同じ
+    assert!( (angle1.sin() - angle2.sin()).abs() < EPSILON );
 }
 
 #[test]
@@ -202,25 +206,4 @@ fn test_integration_method() {
     assert!( (q_1.1[0] - q_2.1[0]).abs() < epsilon );
     assert!( (q_1.1[1] - q_2.1[1]).abs() < epsilon );
     assert!( (q_1.1[2] - q_2.1[2]).abs() < epsilon );
-}
-
-// 二つの方法でSlerpを行う．
-#[test]
-fn test_slerp_eq() {
-    let p = from_axis_angle([2.0, 1.2, 3.5], PI);
-    let q = from_axis_angle([3.0, 4.5, 1.0], PI/2.0);
-    let mut t = 0.0;
-    for _ in 0..10 {
-        let p_t = slerp(p, q, t);
-        let q_t = slerp_1(p, q, t);
-        println!("p_slerp: {:?}", p_t);
-        println!("q_slerp_1: {:?}", q_t);
-        // check
-        assert!( (p_t.0 - q_t.0).abs() < EPSILON );
-        for i in 0..3 {
-            assert!( (p_t.1[i] - q_t.1[i]).abs() < EPSILON );
-        }
-
-        t += 0.1;
-    }
 }

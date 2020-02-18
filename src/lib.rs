@@ -10,7 +10,8 @@ pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosines Matrix
 
 const EPSILON: f64 = std::f64::EPSILON;
 const PI: f64 = std::f64::consts::PI;
-const THRESHOLD: f64 = 0.9995;  // Used in slerp
+const FRAC_PI_2: f64 = std::f64::consts::FRAC_PI_2;  // π/2
+const THRESHOLD: f64 = 0.9995;  // Used in slerp (Approximation error < 0.017%)
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
 pub const IDENTITY: Quaternion<f64> = (1.0, [0.0; 3]);  // Identity Quaternion
 
@@ -28,7 +29,7 @@ pub use to_fast::*;
 #[inline(always)]
 pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     let norm = norm_vec(axis);
-    if norm <= EPSILON {  // ゼロ除算回避
+    if norm < EPSILON {  // ゼロ除算回避
         IDENTITY
     } else {
         let f = (angle * 0.5).sin_cos();
@@ -40,14 +41,15 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
 /// Compute the rotation axis (unit vector) and the rotation angle[rad] 
 /// around the axis from the versor.
 /// return "(axis, angle)"
+/// -π <= angle <= π
 #[inline(always)]
 pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
-    let norm = norm_vec(q.1);
-    if norm <= EPSILON {
+    let norm_vec = norm_vec(q.1);
+    if norm_vec < EPSILON {
         (ZERO_VECTOR, 0.0)
     } else {
-        let axis = scale_vec( norm.recip(), q.1 );
-        let angle = 2.0 * acos_safe(q.0);
+        let axis = scale_vec( norm_vec.recip(), q.1 );
+        let angle = ( 2.0 * asin_safe(norm_vec) ).copysign(q.0);
         (axis, angle)
     }
 }
@@ -127,22 +129,6 @@ pub fn matrix_product(m: DCM<f64>, v: Vector3<f64>) -> Vector3<f64> {
 pub fn system_trans(q: Quaternion<f64>) -> Quaternion<f64> {
     // 実部と，ベクトル部の要素どれか一つの符号を反転させれば良い
     ( -q.0, [ q.1[0], -q.1[1], q.1[2] ] )
-}
-
-/// Versorから単位ベクトル（回転軸）を取り出す．
-/// normalize_vec関数よりも計算量が少ないが，
-/// ||q||=1であることを前提とする．
-/// 引数に渡す四元数のノルムが保証できない場合には
-/// normalize_vec関数を用いるべき．
-/// 恒等四元数を入力した場合には零ベクトルを返す．
-#[inline(always)]
-pub fn get_unit_vector(q: Quaternion<f64>) -> Vector3<f64> {
-    if (q.0 - 1.0).abs() <= EPSILON {
-        ZERO_VECTOR
-    } else {
-        let coef = (1.0 - q.0*q.0).sqrt().recip();
-        scale_vec(coef, q.1)
-    }
 }
 
 /// ベクトルのスカラー積（内積）
@@ -260,7 +246,7 @@ pub fn norm(q: Quaternion<f64>) -> f64 {
 #[inline(always)]
 pub fn normalize_vec(v: Vector3<f64>) -> Vector3<f64> {
     let norm = norm_vec(v);
-    if norm <= EPSILON {
+    if norm < EPSILON {
         ZERO_VECTOR
     } else {
         scale_vec( norm.recip(), v )
@@ -327,7 +313,7 @@ pub fn inv(q: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn exp_vec(v: Vector3<f64>) -> Quaternion<f64> {
     let norm = norm_vec(v);
-    if norm <= EPSILON {
+    if norm < EPSILON {
         IDENTITY
     } else {
         let f = norm.sin_cos();
@@ -348,7 +334,7 @@ pub fn exp(q: Quaternion<f64>) -> Quaternion<f64> {
 pub fn ln(q: Quaternion<f64>) -> Quaternion<f64> {
     let norm = norm(q);
     let norm_vec = norm_vec(q.1);
-    if norm_vec <= EPSILON {
+    if norm_vec < EPSILON {
         ( norm.ln(), ZERO_VECTOR )
     } else {
         let coef = acos_safe(q.0 / norm) / norm_vec;
@@ -362,7 +348,7 @@ pub fn ln(q: Quaternion<f64>) -> Quaternion<f64> {
 #[inline(always)]
 pub fn ln_versor(q: Quaternion<f64>) -> Vector3<f64> {
     let norm_vec = norm_vec(q.1);
-    if norm_vec <= EPSILON {
+    if norm_vec < EPSILON {
         ZERO_VECTOR
     } else {
         let coef = acos_safe(q.0) / norm_vec;
@@ -379,7 +365,7 @@ pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let omega = acos_safe(q.0 / norm);
     let f = (t * omega).sin_cos();
     let coef = norm.powf(t);
-    if norm_vec <= EPSILON {
+    if norm_vec < EPSILON {
         (coef * f.1, ZERO_VECTOR)
     } else {
         let n = scale_vec(f.0 / norm_vec, q.1);
@@ -394,7 +380,7 @@ pub fn pow(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
 pub fn pow_versor(q: Quaternion<f64>, t: f64) -> Quaternion<f64> {
     let norm_vec = norm_vec(q.1);
     let f = ( t * acos_safe(q.0) ).sin_cos();
-    if norm_vec <= EPSILON {
+    if norm_vec < EPSILON {
         ( f.1, ZERO_VECTOR )
     } else {
         ( f.1, scale_vec(f.0 / norm_vec, q.1) )
@@ -509,28 +495,13 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
     }
 }
 
-/// 四元数の冪函数を用いたSlerpアルゴリズム．
-/// 実装方法が違うだけで，計算結果はslerp関数と同じ．
-/// 特に理由がなければ，この関数ではなくslerp関数の仕様を推奨する．
-/// "a"と"b"のノルムは必ず1でなければならない．
-/// Slerp algorithm using quaternion powers.
-/// The calculation result is the same as slerp function, 
-/// only the implementation method is different.
-/// The norm of "a" and "b" must be 1.
+/// 定義域外の値をカットして未定義動作を防ぐ
 #[inline(always)]
-pub fn slerp_1(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f64> {
-    // 最短経路で補間
-    let mut dot = dot(a, b);
-    if dot.is_sign_negative() {
-        b = negate(b);
-        dot = -dot;
-    }
-    // If the distance between quaternions is close enough, use lerp.
-    if dot > THRESHOLD {
-        lerp(a, b, t)
+fn asin_safe(x: f64) -> f64 {
+    if x.abs() >= 1.0 {
+        FRAC_PI_2.copysign(x)
     } else {
-        let tmp = pow_versor( mul( b, conj(a) ), t );
-        mul(tmp, a)
+        x.asin()
     }
 }
 
