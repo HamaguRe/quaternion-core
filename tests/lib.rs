@@ -113,11 +113,15 @@ fn test_to_axis_angle() {
 }
 
 // 二つの異なる方法でVersorの軸回りの回転角を求める．
+// 正の回転角を指定してVersorを生成した場合は以下の方法で回転角と回転軸を復元できるが，
+// 負の回転角を指定した場合には，回転角は正となり回転軸が反転するので完全には復元できない．
+// とはいえ，回転軸と回転角を合わせて考えれば三次元空間上での回転は変化していないので
+// そこまで大きな問題はないと思われる．
 #[test]
 fn test_get_angle() {
     // 適当なVersorを作る
-    let axis = [1.0, 4.0, 2.0];
-    let angle = -0.5 * PI;
+    let axis = [1.0, 4.0, -2.0];
+    let angle = 1.5 * PI;
     let q = from_axis_angle(axis, angle);
 
     // 方法1
@@ -131,8 +135,17 @@ fn test_get_angle() {
     // -π <= angle2 <= π
     let angle2 = ( 2.0 * norm_vec(q.1).asin() ).copysign(q.0);
 
-    // -1から1の範囲に直してしまえば同じ
-    assert!( (angle1.sin() - angle2.sin()).abs() < EPSILON );
+    println!("axis: {:?}", normalize_vec(q.1));
+    println!("angle1: {}PI, angle2: {}PI", angle1/PI, angle2/PI);
+
+    // 0からπまでは同じ
+    if angle <= PI {
+        assert!( (angle1 - angle2).abs() < EPSILON );
+    } else {
+        // 例えば，1.5πと-0.5πは同じ回転を表す．
+        assert!( (angle1 - angle).abs() < EPSILON );
+        assert!( (angle2 - (angle - 2.0*PI)).abs() < EPSILON );
+    }
 }
 
 #[test]

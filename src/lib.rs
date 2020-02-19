@@ -27,11 +27,12 @@ pub use to_fast::*;
 /// The "axis" need not be unit vector.
 /// If you enter a zero vector, it returns an identity quaternion.
 #[inline(always)]
-pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
+pub fn from_axis_angle(axis: Vector3<f64>, mut angle: f64) -> Quaternion<f64> {
     let norm = norm_vec(axis);
     if norm < EPSILON {  // ゼロ除算回避
         IDENTITY
     } else {
+        angle = ( angle % (2.0 * PI) ).copysign(angle);  // limit to (-2π, 2π)
         let f = (angle * 0.5).sin_cos();
         ( f.1, scale_vec(f.0 / norm, axis) )
     }
@@ -257,7 +258,7 @@ pub fn normalize_vec(v: Vector3<f64>) -> Vector3<f64> {
 /// Normalized so that norm is 1
 #[inline(always)]
 pub fn normalize(q: Quaternion<f64>) -> Quaternion<f64> {
-    scale( dot(q, q).sqrt().recip(), q )
+    scale( norm(q).recip(), q )
 }
 
 /// 符号反転
@@ -301,6 +302,18 @@ pub fn conj(q: Quaternion<f64>) -> Quaternion<f64> {
     ( q.0, negate_vec(q.1) )
 }
 
+/// 逆純虚四元数を求める
+/// 零ベクトルを入力した場合は零ベクトルを返す
+/// Compute the inverse pure quaternion
+pub fn inv_vec(v: Vector3<f64>) -> Vector3<f64> {
+    let dot_vec = dot_vec(v, v);
+    if dot_vec < EPSILON {
+        ZERO_VECTOR
+    } else {
+        scale_vec( dot_vec.recip() , negate_vec(v) )
+    }
+}
+
 /// 逆四元数を求める
 /// Compute the inverse quaternion
 #[inline(always)]
@@ -309,7 +322,7 @@ pub fn inv(q: Quaternion<f64>) -> Quaternion<f64> {
 }
 
 /// ネイピア数を底とする指数函数
-/// Exponential function of Vector3.
+/// Exponential function of Vector3
 #[inline(always)]
 pub fn exp_vec(v: Vector3<f64>) -> Quaternion<f64> {
     let norm = norm_vec(v);
