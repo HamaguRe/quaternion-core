@@ -54,6 +54,26 @@ fn test_negate() {
     assert_eq!( p, (1.0, [-1.0, -2.0, 1.0]) )
 }
 
+#[test]
+fn test_dcm() {
+    let v = [2.5, 1.0, -3.0];
+    let diff = [0.2, -0.1, 2.5];
+    let mut axis = [1.0, -0.2, 0.9];
+    for i in 0..20 {
+        axis = add_vec(axis, diff);
+        let q = from_axis_angle(axis, PI * (i as f64));
+        let dcm = to_dcm_vector(q);
+        let q_rest = from_dcm_vector(dcm);
+    
+        let rotated_q = vector_rotation(q, v);
+        let rotated_q_rest = vector_rotation(q_rest, v);
+    
+        assert!( (rotated_q[0] - rotated_q_rest[0]).abs() < EPSILON );
+        assert!( (rotated_q[1] - rotated_q_rest[1]).abs() < EPSILON );
+        assert!( (rotated_q[2] - rotated_q_rest[2]).abs() < EPSILON );
+    }
+}
+
 // 回転行列に変換してからベクトルを回転させる．
 #[test]
 fn test_rotate_by_dcm() {
@@ -120,8 +140,8 @@ fn test_to_axis_angle() {
 #[test]
 fn test_get_angle() {
     // 適当なVersorを作る
-    let axis = [1.0, 4.0, -2.0];
-    let angle = 1.5 * PI;
+    let axis = [0.0, 0.0, 2.0];
+    let angle = -1.5 * PI;
     let q = from_axis_angle(axis, angle);
 
     // 方法1
@@ -134,18 +154,13 @@ fn test_get_angle() {
     // 実部と虚部両方の値を使っているのでなんとなく気持ちが良い．
     // -π <= angle2 <= π
     let angle2 = ( 2.0 * norm_vec(q.1).asin() ).copysign(q.0);
+    //let angle2 = 2.0 * norm_vec(q.1).asin();
 
     println!("axis: {:?}", normalize_vec(q.1));
     println!("angle1: {}PI, angle2: {}PI", angle1/PI, angle2/PI);
 
-    // 0からπまでは同じ
-    if angle <= PI {
-        assert!( (angle1 - angle2).abs() < EPSILON );
-    } else {
-        // 例えば，1.5πと-0.5πは同じ回転を表す．
-        assert!( (angle1 - angle).abs() < EPSILON );
-        assert!( (angle2 - (angle - 2.0*PI)).abs() < EPSILON );
-    }
+    assert!( (angle1 - 1.5*PI).abs() < EPSILON );
+    assert!( (angle2 + 0.5*PI).abs() < EPSILON );
 }
 
 #[test]

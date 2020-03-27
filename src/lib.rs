@@ -11,6 +11,7 @@ pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosines Matrix
 const EPSILON: f64 = std::f64::EPSILON;
 const PI: f64 = std::f64::consts::PI;
 const FRAC_PI_2: f64 = std::f64::consts::FRAC_PI_2;  // π/2
+const TWO_PI: f64 = 2.0 * PI;
 const THRESHOLD: f64 = 0.9995;  // Used in slerp (Approximation error < 0.017%)
 const ZERO_VECTOR: Vector3<f64> = [0.0; 3];
 pub const IDENTITY: Quaternion<f64> = (1.0, [0.0; 3]);  // Identity Quaternion
@@ -27,13 +28,13 @@ pub use to_fast::*;
 /// The "axis" need not be unit vector.
 /// If you enter a zero vector, it returns an identity quaternion.
 #[inline(always)]
-pub fn from_axis_angle(axis: Vector3<f64>, mut angle: f64) -> Quaternion<f64> {
+pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     let norm = norm_vec(axis);
     if norm < EPSILON {  // ゼロ除算回避
         IDENTITY
     } else {
-        angle = ( angle % (2.0 * PI) ).copysign(angle);  // limit to (-2π, 2π)
-        let f = (angle * 0.5).sin_cos();
+        let tmp = (angle % TWO_PI).copysign(angle);  // limit to (-2π, 2π)
+        let f = (tmp * 0.5).sin_cos();
         ( f.1, scale_vec(f.0 / norm, axis) )
     }
 }
@@ -60,12 +61,49 @@ pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
 /// representing rotation of position vector.
 #[inline(always)]
 pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
-    let q0 = (m[0][0] + m[1][1] + m[2][2] + 1.0).sqrt() * 0.5;
-    let q1 = m[2][1] - m[1][2];
-    let q2 = m[0][2] - m[2][0];
-    let q3 = m[1][0] - m[0][1];
-    let coef = (4.0 * q0).recip();
-    normalize( ( q0, scale_vec(coef, [q1, q2, q3]) ) )
+    // ゼロ除算が発生しないように，4通りの式で求めたうちの最大値を係数として使う．
+    let tmp_list = [
+         m[0][0] + m[1][1] + m[2][2],
+         m[0][0] - m[1][1] - m[2][2],
+        -m[0][0] + m[1][1] - m[2][2],
+        -m[0][0] - m[1][1] + m[2][2],
+    ];
+    let index = max4_index(tmp_list);
+
+    let tmp = (tmp_list[index] + 1.0).sqrt();
+    let coef = (2.0 * tmp).recip();
+    let q = match index {
+        0 => {
+            let q0 = 0.5 * tmp;
+            let q1 = (m[2][1] - m[1][2]) * coef;
+            let q2 = (m[0][2] - m[2][0]) * coef;
+            let q3 = (m[1][0] - m[0][1]) * coef;
+            (q0, [q1, q2, q3])
+        },
+        1 => {
+            let q1 = 0.5 * tmp;
+            let q0 = (m[2][1] - m[1][2]) * coef;
+            let q2 = (m[0][1] + m[1][0]) * coef;
+            let q3 = (m[0][2] + m[2][0]) * coef;
+            (q0, [q1, q2, q3])
+        },
+        2 => {
+            let q2 = 0.5 * tmp;
+            let q0 = (m[0][2] - m[2][0]) * coef;
+            let q1 = (m[0][1] + m[1][0]) * coef;
+            let q3 = (m[1][2] + m[2][1]) * coef;
+            (q0, [q1, q2, q3])
+        },
+        3 => {
+            let q3 = 0.5 * tmp;
+            let q0 = (m[1][0] - m[0][1]) * coef;
+            let q1 = (m[0][2] + m[2][0]) * coef;
+            let q2 = (m[1][2] + m[2][1]) * coef;
+            (q0, [q1, q2, q3])
+        },
+        _ => IDENTITY,  // ここに来ることは無い
+    };
+    normalize(q)
 }
 
 /// 位置ベクトル回転を表すVersorを，方向余弦行列（回転行列）に変換．
@@ -508,6 +546,21 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
     }
 }
 
+/// 配列内の最大値を探して，その位置を返す
+/// return: index of max_num
+#[inline(always)]
+fn max4_index(nums: [f64; 4]) -> usize {
+    let mut max_num = nums[0];
+    let mut index = 0;
+    for i in 1..4 {
+        if nums[i] > max_num {
+            max_num = nums[i];
+            index = i;
+        }
+    }
+    index
+}
+
 /// 定義域外の値をカットして未定義動作を防ぐ
 #[inline(always)]
 fn asin_safe(x: f64) -> f64 {
@@ -522,11 +575,7 @@ fn asin_safe(x: f64) -> f64 {
 #[inline(always)]
 fn acos_safe(x: f64) -> f64 {
     if x.abs() >= 1.0 {
-        if x.is_sign_positive() {
-            0.0
-        } else {
-            PI
-        }
+        if x.is_sign_positive() {0.0} else {PI}
     } else {
         x.acos()
     }
