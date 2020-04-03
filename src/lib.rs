@@ -57,6 +57,7 @@ pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
 }
 
 /// 位置ベクトルの回転を表す方向余弦行列からversorを生成．
+/// q v q* と同じ回転を表す．
 /// Generate versor from direction cosine matrix 
 /// representing rotation of position vector.
 #[inline(always)]
@@ -68,9 +69,9 @@ pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
         -m[0][0] + m[1][1] - m[2][2],
         -m[0][0] - m[1][1] + m[2][2],
     ];
-    let index = max4_index(tmp_list);
+    let (index, max_num) = max4(tmp_list);
 
-    let tmp = (tmp_list[index] + 1.0).sqrt();
+    let tmp = (max_num + 1.0).sqrt();
     let coef = (2.0 * tmp).recip();
     let q = match index {
         0 => {
@@ -139,7 +140,7 @@ pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
 
 /// 座標系回転を表す方向余弦行列からVersorを生成．
 /// Generate versor from direction cosine matrix 
-/// representing coordinate system rotation.
+/// representing frame rotation.
 #[inline(always)]
 pub fn from_dcm_frame(m: DCM<f64>) -> Quaternion<f64> {
     conj( from_dcm_vector(m) )
@@ -478,30 +479,6 @@ pub fn rotate_a_to_b(mut a: Vector3<f64>, mut b: Vector3<f64>, t: f64) -> Quater
     from_axis_angle(axis, angle * t)
 }
 
-/// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
-/// Integrate attitude change of body coordinate frame, 
-/// and update Quaternion passed to the argument.
-/// omega[rad/sec]: Angular velocity
-/// dt[sec]: Time step width
-#[inline(always)]
-pub fn integration(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {    
-    let dq = exp_vec( scale_vec(dt*0.5, omega) );
-    mul(dq, q)
-}
-
-/// 近似式(Approximate expression)
-/// 機体座標系の姿勢変化を積分して，引数に渡した四元数を更新する．
-/// Integrate attitude change of body coordinate frame, 
-/// and update quaternion passed to the argument.
-/// omega[rad/sec]: Angular velocity
-/// dt[sec]: Time step width
-#[inline(always)]
-pub fn integration_approx(q: Quaternion<f64>, omega: Vector3<f64>, dt: f64) -> Quaternion<f64> {
-    let f = mul_vec(omega, q.1);
-    let omega_q = ( f.0, scale_add_vec(q.0, omega, f.1) );
-    normalize( scale_add(dt*0.5, omega_q, q) )
-}
-
 /// 線形補間(Linear interpolation)
 /// 引数"a"から"b"への経路を補完する四元数を生成する．
 /// 引数t(0 <= t <= 1) は補間パラメータ．
@@ -546,19 +523,18 @@ pub fn slerp(a: Quaternion<f64>, mut b: Quaternion<f64>, t: f64) -> Quaternion<f
     }
 }
 
-/// 配列内の最大値を探して，その位置を返す
-/// return: index of max_num
+/// 配列内の最大値を探して，その位置と値を返す．
 #[inline(always)]
-fn max4_index(nums: [f64; 4]) -> usize {
+fn max4(nums: [f64; 4]) -> (usize, f64) {
     let mut max_num = nums[0];
     let mut index = 0;
-    for i in 1..4 {
-        if nums[i] > max_num {
-            max_num = nums[i];
+    for (i, num) in nums.iter().enumerate().skip(1) {
+        if num > &max_num {
+            max_num = *num;
             index = i;
         }
     }
-    index
+    (index, max_num)
 }
 
 /// 定義域外の値をカットして未定義動作を防ぐ
