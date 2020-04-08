@@ -62,8 +62,8 @@ fn test_dcm() {
     for i in 0..20 {
         axis = add_vec(axis, diff);
         let q = from_axis_angle(axis, PI * (i as f64));
-        let dcm = to_dcm_vector(q);
-        let q_rest = from_dcm_vector(dcm);
+        let dcm = to_dcm(q);
+        let q_rest = from_dcm(dcm);
     
         let rotated_q = vector_rotation(q, v);
         let rotated_q_rest = vector_rotation(q_rest, v);
@@ -81,18 +81,35 @@ fn test_rotate_by_dcm() {
     let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
 
     // 位置ベクトルの回転
-    let m = to_dcm_vector(q);
+    let m = to_dcm(q);
     let result = matrix_product(m, r);
     assert!( (result[0] - 0.0).abs() < EPSILON);
     assert!( (result[1] - 2.0).abs() < EPSILON);
     assert!( (result[2] + 2.0).abs() < EPSILON);
 
     // 座標系の回転
-    let m = to_dcm_frame(q);
+    let m = to_dcm( conj(q) );
     let result = matrix_product(m, r);
     assert!( (result[0] - 0.0).abs() < EPSILON);
     assert!( (result[1] - 2.0).abs() < EPSILON);
     assert!( (result[2] - 2.0).abs() < EPSILON);
+}
+
+#[test]
+fn test_euler() {
+    let q_z = from_axis_angle([0.0, 0.0, 1.0f64], PI*(3.0/4.0));
+    let q_y = from_axis_angle([0.0, 1.0, 0.0f64], PI*(1.0/4.0));
+    let q_x = from_axis_angle([1.0, 0.0, 0.0f64], PI/2.0);
+
+    let q = mul(q_x, mul(q_y, q_z));
+    let [yaw, pitch, roll] = to_euler_angle(q);
+
+    let tmp = 180.0 / PI;
+    println!("yaw: {}, pitch: {}, roll: {}", yaw*tmp, pitch*tmp, roll*tmp);
+
+    assert!( (yaw + (PI/4.0)).abs() < EPSILON );
+    assert!( (pitch - (PI/4.0)).abs() < EPSILON );
+    assert!( (roll + (PI/2.0)).abs() < EPSILON );
 }
 
 // 手計算した結果で動作確認

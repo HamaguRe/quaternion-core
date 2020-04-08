@@ -56,12 +56,14 @@ pub fn to_axis_angle(q: Quaternion<f64>) -> (Vector3<f64>, f64) {
     }
 }
 
-/// 位置ベクトルの回転を表す方向余弦行列からversorを生成．
-/// q v q* と同じ回転を表す．
+/// 位置ベクトル回転(q v q*)を表す方向余弦行列をVersorに変換．
+/// 座標系回転(q* v q)を表す方向余弦行列を変換する場合には，
+/// let q = conj( from_dcm(dcm) );
+/// とする．
 /// Generate versor from direction cosine matrix 
 /// representing rotation of position vector.
 #[inline(always)]
-pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
+pub fn from_dcm(m: DCM<f64>) -> Quaternion<f64> {
     // ゼロ除算が発生しないように，4通りの式で求めたうちの最大値を係数として使う．
     let tmp_list = [
          m[0][0] + m[1][1] + m[2][2],
@@ -102,15 +104,17 @@ pub fn from_dcm_vector(m: DCM<f64>) -> Quaternion<f64> {
             let q2 = (m[1][2] + m[2][1]) * coef;
             (q0, [q1, q2, q3])
         },
-        _ => IDENTITY,  // ここに来ることは無い
+        _ => panic!("Index error."),  // ここに来ることは無い
     };
     normalize(q)
 }
 
-/// 位置ベクトル回転を表すVersorを，方向余弦行列（回転行列）に変換．
-/// q v q* と同じ回転を表す．
+/// 位置ベクトル回転(q v q*)を表すVersorを，方向余弦行列に変換．
+/// 座標系回転(q* v q)を表すVersorを変換する場合には，
+/// let dcm = to_dcm( conj(q) );
+/// とする．
 #[inline(always)]
-pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
+pub fn to_dcm(q: Quaternion<f64>) -> DCM<f64> {
     let (q0, [q1, q2, q3]) = q;
     // Compute these value only once.
     let q0_q0 = q0 * q0;
@@ -134,23 +138,39 @@ pub fn to_dcm_vector(q: Quaternion<f64>) -> DCM<f64> {
     [
         [m11, m12, m13],
         [m21, m22, m23],
-        [m31, m32, m33]
+        [m31, m32, m33],
     ]
 }
 
-/// 座標系回転を表す方向余弦行列からVersorを生成．
-/// Generate versor from direction cosine matrix 
-/// representing frame rotation.
+/// 位置ベクトル回転を表すVersorをz-y-x系のオイラー角に変換する．
+/// 座標系回転を表すVersorを変換する場合には，
+/// let euler_angles = to_euler_angle( conj(q) );
+/// とする．
+/// Aerospace angle/axis sequences is [yaw, pitch, roll] → [z, y, x].
+/// pitch angle is limited to [-π/2, π/2]．
+/// return: [yaw, pitch, roll]
 #[inline(always)]
-pub fn from_dcm_frame(m: DCM<f64>) -> Quaternion<f64> {
-    conj( from_dcm_vector(m) )
-}
+pub fn to_euler_angle(q: Quaternion<f64>) -> Vector3<f64> {
+    let [
+        [m11, m12, m13],
+        [  _, m22, m23],
+        [  _, m32, m33],
+    ] = to_dcm(q);
 
-/// 座標系回転を表すVersorを，方向余弦行列（回転行列）に変換．
-/// q* v q と同じ回転を表す．
-#[inline(always)]
-pub fn to_dcm_frame(q: Quaternion<f64>) -> DCM<f64> {
-    to_dcm_vector( conj(q) )
+    let yaw;
+    let pitch;
+    let roll;
+    if m13.abs() < (1.0 - EPSILON) {  // ジンバルロックが起きていない場合
+        pitch = m13.asin();
+        yaw  = (-m12 / m11).atan();
+        roll = (-m23 / m33).atan();
+    } else {
+        pitch = FRAC_PI_2.copysign(m13);
+        yaw  = 0.0;
+        roll = (m32 / m22).atan();
+    }
+
+    [yaw, pitch, roll]
 }
 
 /// 方向余弦行列を用いてベクトルを回転させる．
@@ -159,7 +179,7 @@ pub fn matrix_product(m: DCM<f64>, v: Vector3<f64>) -> Vector3<f64> {
     [
         dot_vec(m[0], v),
         dot_vec(m[1], v),
-        dot_vec(m[2], v)
+        dot_vec(m[2], v),
     ]
 }
 
@@ -195,7 +215,7 @@ pub fn cross_vec(a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
     [
         a[1]*b[2] - a[2]*b[1],
         a[2]*b[0] - a[0]*b[2],
-        a[0]*b[1] - a[1]*b[0]
+        a[0]*b[1] - a[1]*b[0],
     ]
 }
 
@@ -250,7 +270,7 @@ pub fn scale_add_vec(s: f64, a: Vector3<f64>, b: Vector3<f64>) -> Vector3<f64> {
     [
         s.mul_add(a[0], b[0]),
         s.mul_add(a[1], b[1]),
-        s.mul_add(a[2], b[2])
+        s.mul_add(a[2], b[2]),
     ]
 }
 
