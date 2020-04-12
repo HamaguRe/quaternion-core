@@ -4,7 +4,7 @@
 // Versorは「回転子」を意味し，ノルムは1に制限される．
 // Versor means the "rotator", the norm is limited to 1.
 
-pub type Vector3<T> = [T; 3];
+pub type Vector3<T> = [T; 3];  // [i, j, k]
 pub type Quaternion<T> = (T, Vector3<T>);  // (1, [i, j, k])
 pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosines Matrix
 
@@ -33,7 +33,7 @@ pub fn from_axis_angle(axis: Vector3<f64>, angle: f64) -> Quaternion<f64> {
     if norm < EPSILON {  // ゼロ除算回避
         IDENTITY
     } else {
-        let tmp = (angle % TWO_PI).copysign(angle);  // limit to (-2π, 2π)
+        let tmp = angle % TWO_PI;  // limit to (-2π, 2π)
         let f = (tmp * 0.5).sin_cos();
         ( f.1, scale_vec(f.0 / norm, axis) )
     }
