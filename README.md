@@ -2,8 +2,6 @@
 ## 【日本語】
   Rustで作成した四元数（クォータニオン）計算用のライブラリです。
 
-  実装の都合上、計算精度はf64のみとなっています。
-
   関数の動作については、ドキュメンテーションコメントを参照してください。
 
   また、四元数自体について詳しく知りたい方は、以下のページをご覧ください。
@@ -20,8 +18,6 @@
 
 ## 【English】
   It's a Quaternion library written in Rust.
-
-  The calculation accuracy is only f64 for implementation reasons.
 
   Refer to the documentation comments for function behavior.
 
@@ -46,7 +42,7 @@ use quaternion as quat;
 use quat::Vector3;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 1e-10;
+const EPSILON: f64 = 1e-14;
 
 fn main() {
     // Position vector

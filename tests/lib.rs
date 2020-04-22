@@ -135,7 +135,7 @@ fn test_sub() {
 
 #[test]
 fn test_scale_add() {
-    let s = 2.0;
+    let s = 2.0_f64;
     let a = (0.5, [1.0, 2.5, 1.2]);
     let b = (2.2, [6.5, 1.0, 3.4]);
 
