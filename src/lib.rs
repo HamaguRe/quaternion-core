@@ -494,11 +494,9 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn vector_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
-    let two: T = cast(2.0);
-
     let dot = dot_vec(q.1, v);
     let cross = cross_vec(q.1, v);
-    let term1 = add_vec( scale_vec(q.0, v),   scale_vec(two, cross) );
+    let term1 = add_vec( scale_vec(q.0, v), scale_vec(cast(2.0), cross) );
     let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
@@ -510,11 +508,9 @@ where T: Float {
 #[inline(always)]
 pub fn frame_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
-    let two: T = cast(2.0);
-
     let dot = dot_vec(q.1, v);
     let cross = cross_vec(q.1, v);
-    let term1 = sub_vec( scale_vec(q.0, v),   scale_vec(two, cross) );
+    let term1 = sub_vec( scale_vec(q.0, v), scale_vec(cast(2.0), cross) );
     let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
@@ -629,19 +625,19 @@ fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
 /// 定義域外の値をカットして未定義動作を防ぐ
 #[inline(always)]
 fn asin_safe<T: Float + FloatConst>(x: T) -> T {
-    if x.abs() >= T::one() {
-        copysign( T::FRAC_PI_2(), x )
-    } else {
+    if x.abs() < T::one() {
         x.asin()
+    } else {
+        copysign( T::FRAC_PI_2(), x )
     }
 }
 
 /// 定義域外の値をカットして未定義動作を防ぐ
 #[inline(always)]
 fn acos_safe<T: Float + FloatConst>(x: T) -> T {
-    if x.abs() >= T::one() {
-        if x.is_sign_positive() { T::zero() } else { T::PI() }
-    } else {
+    if x.abs() < T::one() {
         x.acos()
+    } else {
+        if x.is_sign_positive() { T::zero() } else { T::PI() }
     }
 }

@@ -178,16 +178,18 @@ fn test_rotate_by_dcm() {
     // 位置ベクトルの回転
     let m = to_dcm(q);
     let result = matrix_product(m, r);
-    assert!( (result[0] - 0.0).abs() < EPSILON);
-    assert!( (result[1] - 2.0).abs() < EPSILON);
-    assert!( (result[2] + 2.0).abs() < EPSILON);
+    let diff = sub_vec(result, [0.0, 2.0, -2.0]);
+    for i in 0..3 {
+        assert!( diff[i].abs() < EPSILON );
+    }
 
     // 座標系の回転
     let m = to_dcm( conj(q) );
     let result = matrix_product(m, r);
-    assert!( (result[0] - 0.0).abs() < EPSILON);
-    assert!( (result[1] - 2.0).abs() < EPSILON);
-    assert!( (result[2] - 2.0).abs() < EPSILON);
+    let diff = sub_vec(result, [0.0, 2.0, 2.0]);
+    for i in 0..3 {
+        assert!( diff[i].abs() < EPSILON );
+    }
 }
 
 // 手計算した結果で動作確認
@@ -196,9 +198,11 @@ fn test_vector_rotation() {
     let r: Vector3<f64> = [2.0, 2.0, 0.0];
     let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
     let result = vector_rotation(q, r);
-    assert!( (result[0] - 0.0).abs() < EPSILON);
-    assert!( (result[1] - 2.0).abs() < EPSILON);
-    assert!( (result[2] + 2.0).abs() < EPSILON);
+
+    let diff = sub_vec(result, [0.0, 2.0, -2.0]);
+    for i in 0..3 {
+        assert!( diff[i].abs() < EPSILON );
+    }
 }
 
 #[test]
@@ -206,9 +210,11 @@ fn test_frame_rotation() {
     let r = [2.0, 2.0, 0.0];
     let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
     let result = frame_rotation(q, r);
-    assert!( (result[0] - 0.0).abs() < EPSILON);
-    assert!( (result[1] - 2.0).abs() < EPSILON);
-    assert!( (result[2] - 2.0).abs() < EPSILON);
+
+    let diff = sub_vec(result, [0.0, 2.0, 2.0]);
+    for i in 0..3 {
+        assert!( diff[i].abs() < EPSILON );
+    }
 }
 
 // 回転軸と回転角を取り出す

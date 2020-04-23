@@ -33,7 +33,7 @@ When a zero vector is input, exception processing is performed. However, a situa
 #### Cargo.toml
 ```
 [dependencies]
-quaternion = {git="https://github.com/HamaguRe/quaternion.git"}
+quaternion = {git = "https://github.com/HamaguRe/quaternion.git", version = "2.0"}
 ```
 
 #### src/main.rs
@@ -48,12 +48,16 @@ fn main() {
     // Position vector
     let r: Vector3<f64> = [2.0, 2.0, 0.0];
 
-    // π/2[rad] rotation around the y axis.
+    // Generates a quaternion representing the
+    // rotation of π/2[rad] around the y-axis.
     let q = quat::from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
 
-    let rotated = quat::vector_rotation(q, r);
-    assert!( (rotated[0] - 0.0).abs() < EPSILON );
-    assert!( (rotated[1] - 2.0).abs() < EPSILON );
-    assert!( (rotated[2] + 2.0).abs() < EPSILON );
+    let result = quat::vector_rotation(q, r);
+
+    // Check if the calculation is correct.
+    let diff = quat::sub_vec(result, [0.0, 2.0, -2.0]);
+    for i in 0..3 {
+        assert!( diff[i].abs() < EPSILON );
+    }
 }
 ```
