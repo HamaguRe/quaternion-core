@@ -28,7 +28,7 @@ where T: Float + FloatConst {
         IDENTITY()
     } else {
         let tmp = angle % TWO_PI;  // limit to (-2π, 2π)
-        let f = (tmp * cast(0.5) ).sin_cos();
+        let f = ( tmp * cast(0.5) ).sin_cos();
         ( f.1, scale_vec(f.0 / norm, axis) )
     }
 }
@@ -62,7 +62,7 @@ pub fn from_dcm<T>(m: DCM<T>) -> Quaternion<T>
 where T: Float {
     let half: T = cast(0.5);
 
-    // ゼロ除算が発生しないように，4通りの式で求めたうちの最大値を係数として使う．
+    // ゼロ除算を避けるために，4通りの式で求めたうちの最大値を係数として使う．
     let tmp_list = [
          m[0][0] + m[1][1] + m[2][2],
          m[0][0] - m[1][1] - m[2][2],
@@ -73,7 +73,7 @@ where T: Float {
 
     let tmp = ( max_num + T::one() ).sqrt();
     let coef = (cast::<T>(2.0) * tmp).recip();
-    let q = match index {
+    match index {
         0 => {
             let q0 = half * tmp;
             let q1 = (m[2][1] - m[1][2]) * coef;
@@ -103,8 +103,7 @@ where T: Float {
             (q0, [q1, q2, q3])
         },
         _ => unreachable!(),
-    };
-    normalize(q)
+    }
 }
 
 /// 位置ベクトル回転(q v q*)を表すVersorを，方向余弦行列に変換．
@@ -144,11 +143,11 @@ where T: Float {
     ]
 }
 
-/// 位置ベクトル回転を表すVersorをz-y-x系のオイラー角に変換する．
+/// 位置ベクトル回転を表すVersorをz-y-x系のオイラー角[rad]に変換する．
 /// 座標系回転を表すVersorを変換する場合には，
 /// let euler_angles = to_euler_angle( conj(q) );
 /// とする．
-/// Aerospace angle/axis sequences is [yaw, pitch, roll] → [z, y, x].
+/// Aerospace angle/axis sequences is [yaw, pitch, roll] / [z, y, x].
 /// pitch angle is limited to [-π/2, π/2]．
 /// return: [yaw, pitch, roll]
 #[inline(always)]
@@ -188,7 +187,7 @@ where T: Float {
 }
 
 /// 右手系と左手系の四元数を変換
-/// x, z軸はそのままで，y軸と全ての軸回りの回転方向を反転
+/// x, z軸の向きはそのままで，y軸と全ての軸回りの回転方向を反転
 #[inline(always)]
 pub fn system_trans<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
@@ -196,7 +195,6 @@ where T: Float {
     ( -q.0, [ q.1[0], -q.1[1], q.1[2] ] )
 }
 
-/// ベクトルのスカラー積（内積）
 /// Dot product of vector
 #[inline(always)]
 pub fn dot_vec<T>(a: Vector3<T>, b: Vector3<T>) -> T
@@ -204,18 +202,14 @@ where T: Float {
     a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 }
 
-/// 四元数のスカラー積（内積）
 /// Dot product of quaternion
-/// a・b
 #[inline(always)]
 pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
 where T: Float {
     a.0 * b.0 + dot_vec(a.1, b.1)
 }
 
-/// ベクトル積（外積）
 /// Cross product
-/// a×b
 #[inline(always)]
 pub fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -254,7 +248,6 @@ where T: Float {
     ( a.0 - b.0, sub_vec(a.1, b.1) )
 }
 
-/// スカラーとベクトルの積
 /// Multiplication of scalar and vector.
 #[inline(always)]
 pub fn scale_vec<T>(s: T, v: Vector3<T>) -> Vector3<T>
@@ -262,7 +255,6 @@ where T: Float {
     [ s*v[0], s*v[1], s*v[2] ]
 }
 
-/// スカラーと四元数の積
 /// Multiplication of scalar and quaternion.
 #[inline(always)]
 pub fn scale<T>(s: T, q: Quaternion<T>) -> Quaternion<T>
@@ -270,7 +262,7 @@ where T: Float {
     ( s * q.0, scale_vec(s, q.1) )
 }
 
-/// Compute "s*a + b"
+/// Calculate "s*a + b"
 /// CPUがFMA(Fused multiply–add)命令をサポートしている場合，
 /// "add_vec(scale_vec(s, a), b)" よりも高速に計算出来る．
 /// If the CPU supports FMA(Fused multiply–add) instructions,
@@ -285,7 +277,7 @@ where T: Float {
     ]
 }
 
-/// Compute "s*a + b"
+/// Calculate "s*a + b"
 /// CPUがFMA(Fused multiply–add)命令をサポートしている場合，
 /// "add(scale(s, a), b)" よりも高速に計算出来る．
 /// If the CPU supports FMA(Fused multiply–add) instructions,
@@ -296,7 +288,6 @@ where T: Float {
     ( s.mul_add(a.0, b.0), scale_add_vec(s, a.1, b.1) )
 }
 
-/// L2ノルムを計算
 /// Calculate L2 norm
 #[inline(always)]
 pub fn norm_vec<T>(v: Vector3<T>) -> T
@@ -304,7 +295,6 @@ where T: Float {
     dot_vec(v, v).sqrt()
 }
 
-/// L2ノルムを計算
 /// Calculate L2 norm
 #[inline(always)]
 pub fn norm<T>(q: Quaternion<T>) -> T 
@@ -497,7 +487,7 @@ where T: Float {
     let dot = dot_vec(q.1, v);
     let cross = cross_vec(q.1, v);
     let term1 = add_vec( scale_vec(q.0, v), scale_vec(cast(2.0), cross) );
-    let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
+    let term2 = scale_add_vec( dot, q.1, cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
 
@@ -511,7 +501,7 @@ where T: Float {
     let dot = dot_vec(q.1, v);
     let cross = cross_vec(q.1, v);
     let term1 = sub_vec( scale_vec(q.0, v), scale_vec(cast(2.0), cross) );
-    let term2 = add_vec( scale_vec(dot, q.1), cross_vec(q.1, cross) );
+    let term2 = scale_add_vec( dot, q.1, cross_vec(q.1, cross) );
     scale_add_vec(q.0, term1, term2)
 }
 
@@ -540,9 +530,7 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    let term1 = scale(T::one() - t, a);
-    let term2 = scale(t, b);
-    normalize( add(term1, term2) )
+    normalize( scale_add(t, sub(b, a), a) )
 }
 
 /// 球状線形補間(Spherical linear interpolation)

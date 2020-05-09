@@ -1,7 +1,7 @@
 use quaternion::*;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 1e-14;
+const EPSILON: f64 = 1e-14;  // libmを使う場合は1e-12に落とさないと通らない
 
 
 // 二つの異なる方法でVersorの軸回りの回転角を求める．
@@ -15,6 +15,7 @@ fn test_get_angle() {
     let axis = [0.0, 0.0, 2.0];
     let angle = -1.5 * PI;
     let q = from_axis_angle(axis, angle);
+    assert!( ( norm(q) - 1.0 ).abs() < EPSILON );
 
     // 方法1
     // 実部のみを使うので計算量が少ない．
@@ -80,9 +81,11 @@ fn test_dcm() {
     let mut axis = [1.0, -0.2, 0.9];
     for i in 0..20 {
         axis = add_vec(axis, diff);
-        let q = from_axis_angle(axis, PI * (i as f64));
+        let q = from_axis_angle(axis, PI * (i as f64));  // Versor
         let dcm = to_dcm(q);
         let q_rest = from_dcm(dcm);
+
+        assert!( ( norm(q_rest) - 1.0 ).abs() < EPSILON );
     
         let rotated_q = vector_rotation(q, v);
         let rotated_q_rest = vector_rotation(q_rest, v);

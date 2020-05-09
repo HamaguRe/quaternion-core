@@ -1,9 +1,11 @@
 [package]
 name = "quaternion"
-version = "2.0.0"
+version = "2.0.1"
 authors = ["HamaguRe <space-denpa.jp>"]
 edition = "2018"
 repository = "https://github.com/HamaguRe/quaternion.git"
 
-[dependencies]
-num-traits = "0.2"
+[dependencies.num-traits]
+version = "0.2"
+#default-features = false
+#features = ["libm"]
