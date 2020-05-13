@@ -235,3 +235,19 @@ fn test_to_axis_angle() {
         assert!( (f.0[i] - n[i]).abs() < EPSILON );
     }
 }
+
+#[test]
+fn test_rotate_a_to_b() {
+    let a = normalize_vec([1.0f64, -0.5, -2.0]);
+    
+    let q = from_axis_angle([1.0, 0.5, -0.5], PI);
+    let b = vector_rotation(q, a);
+
+    let a_to_b = rotate_a_to_b(a, b, 1.0);
+    let b_rest = vector_rotation(a_to_b, a);
+
+    let diff = sub_vec(b, b_rest);
+    for i in 0..3 {
+        assert!( diff[i].abs() < EPSILON );
+    }
+}

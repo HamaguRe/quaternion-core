@@ -11,10 +11,10 @@ pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosine Matrix
 use num_traits::float::{Float, FloatConst};
 
 
-/// 回転角[rad]と軸ベクトルを指定して四元数を生成する．
+/// 回転角[rad]と軸ベクトルを指定してVersorを生成する．
 /// axisは単位ベクトルでなくても良い．
 /// 零ベクトルを入力した場合は，恒等四元数を返す．
-/// Generate quaternion by specifying rotation angle[rad] and axis vector.
+/// Generate Versor by specifying rotation angle[rad] and axis vector.
 /// The "axis" need not be unit vector.
 /// If you enter a zero vector, it returns an identity quaternion.
 #[inline(always)]
@@ -511,13 +511,19 @@ where T: Float {
 /// If you enter a zero vector, it returns an identity quaternion.
 /// 0 <= t <= 1
 #[inline(always)]
-pub fn rotate_a_to_b<T>(mut a: Vector3<T>, mut b: Vector3<T>, t: T) -> Quaternion<T>
+pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
-    a = normalize_vec(a);
-    b = normalize_vec(b);
     let axis = cross_vec(a, b);
-    let angle = acos_safe( dot_vec(a, b) );
-    from_axis_angle(axis, angle * t)
+    let norm_axis = norm_vec(axis);
+
+    if norm_axis < T::epsilon() {
+        IDENTITY()
+    } else {
+        let norm_ab = ( dot_vec(a, a) * dot_vec(b, b) ).sqrt();
+        let angle = acos_safe( dot_vec(a, b) / norm_ab );
+        let f = ( t * angle * cast(0.5) ).sin_cos();
+        ( f.1, scale_vec(f.0 / norm_axis, axis) )
+    }
 }
 
 /// 線形補間(Linear interpolation)
