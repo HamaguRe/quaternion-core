@@ -23,13 +23,13 @@ where T: Float + FloatConst {
     #[allow(non_snake_case)]
     let TWO_PI  = cast::<T>(2.0) * T::PI();
 
-    let norm = norm_vec(axis);
-    if norm < T::epsilon() {  // ゼロ除算回避
+    let norm_vec = norm_vec(axis);
+    if norm_vec < T::epsilon() {  // ゼロ除算回避
         IDENTITY()
     } else {
         let tmp = angle % TWO_PI;  // limit to (-2π, 2π)
         let f = ( tmp * cast(0.5) ).sin_cos();
-        ( f.1, scale_vec(f.0 / norm, axis) )
+        ( f.1, scale_vec(f.0 / norm_vec, axis) )
     }
 }
 
@@ -63,13 +63,12 @@ where T: Float {
     let half: T = cast(0.5);
 
     // ゼロ除算を避けるために，4通りの式で求めたうちの最大値を係数として使う．
-    let tmp_list = [
-         m[0][0] + m[1][1] + m[2][2],
-         m[0][0] - m[1][1] - m[2][2],
-        -m[0][0] + m[1][1] - m[2][2],
-        -m[0][0] - m[1][1] + m[2][2],
-    ];
-    let (index, max_num) = max4(tmp_list);
+    let (index, max_num) = max4([
+        m[0][0] + m[1][1] + m[2][2],
+        m[0][0] - m[1][1] - m[2][2],
+       -m[0][0] + m[1][1] - m[2][2],
+       -m[0][0] - m[1][1] + m[2][2],
+    ]);
 
     let tmp = ( max_num + T::one() ).sqrt();
     let coef = (cast::<T>(2.0) * tmp).recip();
@@ -309,11 +308,11 @@ where T: Float {
 #[inline(always)]
 pub fn normalize_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float + FloatConst {
-    let norm = norm_vec(v);
-    if norm < T::epsilon() {
+    let norm_vec = norm_vec(v);
+    if norm_vec < T::epsilon() {
         ZERO_VECTOR()
     } else {
-        scale_vec( norm.recip(), v )
+        scale_vec( norm_vec.recip(), v )
     }
 }
 
@@ -397,12 +396,12 @@ where T: Float {
 #[inline(always)]
 pub fn exp_vec<T>(v: Vector3<T>) -> Quaternion<T>
 where T: Float + FloatConst {
-    let norm = norm_vec(v);
-    if norm < T::epsilon() {
+    let norm_vec = norm_vec(v);
+    if norm_vec < T::epsilon() {
         IDENTITY()
     } else {
-        let f = norm.sin_cos();
-        ( f.1, scale_vec(f.0 / norm, v) )
+        let f = norm_vec.sin_cos();
+        ( f.1, scale_vec(f.0 / norm_vec, v) )
     }
 }
 
@@ -419,8 +418,9 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatConst {
-    let norm = norm(q);
-    let norm_vec = norm_vec(q.1);
+    let tmp = dot_vec(q.1, q.1);
+    let norm = (q.0*q.0 + tmp).sqrt();
+    let norm_vec = tmp.sqrt();
     if norm_vec < T::epsilon() {
         ( norm.ln(), ZERO_VECTOR() )
     } else {
@@ -449,8 +449,9 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
-    let norm = norm(q);
-    let norm_vec = norm_vec(q.1);
+    let tmp = dot_vec(q.1, q.1);
+    let norm = (q.0*q.0 + tmp).sqrt();
+    let norm_vec = tmp.sqrt();
     let omega = acos_safe(q.0 / norm);
     let f = (t * omega).sin_cos();
     let coef = norm.powf(t);
