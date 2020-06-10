@@ -174,6 +174,34 @@ where T: Float + FloatConst {
     [yaw, pitch, roll]
 }
 
+/// 回転ベクトル(rotation vector)をVersorに変換
+/// 回転ベクトルはそれ自体が回転軸を表し，ノルムは軸回りの回転角(0, 2π)を表す．
+#[inline(always)]
+pub fn from_rotation_vector<T>(v: Vector3<T>) -> Quaternion<T>
+where T: Float + FloatConst {
+    let theta = norm_vec(v);
+    if theta < T::epsilon() {
+        IDENTITY()
+    } else {
+        let f = ( theta * cast(0.5) ).sin_cos();
+        ( f.1, scale_vec(f.0 / theta, v) )
+    }
+}
+
+/// Versorを回転ベクトル(rotation vector)に変換
+/// 回転ベクトルはそれ自体が回転軸を表し，ノルムは軸回りの回転角(0, 2π)を表す．
+#[inline(always)]
+pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
+where T: Float + FloatConst {
+    let norm_vec = norm_vec(q.1);
+    if norm_vec < T::epsilon() {
+        ZERO_VECTOR()
+    } else {
+        let theta = cast::<T>(2.0) * acos_safe(q.0);
+        scale_vec(theta / norm_vec, q.1)
+    }
+}
+
 /// 方向余弦行列を用いてベクトルを回転させる．
 #[inline(always)]
 pub fn matrix_product<T>(m: DCM<T>, v: Vector3<T>) -> Vector3<T>
@@ -373,6 +401,7 @@ where T: Float {
 /// 逆純虚四元数を求める
 /// 零ベクトルを入力した場合は零ベクトルを返す
 /// Compute the inverse pure quaternion
+#[inline(always)]
 pub fn inv_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float + FloatConst {
     let dot_vec = dot_vec(v, v);
