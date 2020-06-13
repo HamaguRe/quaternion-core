@@ -33,7 +33,7 @@ When a zero vector is input, exception processing is performed. However, a situa
 #### Cargo.toml
 ```
 [dependencies]
-quaternion = {git = "https://github.com/HamaguRe/quaternion.git", version = "2.0"}
+quaternion = {git = "https://github.com/HamaguRe/quaternion.git", version = "2.1"}
 ```
 
 #### src/main.rs

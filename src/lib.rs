@@ -60,8 +60,6 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn from_dcm<T>(m: DCM<T>) -> Quaternion<T>
 where T: Float {
-    let half: T = cast(0.5);
-
     // ゼロ除算を避けるために，4通りの式で求めたうちの最大値を係数として使う．
     let (index, max_num) = max4([
         m[0][0] + m[1][1] + m[2][2],
@@ -70,39 +68,40 @@ where T: Float {
        -m[0][0] - m[1][1] + m[2][2],
     ]);
 
+    let half: T = cast(0.5);
     let tmp = ( max_num + T::one() ).sqrt();
     let coef = (cast::<T>(2.0) * tmp).recip();
+
+    let (q0, [q1, q2, q3]): Quaternion<T>;
     match index {
         0 => {
-            let q0 = half * tmp;
-            let q1 = (m[2][1] - m[1][2]) * coef;
-            let q2 = (m[0][2] - m[2][0]) * coef;
-            let q3 = (m[1][0] - m[0][1]) * coef;
-            (q0, [q1, q2, q3])
+            q0 = half * tmp;
+            q1 = (m[2][1] - m[1][2]) * coef;
+            q2 = (m[0][2] - m[2][0]) * coef;
+            q3 = (m[1][0] - m[0][1]) * coef;
         },
         1 => {
-            let q1 = half * tmp;
-            let q0 = (m[2][1] - m[1][2]) * coef;
-            let q2 = (m[0][1] + m[1][0]) * coef;
-            let q3 = (m[0][2] + m[2][0]) * coef;
-            (q0, [q1, q2, q3])
+            q1 = half * tmp;
+            q0 = (m[2][1] - m[1][2]) * coef;
+            q2 = (m[0][1] + m[1][0]) * coef;
+            q3 = (m[0][2] + m[2][0]) * coef;
         },
         2 => {
-            let q2 = half * tmp;
-            let q0 = (m[0][2] - m[2][0]) * coef;
-            let q1 = (m[0][1] + m[1][0]) * coef;
-            let q3 = (m[1][2] + m[2][1]) * coef;
-            (q0, [q1, q2, q3])
+            q2 = half * tmp;
+            q0 = (m[0][2] - m[2][0]) * coef;
+            q1 = (m[0][1] + m[1][0]) * coef;
+            q3 = (m[1][2] + m[2][1]) * coef;
         },
         3 => {
-            let q3 = half * tmp;
-            let q0 = (m[1][0] - m[0][1]) * coef;
-            let q1 = (m[0][2] + m[2][0]) * coef;
-            let q2 = (m[1][2] + m[2][1]) * coef;
-            (q0, [q1, q2, q3])
+            q3 = half * tmp;
+            q0 = (m[1][0] - m[0][1]) * coef;
+            q1 = (m[0][2] + m[2][0]) * coef;
+            q2 = (m[1][2] + m[2][1]) * coef;
         },
         _ => unreachable!(),
-    }
+    };
+
+    (q0, [q1, q2, q3])
 }
 
 /// 位置ベクトル回転(q v q*)を表すVersorを，方向余弦行列に変換．
@@ -158,20 +157,19 @@ where T: Float + FloatConst {
         [  _, m32, m33],
     ] = to_dcm(q);
 
-    let yaw;
-    let pitch;
-    let roll;
     if m13.abs() < (T::one() - T::epsilon()) {  // ジンバルロックが起きていない場合
-        pitch = m13.asin();
-        yaw  = (-m12 / m11).atan();
-        roll = (-m23 / m33).atan();
+        [
+            (-m12 / m11).atan(),  // yaw
+            m13.asin(),           // pitch
+            (-m23 / m33).atan(),  // roll
+        ]
     } else {
-        pitch = copysign(T::FRAC_PI_2(), m13);
-        yaw  = T::zero();
-        roll = (m32 / m22).atan();
+        [
+            T::zero(),                      // yaw
+            copysign(T::FRAC_PI_2(), m13),  // pitch
+            (m32 / m22).atan(),             // roll
+        ]
     }
-
-    [yaw, pitch, roll]
 }
 
 /// 回転ベクトル(rotation vector)をVersorに変換
