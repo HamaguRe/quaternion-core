@@ -114,6 +114,29 @@ fn test_euler() {
 }
 
 #[test]
+fn test_rotation_vector() {
+    // 適当なVersorを作る
+    let q = from_axis_angle([1.0, 2.0, 3.0], PI);
+
+    // 回転ベクトルに変換
+    let rot_v = to_rotation_vector(q);
+
+    // 回転ベクトルから復元したVecsor
+    let mut q_rest = from_rotation_vector(rot_v);
+
+    // 符号が反転していても，３次元空間上で表す回転は同じ
+    if q.0.is_sign_positive() && q_rest.0.is_sign_negative() {
+        q_rest = negate(q_rest);
+    }
+
+    let diff = sub(q, q_rest);
+    assert!(diff.0.abs() < EPSILON);
+    for i in 0..3 {
+        assert!(diff.1[i].abs() < EPSILON);
+    }
+}
+
+#[test]
 fn test_cross() {
     let r1 = [1.0, 0.0, 0.0];
     let r2 = [0.0, 1.0, 0.0];

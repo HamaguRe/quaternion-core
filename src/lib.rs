@@ -4,11 +4,16 @@
 // Versorは「回転子」を意味し，ノルムは1に制限される．
 // Versor means the "rotator", the norm is limited to 1.
 
-pub type Vector3<T> = [T; 3];  // [i, j, k]
-pub type Quaternion<T> = (T, Vector3<T>);  // (1, [i, j, k])
-pub type DCM<T> = [Vector3<T>; 3];  // Direction Cosine Matrix
-
 use num_traits::float::{Float, FloatConst};
+
+/// [i, j, k]
+pub type Vector3<T> = [T; 3];
+
+/// (1, [i, j, k])
+pub type Quaternion<T> = (T, Vector3<T>);
+
+/// Direction Cosine Matrix
+pub type DCM<T> = [Vector3<T>; 3];
 
 
 /// 回転角[rad]と軸ベクトルを指定してVersorを生成する．
@@ -633,10 +638,10 @@ fn copysign<T: Float>(x: T, sign: T) -> T {
 /// 配列内の最大値を探して，その位置と値を返す．
 #[inline(always)]
 fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
-    let mut max_num = nums[0];
     let mut index = 0;
-    for (i, num) in nums.iter().enumerate().skip(1) {
-        if num > &max_num {
+    let mut max_num = T::zero();
+    for (i, num) in nums.iter().enumerate() {
+        if *num > max_num {
             max_num = *num;
             index = i;
         }
