@@ -451,11 +451,11 @@ where T: Float + FloatConst {
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     let tmp = dot_vec(q.1, q.1);
-    let norm = (q.0*q.0 + tmp).sqrt();
     let norm_vec = tmp.sqrt();
     if norm_vec < T::epsilon() {
-        ( norm.ln(), ZERO_VECTOR() )
+        ( q.0.abs().ln(), ZERO_VECTOR() )
     } else {
+        let norm = (q.0*q.0 + tmp).sqrt();
         let coef = acos_safe(q.0 / norm) / norm_vec;
         ( norm.ln(), scale_vec(coef, q.1) )
     }
@@ -482,16 +482,16 @@ where T: Float + FloatConst {
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let tmp = dot_vec(q.1, q.1);
-    let norm = (q.0*q.0 + tmp).sqrt();
     let norm_vec = tmp.sqrt();
-    let omega = acos_safe(q.0 / norm);
-    let f = (t * omega).sin_cos();
-    let coef = norm.powf(t);
     if norm_vec < T::epsilon() {
-        ( coef * f.1, ZERO_VECTOR() )
+        let omega = if q.0.is_sign_positive() { T::zero() } else { T::PI() };
+        ( q.0.abs().powf(t) * (t * omega).cos(), ZERO_VECTOR() )
     } else {
-        let n = scale_vec(f.0 / norm_vec, q.1);
-        scale( coef, (f.1, n) )
+        let norm = (q.0*q.0 + tmp).sqrt();
+        let omega = acos_safe(q.0 / norm);
+        let f = (t * omega).sin_cos();
+        let pow_t = norm.powf(t);
+        ( pow_t * f.1, scale_vec((pow_t * f.0) / norm_vec, q.1) )
     }
 }
 
@@ -502,10 +502,11 @@ where T: Float + FloatConst {
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(q.1);
-    let f = ( t * acos_safe(q.0) ).sin_cos();
     if norm_vec < T::epsilon() {
-        ( f.1, ZERO_VECTOR() )
+        let omega = if q.0.is_sign_positive() { T::zero() } else { T::PI() };
+        ( (t * omega).cos(), ZERO_VECTOR() )
     } else {
+        let f = ( t * acos_safe(q.0) ).sin_cos();
         ( f.1, scale_vec(f.0 / norm_vec, q.1) )
     }
 }
