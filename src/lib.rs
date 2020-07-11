@@ -429,12 +429,8 @@ where T: Float {
 pub fn exp_vec<T>(v: Vector3<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(v);
-    if norm_vec < T::epsilon() {
-        IDENTITY()
-    } else {
-        let f = norm_vec.sin_cos();
-        ( f.1, scale_vec(f.0 / norm_vec, v) )
-    }
+    let (sin, cos) = norm_vec.sin_cos();
+    ( cos, scale_vec(sin / norm_vec, v) )
 }
 
 /// ネイピア数を底とする指数函数
@@ -442,7 +438,10 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn exp<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatConst {
-    scale( q.0.exp(), exp_vec(q.1) )
+    let norm_vec = norm_vec(q.1);
+    let (sin, cos) = norm_vec.sin_cos();
+    let coef = q.0.exp();
+    ( coef * cos, scale_vec((coef * sin) / norm_vec, q.1) )
 }
 
 /// 四元数の自然対数
@@ -452,13 +451,9 @@ pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     let tmp = dot_vec(q.1, q.1);
     let norm_vec = tmp.sqrt();
-    if norm_vec < T::epsilon() {
-        ( q.0.abs().ln(), ZERO_VECTOR() )
-    } else {
-        let norm = (q.0*q.0 + tmp).sqrt();
-        let coef = acos_safe(q.0 / norm) / norm_vec;
-        ( norm.ln(), scale_vec(coef, q.1) )
-    }
+    let norm = (q.0*q.0 + tmp).sqrt();
+    let coef = acos_safe(q.0 / norm) / norm_vec;
+    ( norm.ln(), scale_vec(coef, q.1) )
 }
 
 /// Versor(単位四元数)の自然対数
@@ -467,13 +462,8 @@ where T: Float + FloatConst {
 #[inline(always)]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
-    let norm_vec = norm_vec(q.1);
-    if norm_vec < T::epsilon() {
-        ZERO_VECTOR()
-    } else {
-        let coef = acos_safe(q.0) / norm_vec;
-        scale_vec(coef, q.1)
-    }
+    let coef = acos_safe(q.0) / norm_vec(q.1);
+    scale_vec(coef, q.1)
 }
 
 /// 四元数の冪函数
@@ -483,16 +473,11 @@ pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let tmp = dot_vec(q.1, q.1);
     let norm_vec = tmp.sqrt();
-    if norm_vec < T::epsilon() {
-        let omega = if q.0.is_sign_positive() { T::zero() } else { T::PI() };
-        ( q.0.abs().powf(t) * (t * omega).cos(), ZERO_VECTOR() )
-    } else {
-        let norm = (q.0*q.0 + tmp).sqrt();
-        let omega = acos_safe(q.0 / norm);
-        let f = (t * omega).sin_cos();
-        let pow_t = norm.powf(t);
-        ( pow_t * f.1, scale_vec((pow_t * f.0) / norm_vec, q.1) )
-    }
+    let norm = (q.0*q.0 + tmp).sqrt();
+    let omega = acos_safe(q.0 / norm);
+    let (sin, cos) = (t * omega).sin_cos();
+    let coef = norm.powf(t);
+    ( coef * cos, scale_vec((coef * sin) / norm_vec, q.1) )
 }
 
 /// Versor(単位四元数)の冪函数
@@ -502,13 +487,8 @@ where T: Float + FloatConst {
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(q.1);
-    if norm_vec < T::epsilon() {
-        let omega = if q.0.is_sign_positive() { T::zero() } else { T::PI() };
-        ( (t * omega).cos(), ZERO_VECTOR() )
-    } else {
-        let f = ( t * acos_safe(q.0) ).sin_cos();
-        ( f.1, scale_vec(f.0 / norm_vec, q.1) )
-    }
+    let (sin, cos) = ( t * acos_safe(q.0) ).sin_cos();
+    ( cos, scale_vec(sin / norm_vec, q.1) )
 }
 
 /// 位置ベクトルの回転
