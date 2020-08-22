@@ -1,11 +1,19 @@
 [package]
 name = "quaternion"
-version = "2.2.0"
+version = "2.3.0"
 authors = ["HamaguRe <space-denpa.jp>"]
 edition = "2018"
 repository = "https://github.com/HamaguRe/quaternion.git"
+build = "build.rs"
+
+[features]
+default = ["std", "num-traits/std"]
+std = []
+libm = ["num-traits/libm"]
 
 [dependencies.num-traits]
 version = "0.2"
-#default-features = false
-#features = ["libm"]
+default-features = false
+
+[build-dependencies]
+autocfg = "1"

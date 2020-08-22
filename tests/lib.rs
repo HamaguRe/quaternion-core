@@ -1,7 +1,7 @@
 use quaternion::*;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 1e-14;  // libmを使う場合は1e-12に落とさないと通らない
+const EPSILON: f64 = 1e-15;  // libmを使う場合は1e-12に落とさないと通らない
 
 
 // 二つの異なる方法でVersorの軸回りの回転角を求める．

@@ -1,43 +1,58 @@
 # Quaternion library
+
 ## 【日本語】
-  Rustで作成した四元数（クォータニオン）計算用のライブラリです。
 
-  関数の動作については、ドキュメンテーションコメントを参照してください。
+Rustで作成した四元数（クォータニオン）計算用のライブラリです。
 
-  また、四元数自体について詳しく知りたい方は、以下のページをご覧ください。
+関数の動作については、
+[Documentation](./target/doc/quaternion/index.html)
+を参照してください。
 
-  * [四元数まとめ資料を書いた（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
+また、四元数自体について詳しく知りたい方は、
+[四元数まとめ資料を書いた（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
+をご覧ください
 
 ### 使用時の注意点
-不要なオーバーヘッドを減らすため、基本的に関数の内部では正規化を行っていません。そのため、引数がVersor（単位四元数）である関数を使用する際には、引数のノルムが1となるようにしてください。
+
+不要なオーバーヘッドを減らすため、基本的に引数に対しては正規化を行っていません。そのため、引数がVersor（単位四元数）である関数を使用する際には、引数のノルムが1となるようにしてください。
 
 ただし、DCMをVersorに変換する関数や近似式を使う関数（lerpなど）では、出力がVersorになるように関数内部で正規化を行っています。
 
 ### 例外処理に関して
+
  零ベクトルを入力した場合には例外処理を行いますが、すべての要素が零となる四元数が入力される状況（ベクトルを純虚四元数として扱った場合などに起こる）は考慮していません。
 
 ## 【English】
-  It's a Quaternion library written in Rust.
 
-  Refer to the documentation comments for function behavior.
+It's a Quaternion library written in Rust.
 
 ### Precautions when using
+
 To reduce unnecessary overhead, normalization is basically not performed inside the function. Therefore, when using a function whose argument is Versor (unit quaternion), make sure that the norm of the argument is 1.
 
 However, in functions that convert DCM to Versor and functions that use approximations (such as lerp), normalization is performed inside the function so that the output is Versor.
 
 ### About exception handling
+
 When a zero vector is input, exception processing is performed. However, a situation where a quaternion in which all elements are zero (which occurs when a vector is treated as a pure quaternion) is not considered.
 
 # Example of use
+
 #### Cargo.toml
-```
-[dependencies]
-quaternion = {git = "https://github.com/HamaguRe/quaternion.git", version = "2.1"}
+
+```toml
+[dependencies.quaternion]
+git = "https://github.com/HamaguRe/quaternion.git"
+version = "2.2"
+
+# Uncomment if you wish to use this crate without `std`
+#default-features = false
+#features = ["libm"]
 ```
 
 #### src/main.rs
-```
+
+```rust
 use quaternion as quat;
 use quat::Vector3;
 
@@ -56,8 +71,8 @@ fn main() {
 
     // Check if the calculation is correct.
     let diff = quat::sub_vec(result, [0.0, 2.0, -2.0]);
-    for i in 0..3 {
-        assert!( diff[i].abs() < EPSILON );
+    for i in diff.iter() {
+        assert!( i.abs() < EPSILON );
     }
 }
 ```
