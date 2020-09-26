@@ -82,7 +82,7 @@ where T: Float {
 
     let half: T = cast(0.5);
     let tmp = ( max_num + T::one() ).sqrt();
-    let coef = half * tmp.recip();
+    let coef = half / tmp;
 
     let (q0, [q1, q2, q3]): Quaternion<T>;
     match index {

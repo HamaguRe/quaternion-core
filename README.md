@@ -18,6 +18,8 @@ It's a Quaternion library written in Rust.
 
 In `version=2.3.0` or later, it is available in the `no_std` environment.
 
+For function behavior, see the documentation comments in `src/lib.rs`.
+
 # Example of use
 
 #### Cargo.toml
@@ -53,8 +55,8 @@ fn main() {
 
     // Check if the calculation is correct.
     let diff = quat::sub_vec(result, [0.0, 2.0, -2.0]);
-    for i in diff.iter() {
-        assert!( i.abs() < EPSILON );
+    for val in diff.iter() {
+        assert!( val.abs() < EPSILON );
     }
 }
 ```
