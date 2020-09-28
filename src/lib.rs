@@ -24,7 +24,7 @@ pub type DCM<T> = [Vector3<T>; 3];
 /// Generate Versor by specifying rotation angle\[rad\] and axis vector.  
 /// The "axis" need not be unit vector.  
 /// If you enter a zero vector, it returns an identity quaternion.
-#[inline(always)]
+#[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(axis);
@@ -45,7 +45,7 @@ where T: Float + FloatConst {
 /// return: `(axis, angle)`
 /// 
 /// Range of angle: `-π <= angle <= π`
-#[inline(always)]
+#[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
 where T: Float + FloatConst {
     let norm_vec = norm_vec(q.1);
@@ -69,7 +69,7 @@ where T: Float + FloatConst {
 /// 
 /// Generate versor from direction cosine matrix, 
 /// representing rotation of position vector.
-#[inline(always)]
+#[inline]
 pub fn from_dcm<T>(m: DCM<T>) -> Quaternion<T>
 where T: Float {
     // ゼロ除算を避けるために，4通りの式で求めたうちの最大値を係数として使う．
@@ -123,7 +123,7 @@ where T: Float {
 /// let dcm = to_dcm( conj(q) );
 /// ```
 /// とする．
-#[inline(always)]
+#[inline]
 pub fn to_dcm<T>(q: Quaternion<T>) -> DCM<T>
 where T: Float {
     let one = T::one();
@@ -168,7 +168,7 @@ where T: Float {
 /// pitch angle is limited to [-π/2, π/2]．
 /// 
 /// return: `[yaw, pitch, roll]`
-#[inline(always)]
+#[inline]
 pub fn to_euler_angle<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
     let [
@@ -195,7 +195,7 @@ where T: Float + FloatConst {
 /// 回転ベクトル(rotation vector)をVersorに変換
 /// 
 /// 回転ベクトルはそれ自体が回転軸を表し，ノルムは軸回りの回転角(0, 2π)を表す．
-#[inline(always)]
+#[inline]
 pub fn from_rotation_vector<T>(v: Vector3<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     let theta = norm_vec(v);
@@ -210,7 +210,7 @@ where T: Float + FloatConst {
 /// Versorを回転ベクトル(rotation vector)に変換
 /// 
 /// 回転ベクトルはそれ自体が回転軸を表し，ノルムは軸回りの回転角(0, 2π)を表す．
-#[inline(always)]
+#[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(q.1);
@@ -223,7 +223,7 @@ where T: Float + FloatConst {
 }
 
 /// 方向余弦行列を用いてベクトルを回転させる．
-#[inline(always)]
+#[inline]
 pub fn matrix_product<T>(m: DCM<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     [
@@ -236,7 +236,7 @@ where T: Float {
 /// 右手系と左手系の四元数を変換
 /// 
 /// x, z軸の向きはそのままで，y軸と全ての軸回りの回転方向を反転
-#[inline(always)]
+#[inline]
 pub fn system_trans<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     // 実部と，ベクトル部の要素どれか一つの符号を反転させれば良い
@@ -244,21 +244,21 @@ where T: Float {
 }
 
 /// Dot product of vector.
-#[inline(always)]
+#[inline]
 pub fn dot_vec<T>(a: Vector3<T>, b: Vector3<T>) -> T
 where T: Float {
     a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
 }
 
 /// Dot product of quaternion.
-#[inline(always)]
+#[inline]
 pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
 where T: Float {
     a.0 * b.0 + dot_vec(a.1, b.1)
 }
 
 /// Cross product.
-#[inline(always)]
+#[inline]
 pub fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [
@@ -269,28 +269,28 @@ where T: Float {
 }
 
 /// Calcurate `a + b`
-#[inline(always)]
+#[inline]
 pub fn add_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ a[0]+b[0], a[1]+b[1], a[2]+b[2] ]
 }
 
 /// Calcurate `a + b`
-#[inline(always)]
+#[inline]
 pub fn add<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( a.0 + b.0, add_vec(a.1, b.1) )
 }
 
 /// Calculate `a - b`
-#[inline(always)]
+#[inline]
 pub fn sub_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ a[0]-b[0], a[1]-b[1], a[2]-b[2] ]
 }
 
 /// Calculate `a - b`
-#[inline(always)]
+#[inline]
 pub fn sub<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( a.0 - b.0, sub_vec(a.1, b.1) )
@@ -299,7 +299,7 @@ where T: Float {
 /// Calculate `s * v`
 /// 
 /// Multiplication of scalar and vector.
-#[inline(always)]
+#[inline]
 pub fn scale_vec<T>(s: T, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ s*v[0], s*v[1], s*v[2] ]
@@ -308,7 +308,7 @@ where T: Float {
 /// Calculate `s * q`
 /// 
 /// Multiplication of scalar and quaternion.
-#[inline(always)]
+#[inline]
 pub fn scale<T>(s: T, q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( s * q.0, scale_vec(s, q.1) )
@@ -318,7 +318,7 @@ where T: Float {
 /// 
 /// If the CPU supports FMA(Fused multiply–add) instructions,
 /// this is faster than `add_vec(scale_vec(s, a), b)`.
-#[inline(always)]
+#[inline]
 pub fn scale_add_vec<T>(s: T, a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [
@@ -332,21 +332,21 @@ where T: Float {
 /// 
 /// If the CPU supports FMA(Fused multiply–add) instructions,
 /// this is faster than `add(scale(s, a), b)`
-#[inline(always)]
+#[inline]
 pub fn scale_add<T>(s: T, a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( s.mul_add(a.0, b.0), scale_add_vec(s, a.1, b.1) )
 }
 
 /// Calculate L2 norm.
-#[inline(always)]
+#[inline]
 pub fn norm_vec<T>(v: Vector3<T>) -> T
 where T: Float {
     dot_vec(v, v).sqrt()
 }
 
 /// Calculate L2 norm.
-#[inline(always)]
+#[inline]
 pub fn norm<T>(q: Quaternion<T>) -> T 
 where T: Float {
     dot(q, q).sqrt()
@@ -357,7 +357,7 @@ where T: Float {
 /// 零ベクトルを入力した場合は零ベクトルを返す．
 /// 
 /// If you enter a zero vector, it returns a zero vector.
-#[inline(always)]
+#[inline]
 pub fn normalize_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(v);
@@ -369,7 +369,7 @@ where T: Float + FloatConst {
 }
 
 /// Normalization of quaternion.
-#[inline(always)]
+#[inline]
 pub fn normalize<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     scale( norm(q).recip(), q )
@@ -378,7 +378,7 @@ where T: Float {
 /// ベクトルの符号を反転．
 /// 
 /// return: `-v`
-#[inline(always)]
+#[inline]
 pub fn negate_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ -v[0], -v[1], -v[2] ]
@@ -387,7 +387,7 @@ where T: Float {
 /// 四元数の符号を反転．
 /// 
 /// return: `-q`
-#[inline(always)]
+#[inline]
 pub fn negate<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( -q.0, negate_vec(q.1) )
@@ -396,7 +396,7 @@ where T: Float {
 /// 純虚四元数同士の積．
 /// 
 /// `ab ≡ -a・b + a×b` (!= ba)
-#[inline(always)]
+#[inline]
 pub fn mul_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
 where T: Float {
     ( -dot_vec(a, b), cross_vec(a, b) )
@@ -405,7 +405,7 @@ where T: Float {
 /// Hamilton product.
 /// 
 /// The product order is `ab (!= ba)`
-#[inline(always)]
+#[inline]
 pub fn mul<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let v0 = scale_vec(a.0, b.1);
@@ -418,7 +418,7 @@ where T: Float {
 /// 共役四元数を求める．
 /// 
 /// Compute the conjugate quaternion.
-#[inline(always)]
+#[inline]
 pub fn conj<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( q.0, negate_vec(q.1) )
@@ -429,7 +429,7 @@ where T: Float {
 /// 零ベクトルを入力した場合は零ベクトルを返す．
 /// 
 /// Compute the inverse pure quaternion.
-#[inline(always)]
+#[inline]
 pub fn inv_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float + FloatConst {
     let dot_vec = dot_vec(v, v);
@@ -443,14 +443,14 @@ where T: Float + FloatConst {
 /// 逆四元数を求める．
 /// 
 /// Compute the inverse quaternion.
-#[inline(always)]
+#[inline]
 pub fn inv<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     scale( dot(q, q).recip(), conj(q) )
 }
 
 /// Exponential function of vector.
-#[inline(always)]
+#[inline]
 pub fn exp_vec<T>(v: Vector3<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(v);
@@ -459,7 +459,7 @@ where T: Float + FloatConst {
 }
 
 /// Exponential function of quaternion.
-#[inline(always)]
+#[inline]
 pub fn exp<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(q.1);
@@ -469,7 +469,7 @@ where T: Float + FloatConst {
 }
 
 /// Natural logarithm of quaternion.
-#[inline(always)]
+#[inline]
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     let tmp = dot_vec(q.1, q.1);
@@ -483,7 +483,7 @@ where T: Float + FloatConst {
 /// 
 /// Versorであることが保証されている場合にはln関数よりも計算量を減らせる．
 /// 実部は必ず0になるので省略．
-#[inline(always)]
+#[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
     let coef = acos_safe(q.0) / norm_vec(q.1);
@@ -491,7 +491,7 @@ where T: Float + FloatConst {
 }
 
 /// Power function of quaternion.
-#[inline(always)]
+#[inline]
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let tmp = dot_vec(q.1, q.1);
@@ -507,7 +507,7 @@ where T: Float + FloatConst {
 /// 
 /// Versorであることが保証されている場合にはpow関数よりも計算量を減らせる．
 /// Power function of Versor.
-#[inline(always)]
+#[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let norm_vec = norm_vec(q.1);
@@ -518,7 +518,7 @@ where T: Float + FloatConst {
 /// 位置ベクトルの回転
 /// 
 /// `q v q*  (||q|| = 1)`
-#[inline(always)]
+#[inline]
 pub fn vector_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     let tmp = scale_add_vec(q.0, v, cross_vec(q.1, v));
@@ -528,7 +528,7 @@ where T: Float {
 /// 座標系の回転
 /// 
 /// `q* v q  (||q|| = 1)`
-#[inline(always)]
+#[inline]
 pub fn frame_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     let tmp = scale_add_vec(-q.0, v, cross_vec(q.1, v));
@@ -543,7 +543,7 @@ where T: Float {
 /// If you enter a zero vector, it returns an identity quaternion.
 /// 
 /// Range of rotation parameter: `0 <= t <= 1`
-#[inline(always)]
+#[inline]
 pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let dot_ab = dot_vec(a, b);
@@ -566,7 +566,7 @@ where T: Float + FloatConst {
 /// The argument `t (0 <= t <= 1)` is the interpolation parameter.
 /// 
 /// The norm of `a` and `b` must be 1 (Versor).
-#[inline(always)]
+#[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     normalize( scale_add(t, sub(b, a), a) )
@@ -578,7 +578,7 @@ where T: Float {
 /// The argument `t(0 <= t <= 1)` is the interpolation parameter.
 /// 
 /// The norm of `a` and `b` must be 1 (Versor).
-#[inline(always)]
+#[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     // 最短経路で補間
