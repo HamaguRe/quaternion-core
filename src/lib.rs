@@ -54,7 +54,7 @@ where T: Float + FloatConst {
     } else {
         let axis = scale_vec( norm_vec.recip(), q.1 );
         let tmp = asin_safe(norm_vec);
-        let angle = copysign(tmp + tmp, q.0 );  // 2*tmp
+        let angle = copysign(tmp + tmp, q.0);  // 2*tmp
         (axis, angle)
     }
 }
@@ -436,7 +436,7 @@ where T: Float + FloatConst {
     if dot_vec < T::epsilon() {
         ZERO_VECTOR()
     } else {
-        scale_vec( dot_vec.recip() , negate_vec(v) )
+        scale_vec( dot_vec.recip(), negate_vec(v) )
     }
 }
 
@@ -473,9 +473,8 @@ where T: Float + FloatConst {
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     let tmp = dot_vec(q.1, q.1);
-    let norm_vec = tmp.sqrt();
     let norm = (q.0*q.0 + tmp).sqrt();
-    let coef = acos_safe(q.0 / norm) / norm_vec;
+    let coef = acos_safe(q.0 / norm) / tmp.sqrt();
     ( norm.ln(), scale_vec(coef, q.1) )
 }
 
@@ -486,8 +485,7 @@ where T: Float + FloatConst {
 #[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
-    let coef = acos_safe(q.0) / norm_vec(q.1);
-    scale_vec(coef, q.1)
+    scale_vec(acos_safe(q.0) / norm_vec(q.1), q.1)
 }
 
 /// Power function of quaternion.
@@ -495,24 +493,21 @@ where T: Float + FloatConst {
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let tmp = dot_vec(q.1, q.1);
-    let norm_vec = tmp.sqrt();
     let norm = (q.0*q.0 + tmp).sqrt();
     let omega = acos_safe(q.0 / norm);
     let (sin, cos) = (t * omega).sin_cos();
     let coef = norm.powf(t);
-    ( coef * cos, scale_vec((coef * sin) / norm_vec, q.1) )
+    ( coef * cos, scale_vec((coef * sin) / tmp.sqrt(), q.1) )
 }
 
 /// Power function of versor.
 /// 
 /// Versorであることが保証されている場合にはpow関数よりも計算量を減らせる．
-/// Power function of Versor.
 #[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
-    let norm_vec = norm_vec(q.1);
     let (sin, cos) = ( t * acos_safe(q.0) ).sin_cos();
-    ( cos, scale_vec(sin / norm_vec, q.1) )
+    ( cos, scale_vec(sin / norm_vec(q.1), q.1) )
 }
 
 /// 位置ベクトルの回転
@@ -546,6 +541,11 @@ where T: Float {
 #[inline]
 pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
+    debug_assert!(
+        T::zero() <= t && t <= T::one(),
+        "rotate_a_to_b(): The rotate parameter `t` is out of range."
+    );
+
     let dot_ab = dot_vec(a, b);
     let norm_ab_square = dot_vec(a, a) * dot_vec(b, b);
     let tmp = norm_ab_square - dot_ab * dot_ab;
@@ -553,10 +553,9 @@ where T: Float + FloatConst {
     if tmp < T::epsilon() {
         IDENTITY()
     } else {
-        let norm_ab = norm_ab_square.sqrt();
-        let angle = acos_safe(dot_ab / norm_ab);
-        let f = ( t * angle * cast(0.5) ).sin_cos();
-        ( f.1, scale_vec(f.0 / tmp.sqrt(), cross_vec(a, b)) )
+        let angle = acos_safe( dot_ab / norm_ab_square.sqrt() );
+        let (sin, cos) = ( t * angle * cast(0.5) ).sin_cos();
+        ( cos, scale_vec(sin / tmp.sqrt(), cross_vec(a, b)) )
     }
 }
 
@@ -569,6 +568,11 @@ where T: Float + FloatConst {
 #[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
+    debug_assert!(
+        T::zero() <= t && t <= T::one(),
+        "lerp(): The interpolation parameter `t` is out of range."
+    );
+
     normalize( scale_add(t, sub(b, a), a) )
 }
 
@@ -581,6 +585,11 @@ where T: Float {
 #[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
+    debug_assert!(
+        T::zero() <= t && t <= T::one(),
+        "slerp(): The interpolation parameter `t` is out of range."
+    );
+
     // 最短経路で補間
     let mut dot = dot(a, b);
     if dot.is_sign_negative() {
