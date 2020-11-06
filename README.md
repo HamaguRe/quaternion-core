@@ -9,8 +9,8 @@ Rustで作成した四元数（クォータニオン）計算用のライブラ�
 関数の動作については、`src/lib.rs`内のドキュメンテーションコメントを参照してください。
 
 また、四元数自体について詳しく知りたい方は、
-[四元数まとめ資料を書いた（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
-をご覧ください。
+[四元数まとめ資料（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
+をご覧ください。この資料中に出てくる演算はすべて実装してあります。
 
 ## 【English】
 
@@ -20,9 +20,11 @@ In `version=2.3.0` or later, it is available in the `no_std` environment.
 
 For function behavior, see the documentation comments in `src/lib.rs`.
 
-# Example of use
+## Example of use
 
-#### Cargo.toml
+---
+
+Cargo.toml
 
 ```toml
 [dependencies.quaternion]
@@ -34,7 +36,7 @@ version = "2.3"
 #features = ["libm"]
 ```
 
-#### src/main.rs
+src/main.rs
 
 ```rust
 use quaternion as quat;

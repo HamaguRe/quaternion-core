@@ -526,8 +526,8 @@ where T: Float {
 #[inline]
 pub fn frame_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
-    let tmp = scale_add_vec(-q.0, v, cross_vec(q.1, v));
-    scale_add_vec(cast(2.0), cross_vec(q.1, tmp), v)
+    let tmp = scale_add_vec(q.0, v, cross_vec(v, q.1));
+    scale_add_vec(cast(2.0), cross_vec(tmp, q.1), v)
 }
 
 /// 位置ベクトル`a`を 位置ベクトル`b`と同じ場所へ最短距離で回転させるVersorを求める．
