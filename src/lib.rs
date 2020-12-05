@@ -31,7 +31,7 @@ where T: Float + FloatConst {
     if norm_vec < T::epsilon() {  // ゼロ除算回避
         IDENTITY()
     } else {
-        let tmp = angle % ( cast::<T>(2.0) * T::PI() );  // limit to (-2π, 2π)
+        let tmp = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
         let f = ( tmp * cast(0.5) ).sin_cos();
         ( f.1, scale_vec(f.0 / norm_vec, axis) )
     }

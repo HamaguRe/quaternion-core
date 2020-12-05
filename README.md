@@ -1,6 +1,8 @@
-# Quaternion library
+# Quaternion
 
-## 【日本語】
+## About
+
+### 【日本語】
 
 Rustで作成した四元数（クォータニオン）計算用のライブラリです。
 
@@ -8,11 +10,11 @@ Rustで作成した四元数（クォータニオン）計算用のライブラ�
 
 関数の動作については、`src/lib.rs`内のドキュメンテーションコメントを参照してください。
 
-また、四元数自体について詳しく知りたい方は、
-[四元数まとめ資料（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
-をご覧ください。この資料中に出てくる演算はすべて実装してあります。
+また、四元数自体について詳しく知りたい方は以下の資料をご覧ください。この資料中に出てくる演算はすべて実装してあります。
 
-## 【English】
+- [四元数まとめ資料（宇宙電波実験室）](https://space-denpa.jp/2019/03/26/quaternion-doc/)
+
+### 【English】
 
 It's a Quaternion library written in Rust.
 
@@ -20,9 +22,17 @@ In `version=2.3.0` or later, it is available in the `no_std` environment.
 
 For function behavior, see the documentation comments in `src/lib.rs`.
 
-## Example of use
+## Dependencies
 
----
+- [num-traits](https://crates.io/crates/num-traits)
+
+- [libm](https://crates.io/crates/libm) (optional)
+
+## License
+
+- [MIT license](https://opensource.org/licenses/MIT)
+
+## Example of use
 
 Cargo.toml
 
