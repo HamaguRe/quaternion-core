@@ -22,6 +22,12 @@ In `version=2.3.0` or later, it is available in the `no_std` environment.
 
 For function behavior, see the documentation comments in `src/lib.rs`.
 
+## FMA (Fused Multiply-Add)
+
+In this library, we use the [mul_add](https://doc.rust-lang.org/std/primitive.f64.html#method.mul_add) method mainly to improve the performance, but by default it is replace with a unfused multiply-add (`s*a + b`) . If you wish to use mul_add method, enable the `fma` feature in the `Cargo.toml` file.
+
+If your CPU does not support FMA instructions, or if you use libm (running in no_std environment), enabling the `fma` feature may cause slowdown of execution speed. Also, due to rounding error, `s.mul_add(a, b)` and `s*a + b` will not match perfectly.
+
 ## Dependencies
 
 - [num-traits](https://crates.io/crates/num-traits)
@@ -39,9 +45,12 @@ Cargo.toml
 ```toml
 [dependencies.quaternion]
 git = "https://github.com/HamaguRe/quaternion.git"
-version = "2.3"
+version = "2.4"
 
-# Uncomment if you wish to use in `no_std` environment.
+# Uncomment if you wish to use "mul_add" method.
+#features = ["fma"]
+
+# Uncomment if you wish to use in "no_std" environment.
 #default-features = false
 #features = ["libm"]
 ```

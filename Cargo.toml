@@ -1,6 +1,6 @@
 [package]
 name = "quaternion"
-version = "2.3.2"
+version = "2.4.0"
 authors = ["HamaguRe <space-denpa.jp>"]
 edition = "2018"
 repository = "https://github.com/HamaguRe/quaternion.git"
@@ -10,6 +10,7 @@ build = "build.rs"
 [features]
 default = ["std", "num-traits/std"]
 std = []
+fma = []
 libm = ["num-traits/libm"]
 
 [dependencies.num-traits]

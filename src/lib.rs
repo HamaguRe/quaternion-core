@@ -139,15 +139,15 @@ where T: Float {
     let q1_q3 = q1 * q3;
     let q2_q3 = q2 * q3;
 
-    let m11 = (q0_q0 + q1*q1).mul_add(two, -one);
+    let m11 = mul_add(q0_q0 + q1*q1, two, -one);
     let m12 = (q1_q2 - q0_q3) * two;
     let m13 = (q1_q3 + q0_q2) * two;
     let m21 = (q1_q2 + q0_q3) * two;
-    let m22 = (q0_q0 + q2*q2).mul_add(two, -one);
+    let m22 = mul_add(q0_q0 + q2*q2, two, -one);
     let m23 = (q2_q3 - q0_q1) * two;
     let m31 = (q1_q3 - q0_q2) * two;
     let m32 = (q2_q3 + q0_q1) * two;
-    let m33 = (q0_q0 + q3*q3).mul_add(two, -one);
+    let m33 = mul_add(q0_q0 + q3*q3, two, -one);
 
     [
         [m11, m12, m13],
@@ -316,26 +316,26 @@ where T: Float {
 
 /// Calculate `s*a + b`
 /// 
-/// If the CPU supports FMA(Fused multiply–add) instructions,
-/// this is faster than `add_vec(scale_vec(s, a), b)`.
+/// `fma` featureを有効にした場合は`mul_add`メソッドを用いてFMA計算を行い，
+/// 有効にしなかった場合は単純な積和（s*a + b）に展開して計算する．
 #[inline]
 pub fn scale_add_vec<T>(s: T, a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [
-        s.mul_add(a[0], b[0]),
-        s.mul_add(a[1], b[1]),
-        s.mul_add(a[2], b[2]),
+        mul_add(s, a[0], b[0]),
+        mul_add(s, a[1], b[1]),
+        mul_add(s, a[2], b[2]),
     ]
 }
 
 /// Calculate `s*a + b`
 /// 
-/// If the CPU supports FMA(Fused multiply–add) instructions,
-/// this is faster than `add(scale(s, a), b)`
+/// `fma` featureを有効にした場合は`mul_add`メソッドを用いてFMA計算を行い，
+/// 有効にしなかった場合は単純な積和（s*a + b）に展開して計算する．
 #[inline]
 pub fn scale_add<T>(s: T, a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
-    ( s.mul_add(a.0, b.0), scale_add_vec(s, a.1, b.1) )
+    ( mul_add(s, a.0, b.0), scale_add_vec(s, a.1, b.1) )
 }
 
 /// Calculate L2 norm.
@@ -640,6 +640,17 @@ fn copysign<T: Float>(x: T, sign: T) -> T {
          x.abs()
     } else {
         -x.abs()
+    }
+}
+
+/// `fma` featureを有効にした場合は`mul_add`メソッドとして展開され，
+/// 有効にしなかった場合は単純な積和（`s*a + b`）に展開してコンパイルされる．
+#[inline(always)]
+fn mul_add<T: Float>(s: T, a: T, b: T) -> T {
+    if cfg!(feature = "fma") {
+        s.mul_add(a, b)
+    } else {
+        s * a + b
     }
 }
 
