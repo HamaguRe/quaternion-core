@@ -98,19 +98,15 @@ fn test_dcm() {
 
 #[test]
 fn test_euler() {
-    let q_z = from_axis_angle([0.0, 0.0, 1.0f64], PI*(3.0/4.0));
-    let q_y = from_axis_angle([0.0, 1.0, 0.0f64], PI*(1.0/4.0));
-    let q_x = from_axis_angle([1.0, 0.0, 0.0f64], PI/2.0);
-
-    let q = mul(q_x, mul(q_y, q_z));
+    let yaw_ori   = PI / 4.0;
+    let pitch_ori = PI / 4.0;
+    let roll_ori  = PI / 4.0;
+    let q = from_euler_angles([yaw_ori, pitch_ori, roll_ori]);
+    
     let [yaw, pitch, roll] = to_euler_angle(q);
-
-    let tmp = 180.0 / PI;
-    println!("yaw: {}, pitch: {}, roll: {}", yaw*tmp, pitch*tmp, roll*tmp);
-
-    assert!( (yaw + (PI/4.0)).abs() < EPSILON );
-    assert!( (pitch - (PI/4.0)).abs() < EPSILON );
-    assert!( (roll + (PI/2.0)).abs() < EPSILON );
+    assert!((yaw   - yaw_ori).abs()   < EPSILON);
+    assert!((pitch - pitch_ori).abs() < EPSILON);
+    assert!((roll  - roll_ori).abs()  < EPSILON);
 }
 
 #[test]
@@ -172,6 +168,18 @@ fn test_scale_add() {
     assert!( diff.1[0].abs() < EPSILON );
     assert!( diff.1[1].abs() < EPSILON );
     assert!( diff.1[2].abs() < EPSILON );
+}
+
+#[test]
+fn test_hadamard() {
+    let a = (1.0f64, [2.0, 3.0, 4.0]);
+    let b = (4.0f64, [3.0, 2.0, 1.0]);
+
+    let result = hadamard(a, b);
+    assert!((result.0 - 4.0).abs() < EPSILON);
+    assert!((result.1[0] - 6.0).abs() < EPSILON);
+    assert!((result.1[1] - 6.0).abs() < EPSILON);
+    assert!((result.1[2] - 4.0).abs() < EPSILON);
 }
 
 #[test]

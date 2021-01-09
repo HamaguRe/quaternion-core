@@ -129,31 +129,55 @@ where T: Float {
     let one = T::one();
     let two = cast(2.0);
 
-    let (q0, [q1, q2, q3]) = q;
     // Compute these value only once.
-    let q0_q0 = q0 * q0;
-    let q0_q1 = q0 * q1;
-    let q0_q2 = q0 * q2;
-    let q0_q3 = q0 * q3;
-    let q1_q2 = q1 * q2;
-    let q1_q3 = q1 * q3;
-    let q2_q3 = q2 * q3;
+    let q0_q0 = q.0 * q.0;
+    let q0_q1 = q.0 * q.1[0];
+    let q0_q2 = q.0 * q.1[1];
+    let q0_q3 = q.0 * q.1[2];
+    let q1_q2 = q.1[0] * q.1[1];
+    let q1_q3 = q.1[0] * q.1[2];
+    let q2_q3 = q.1[1] * q.1[2];
 
-    let m11 = mul_add(q0_q0 + q1*q1, two, -one);
+    let m11 = mul_add(mul_add(q.1[0], q.1[0], q0_q0), two, -one);
     let m12 = (q1_q2 - q0_q3) * two;
     let m13 = (q1_q3 + q0_q2) * two;
     let m21 = (q1_q2 + q0_q3) * two;
-    let m22 = mul_add(q0_q0 + q2*q2, two, -one);
+    let m22 = mul_add(mul_add(q.1[1], q.1[1], q0_q0), two, -one);
     let m23 = (q2_q3 - q0_q1) * two;
     let m31 = (q1_q3 - q0_q2) * two;
     let m32 = (q2_q3 + q0_q1) * two;
-    let m33 = mul_add(q0_q0 + q3*q3, two, -one);
+    let m33 = mul_add(mul_add(q.1[2], q.1[2], q0_q0), two, -one);
 
     [
         [m11, m12, m13],
         [m21, m22, m23],
         [m31, m32, m33],
     ]
+}
+
+/// `z-y-x`系のオイラー角[rad]を四元数に変換する．
+/// 
+/// ypr: [yaw, pitch, roll]
+/// 
+/// Aerospace angle/axis sequences is `[yaw, pitch, roll] / [z, y, x]`.  
+#[inline]
+pub fn from_euler_angles<T>(ypr: Vector3<T>) -> Quaternion<T> 
+where T: Float {
+    let [alpha, beta, gamma] = scale_vec(cast(0.5), ypr);
+
+    // Compute these value only once
+    let (sin_alpha, cos_alpha) = alpha.sin_cos();
+    let (sin_beta,  cos_beta)  = beta.sin_cos();
+    let (sin_gamma, cos_gamma) = gamma.sin_cos();
+    let cos_alpha_cos_beta = cos_alpha * cos_beta;
+    let sin_alpha_sin_beta = sin_alpha * sin_beta;
+
+    let q0 = cos_alpha_cos_beta   * cos_gamma + sin_alpha_sin_beta   * sin_gamma;
+    let q1 = cos_alpha_cos_beta   * sin_gamma - sin_alpha_sin_beta   * cos_gamma;
+    let q2 = cos_alpha * sin_beta * cos_gamma + sin_alpha * cos_beta * sin_gamma;
+    let q3 = sin_alpha * cos_beta * cos_gamma - cos_alpha * sin_beta * sin_gamma;
+
+    (q0, [q1, q2, q3])
 }
 
 /// 位置ベクトル回転（`q v q*`）を表すVersorを`z-y-x系`のオイラー角\[rad\]に変換する．
@@ -172,22 +196,22 @@ where T: Float {
 pub fn to_euler_angle<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
     let [
-        [m11, m12, m13],
-        [  _, m22, m23],
-        [  _, m32, m33],
+        [m11,   _, m13],
+        [m21,   _, m23],
+        [m31, m32, m33],
     ] = to_dcm(q);
 
     if m13.abs() < (T::one() - T::epsilon()) {
         [
-            (-m12 / m11).atan(),  // yaw
-            m13.asin(),           // pitch
-            (-m23 / m33).atan(),  // roll
+            (m32 / m33).atan(),  // yaw
+            (-m31).asin(),       // pitch
+            (m21 / m11).atan(),  // roll
         ]
     } else {  // ジンバルロック
         [
-            T::zero(),                      // yaw
-            copysign(T::FRAC_PI_2(), m13),  // pitch
-            (m32 / m22).atan(),             // roll
+            T::zero(),                       // yaw
+            copysign(T::FRAC_PI_2(), -m13),  // pitch
+            (m23 / m13).atan(),              // roll
         ]
     }
 }
@@ -338,6 +362,20 @@ where T: Float {
     ( mul_add(s, a.0, b.0), scale_add_vec(s, a.1, b.1) )
 }
 
+/// Hadamard product of Vector.
+#[inline]
+pub fn hadamard_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
+where T: Float {
+    [ a[0]*b[0], a[1]*b[1], a[2]*b[2] ]
+}
+
+/// Hadamard product of Quaternion.
+#[inline]
+pub fn hadamard<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
+where T: Float {
+    ( a.0 * b.0, hadamard_vec(a.1, b.1) )
+}
+
 /// Calculate L2 norm.
 #[inline]
 pub fn norm_vec<T>(v: Vector3<T>) -> T
@@ -485,7 +523,7 @@ where T: Float + FloatConst {
 #[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
-    scale_vec(acos_safe(q.0) / norm_vec(q.1), q.1)
+    scale_vec(q.0.acos() / norm_vec(q.1), q.1)
 }
 
 /// Power function of quaternion.
@@ -506,7 +544,7 @@ where T: Float + FloatConst {
 #[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
-    let (sin, cos) = ( t * acos_safe(q.0) ).sin_cos();
+    let (sin, cos) = ( t * q.0.acos() ).sin_cos();
     ( cos, scale_vec(sin / norm_vec(q.1), q.1) )
 }
 
