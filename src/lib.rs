@@ -363,6 +363,8 @@ where T: Float {
 }
 
 /// Hadamard product of Vector.
+/// 
+/// Calculate `a・b`
 #[inline]
 pub fn hadamard_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -370,10 +372,34 @@ where T: Float {
 }
 
 /// Hadamard product of Quaternion.
+/// 
+/// Calculate `a・b`
 #[inline]
 pub fn hadamard<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( a.0 * b.0, hadamard_vec(a.1, b.1) )
+}
+
+/// Hadamard product and Addiction of Vector.
+/// 
+/// Calculate `a・b + c`
+#[inline]
+pub fn hadamard_add_vec<T>(a: Vector3<T>, b: Vector3<T>, c: Vector3<T>) -> Vector3<T>
+where T: Float {
+    [
+        mul_add(a[0], b[0], c[0]),
+        mul_add(a[1], b[1], c[1]),
+        mul_add(a[2], b[2], c[2]),
+    ]
+}
+
+/// Hadamard product and Addiction of Quaternion.
+/// 
+/// Calculate `a・b + c`
+#[inline]
+pub fn hadamard_add<T>(a: Quaternion<T>, b: Quaternion<T>, c: Quaternion<T>) -> Quaternion<T>
+where T: Float {
+    ( mul_add(a.0, b.0, c.0), hadamard_add_vec(a.1, b.1, c.1) )
 }
 
 /// Calculate L2 norm.
@@ -681,8 +707,8 @@ fn copysign<T: Float>(x: T, sign: T) -> T {
     }
 }
 
-/// `fma` featureを有効にした場合は`mul_add`メソッドとして展開され，
-/// 有効にしなかった場合は単純な積和（`s*a + b`）に展開してコンパイルされる．
+/// `fma` featureを有効にした場合は`s.mul_add(a, b)`として展開され，
+/// 有効にしなかった場合は単純な積和`s*a + b`に展開してコンパイルされる．
 #[inline(always)]
 fn mul_add<T: Float>(s: T, a: T, b: T) -> T {
     if cfg!(feature = "fma") {
