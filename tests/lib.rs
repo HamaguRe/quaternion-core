@@ -25,7 +25,7 @@ fn test_get_angle() {
     // 方法2
     // 実部の符号を反映することで幾何学的には方法1と同じ結果が得られる．
     // 実部と虚部両方の値を使っているのでなんとなく気持ちが良い．
-    // -π <= angle2 <= π
+    // -π < angle2 <= π
     let angle2 = ( 2.0 * norm_vec(q.1).asin() ).copysign(q.0);
 
     println!("axis: {:?}", normalize_vec(q.1));
@@ -42,6 +42,7 @@ fn test_axis_angle() {
     let axis = normalize_vec([0.0, 1.0, 1.0]);
     let angle = -1.5*PI;
     let q = from_axis_angle(axis, angle);
+    println!("q: {:?}", q);
 
     assert!( (1.0 - norm(q)).abs() < EPSILON );
 
@@ -274,11 +275,12 @@ fn test_rotate_a_to_b() {
     let q = from_axis_angle([1.0, 0.5, -0.5], PI);
     let b = vector_rotation(q, a);
 
-    let a_to_b = rotate_a_to_b(a, b, 1.0);
+    let a_to_b = rotate_a_to_b(a, b);
+    println!("a_to_b: {:?}", a_to_b);
     let b_rest = vector_rotation(a_to_b, a);
 
     let diff = sub_vec(b, b_rest);
     for i in 0..3 {
-        assert!( diff[i].abs() < EPSILON );
+        assert!(diff[i].abs() < EPSILON, "{}", diff[i]);
     }
 }

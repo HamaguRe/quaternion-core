@@ -27,13 +27,13 @@ pub type DCM<T> = [Vector3<T>; 3];
 #[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
-    let norm_vec = norm_vec(axis);
-    if norm_vec < T::epsilon() {  // ゼロ除算回避
+    let tmp = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
+    let f = ( tmp * cast(0.5) ).sin_cos();
+    let coef = f.0 / norm_vec(axis);
+    if coef.is_infinite() {
         IDENTITY()
     } else {
-        let tmp = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
-        let f = ( tmp * cast(0.5) ).sin_cos();
-        ( f.1, scale_vec(f.0 / norm_vec, axis) )
+        ( f.1, scale_vec(coef, axis) )
     }
 }
 
@@ -44,18 +44,24 @@ where T: Float + FloatConst {
 /// 
 /// return: `(axis, angle)`
 /// 
-/// Range of angle: `-π <= angle <= π`
+/// Range of angle: `-PI < angle <= PI`
 #[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
 where T: Float + FloatConst {
-    let norm_vec = norm_vec(q.1);
-    if norm_vec < T::epsilon() {
+    let norm_q_v = norm_vec(q.1);
+    let coef = norm_q_v.recip();
+    if coef.is_infinite() {
         ( ZERO_VECTOR(), T::zero() )
     } else {
-        let axis = scale_vec( norm_vec.recip(), q.1 );
-        let tmp = asin_safe(norm_vec);
-        let angle = copysign(tmp + tmp, q.0);  // 2*tmp
-        (axis, angle)
+        // 少しの誤差は見逃す．
+        let theta = if norm_q_v < T::one() {
+            let tmp = norm_q_v.asin();
+            tmp + tmp  // 2*tmp
+        } else {
+            T::PI()
+        };
+        
+        ( scale_vec(coef, q.1), copysign(theta, q.0) )
     }
 }
 
@@ -126,7 +132,7 @@ where T: Float {
 #[inline]
 pub fn to_dcm<T>(q: Quaternion<T>) -> DCM<T>
 where T: Float {
-    let one = T::one();
+    let neg_one = -T::one();
     let two = cast(2.0);
 
     // Compute these value only once.
@@ -138,15 +144,15 @@ where T: Float {
     let q1_q3 = q.1[0] * q.1[2];
     let q2_q3 = q.1[1] * q.1[2];
 
-    let m11 = mul_add(mul_add(q.1[0], q.1[0], q0_q0), two, -one);
+    let m11 = mul_add(mul_add(q.1[0], q.1[0], q0_q0), two, neg_one);
     let m12 = (q1_q2 - q0_q3) * two;
     let m13 = (q1_q3 + q0_q2) * two;
     let m21 = (q1_q2 + q0_q3) * two;
-    let m22 = mul_add(mul_add(q.1[1], q.1[1], q0_q0), two, -one);
+    let m22 = mul_add(mul_add(q.1[1], q.1[1], q0_q0), two, neg_one);
     let m23 = (q2_q3 - q0_q1) * two;
     let m31 = (q1_q3 - q0_q2) * two;
     let m32 = (q2_q3 + q0_q1) * two;
-    let m33 = mul_add(mul_add(q.1[2], q.1[2], q0_q0), two, -one);
+    let m33 = mul_add(mul_add(q.1[2], q.1[2], q0_q0), two, neg_one);
 
     [
         [m11, m12, m13],
@@ -221,13 +227,14 @@ where T: Float + FloatConst {
 /// 回転ベクトルはそれ自体が回転軸を表し，ノルムは軸回りの回転角(0, 2π)を表す．
 #[inline]
 pub fn from_rotation_vector<T>(v: Vector3<T>) -> Quaternion<T>
-where T: Float + FloatConst {
+where T: Float {
     let theta = norm_vec(v);
-    if theta < T::epsilon() {
+    let f = ( theta * cast(0.5) ).sin_cos();
+    let coef = f.0 / theta;
+    if coef.is_infinite() {
         IDENTITY()
     } else {
-        let f = ( theta * cast(0.5) ).sin_cos();
-        ( f.1, scale_vec(f.0 / theta, v) )
+        ( f.1, scale_vec(coef, v) )
     }
 }
 
@@ -237,12 +244,12 @@ where T: Float + FloatConst {
 #[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
-    let norm_vec = norm_vec(q.1);
-    if norm_vec < T::epsilon() {
+    let tmp = acos_safe(q.0);
+    let coef = (tmp + tmp) / norm_vec(q.1);  // 2*tmp
+    if coef.is_infinite() {
         ZERO_VECTOR()
     } else {
-        let tmp = acos_safe(q.0);
-        scale_vec((tmp + tmp) / norm_vec, q.1)  // 2*tmp
+        scale_vec(coef, q.1)
     }
 }
 
@@ -416,7 +423,7 @@ where T: Float {
     dot(q, q).sqrt()
 }
 
-/// Normalization of vector.
+/// Normalization of vector3.
 /// 
 /// 零ベクトルを入力した場合は零ベクトルを返す．
 /// 
@@ -424,11 +431,11 @@ where T: Float {
 #[inline]
 pub fn normalize_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float + FloatConst {
-    let norm_vec = norm_vec(v);
-    if norm_vec < T::epsilon() {
+    let coef = norm_vec(v).recip();
+    if coef.is_infinite() {
         ZERO_VECTOR()
     } else {
-        scale_vec( norm_vec.recip(), v )
+        scale_vec(coef, v)
     }
 }
 
@@ -490,18 +497,11 @@ where T: Float {
 
 /// 逆純虚四元数を求める．
 /// 
-/// 零ベクトルを入力した場合は零ベクトルを返す．
-/// 
 /// Compute the inverse pure quaternion.
 #[inline]
 pub fn inv_vec<T>(v: Vector3<T>) -> Vector3<T>
-where T: Float + FloatConst {
-    let dot_vec = dot_vec(v, v);
-    if dot_vec < T::epsilon() {
-        ZERO_VECTOR()
-    } else {
-        scale_vec( dot_vec.recip(), negate_vec(v) )
-    }
+where T: Float {
+    scale_vec( dot_vec(v, v).recip(), negate_vec(v) )
 }
 
 /// 逆四元数を求める．
@@ -513,33 +513,33 @@ where T: Float {
     scale( dot(q, q).recip(), conj(q) )
 }
 
-/// Exponential function of vector.
+/// Exponential function of vector3.
 #[inline]
 pub fn exp_vec<T>(v: Vector3<T>) -> Quaternion<T>
-where T: Float + FloatConst {
-    let norm_vec = norm_vec(v);
-    let (sin, cos) = norm_vec.sin_cos();
-    ( cos, scale_vec(sin / norm_vec, v) )
+where T: Float {
+    let norm_v = norm_vec(v);
+    let (sin, cos) = norm_v.sin_cos();
+    ( cos, scale_vec(sin / norm_v, v) )
 }
 
 /// Exponential function of quaternion.
 #[inline]
 pub fn exp<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float + FloatConst {
-    let norm_vec = norm_vec(q.1);
-    let (sin, cos) = norm_vec.sin_cos();
+where T: Float {
+    let norm_q_v = norm_vec(q.1);
+    let (sin, cos) = norm_q_v.sin_cos();
     let coef = q.0.exp();
-    ( coef * cos, scale_vec((coef * sin) / norm_vec, q.1) )
+    ( coef * cos, scale_vec((coef * sin) / norm_q_v, q.1) )
 }
 
 /// Natural logarithm of quaternion.
 #[inline]
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float + FloatConst {
+where T: Float {
     let tmp = dot_vec(q.1, q.1);
-    let norm = (q.0*q.0 + tmp).sqrt();
-    let coef = acos_safe(q.0 / norm) / tmp.sqrt();
-    ( norm.ln(), scale_vec(coef, q.1) )
+    let norm_q = (q.0*q.0 + tmp).sqrt();
+    let coef = (q.0 / norm_q).acos() / tmp.sqrt();
+    ( norm_q.ln(), scale_vec(coef, q.1) )
 }
 
 /// Natural logarithm of versor.
@@ -549,18 +549,18 @@ where T: Float + FloatConst {
 #[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
-    scale_vec(q.0.acos() / norm_vec(q.1), q.1)
+    scale_vec( acos_safe(q.0) / norm_vec(q.1), q.1)
 }
 
 /// Power function of quaternion.
 #[inline]
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
-where T: Float + FloatConst {
+where T: Float {
     let tmp = dot_vec(q.1, q.1);
-    let norm = (q.0*q.0 + tmp).sqrt();
-    let omega = acos_safe(q.0 / norm);
+    let norm_q = (q.0*q.0 + tmp).sqrt();
+    let omega = (q.0 / norm_q).acos();
     let (sin, cos) = (t * omega).sin_cos();
-    let coef = norm.powf(t);
+    let coef = norm_q.powf(t);
     ( coef * cos, scale_vec((coef * sin) / tmp.sqrt(), q.1) )
 }
 
@@ -570,7 +570,7 @@ where T: Float + FloatConst {
 #[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatConst {
-    let (sin, cos) = ( t * q.0.acos() ).sin_cos();
+    let (sin, cos) = (t * acos_safe(q.0)).sin_cos();
     ( cos, scale_vec(sin / norm_vec(q.1), q.1) )
 }
 
@@ -595,49 +595,47 @@ where T: Float {
 }
 
 /// 位置ベクトル`a`を 位置ベクトル`b`と同じ場所へ最短距離で回転させるVersorを求める．
-/// 
 /// 零ベクトルを入力した場合は，恒等四元数を返す．
 /// 
-/// Find a versor to rotate from vector `a` to `b`.
+/// Calculate a versor to rotate from vector `a` to `b`.
 /// If you enter a zero vector, it returns an identity quaternion.
-/// 
-/// Range of rotation parameter: `0 <= t <= 1`
 #[inline]
-pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
-where T: Float + FloatConst {
-    debug_assert!(
-        T::zero() <= t && t <= T::one(),
-        "rotate_a_to_b(): The rotate parameter `t` is out of range."
-    );
+pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
+where T: Float {
+    let half = cast(0.5);
 
     let dot_ab = dot_vec(a, b);
     let norm_ab_square = dot_vec(a, a) * dot_vec(b, b);
-    let tmp = norm_ab_square - dot_ab * dot_ab;
+    let norm_a_cross_b = (norm_ab_square - dot_ab * dot_ab).sqrt();
+    let e = dot_ab / norm_ab_square.sqrt();
+    let tmp = e * half;
+    let v = (half - tmp).sqrt() / norm_a_cross_b;
 
-    if tmp < T::epsilon() {
-        IDENTITY()
+    // vがfiniteならeもfiniteである．
+    if v.is_finite() {
+        ( (half + tmp).sqrt(), scale_vec(v, cross_vec(a, b)) )
     } else {
-        let angle = acos_safe( dot_ab / norm_ab_square.sqrt() );
-        let (sin, cos) = ( t * angle * cast(0.5) ).sin_cos();
-        ( cos, scale_vec(sin / tmp.sqrt(), cross_vec(a, b)) )
+        IDENTITY()
     }
 }
 
 /// Lerp (Linear interpolation)
 /// 
-/// Generate a quaternion that interpolate the route from `a` to `b`.
+/// Generate a quaternion that interpolate the route from `a` to `b` 
+/// (The norm of `a` and `b` must be 1).
 /// The argument `t (0 <= t <= 1)` is the interpolation parameter.
 /// 
-/// The norm of `a` and `b` must be 1 (Versor).
+/// Normalization is not performed internally because 
+/// it increases the computational complexity.
 #[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     debug_assert!(
         T::zero() <= t && t <= T::one(),
-        "lerp(): The interpolation parameter `t` is out of range."
+        "Lerp: The interpolation parameter `t` is out of range."
     );
 
-    normalize( scale_add(t, sub(b, a), a) )
+    scale_add(t, sub(b, a), a)
 }
 
 /// Slerp (Spherical linear interpolation)
@@ -651,7 +649,7 @@ pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     debug_assert!(
         T::zero() <= t && t <= T::one(),
-        "slerp(): The interpolation parameter `t` is out of range."
+        "Slerp: The interpolation parameter `t` is out of range."
     );
 
     // 最短経路で補間
@@ -691,13 +689,15 @@ fn ZERO_VECTOR<T: Float>() -> Vector3<T> {
     [T::zero(); 3]
 }
 
-/// 定数呼び出し以外に使わないのでエラー処理を省略
+/// 定数呼び出し以外に使わないのでエラー処理を省略．
 #[inline(always)]
 fn cast<T: Float>(x: f64) -> T {
     num_traits::cast::<f64, T>(x).unwrap()
 }
 
 /// xの絶対値を持ち，かつsignの符号を持つ値を返す．
+/// 
+/// xが零の場合には，+0.0か-0.0のどちらかに従う．
 #[inline(always)]
 fn copysign<T: Float>(x: T, sign: T) -> T {
     if sign.is_sign_positive() {
@@ -718,7 +718,7 @@ fn mul_add<T: Float>(s: T, a: T, b: T) -> T {
     }
 }
 
-/// 配列内の最大値を探して，その位置と値を返す．
+/// 配列内の最大値とそのインデックスを返す．
 #[inline(always)]
 fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
     let mut index = 0;
@@ -732,17 +732,7 @@ fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
     (index, max_num)
 }
 
-/// 定義域外の値をカットして未定義動作を防ぐ
-#[inline(always)]
-fn asin_safe<T: Float + FloatConst>(x: T) -> T {
-    if x.abs() < T::one() {
-        x.asin()
-    } else {
-        copysign(T::FRAC_PI_2(), x)
-    }
-}
-
-/// 定義域外の値をカットして未定義動作を防ぐ
+/// 定義域外の値をカットして未定義動作を防ぐ．
 #[inline(always)]
 fn acos_safe<T: Float + FloatConst>(x: T) -> T {
     if x.abs() < T::one() {
