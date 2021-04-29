@@ -9,6 +9,7 @@ Rustで作成した四元数（クォータニオン）計算用のライブラ�
 `version=2.3.0`以降では`no_std`環境で使用できます。
 
 関数の動作については、`src/lib.rs`内のドキュメンテーションコメントを参照してください。
+もしくは、`cargo doc`コマンドから確認することもできます。
 
 また、四元数自体について詳しく知りたい方は以下の資料をご覧ください。この資料中に出てくる演算はすべて実装してあります。
 
@@ -45,7 +46,6 @@ Cargo.toml
 ```toml
 [dependencies.quaternion]
 git = "https://github.com/HamaguRe/quaternion.git"
-version = "2.4"
 
 # Uncomment if you wish to use "mul_add" method.
 #features = ["fma"]

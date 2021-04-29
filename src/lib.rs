@@ -39,6 +39,8 @@ where T: Float + FloatConst {
 
 /// Versorから回転軸（単位ベクトル）と軸回りの回転角\[rad\]を求める．
 /// 
+/// 恒等四元数を入力した場合，回転角は零[rad]，回転軸は零ベクトルを返す．
+/// 
 /// Compute the rotation axis (unit vector) and the rotation angle\[rad\] 
 /// around the axis from the versor.
 /// 
@@ -616,6 +618,33 @@ where T: Float {
         ( (half + tmp).sqrt(), scale_vec(v, cross_vec(a, b)) )
     } else {
         IDENTITY()
+    }
+}
+
+/// 位置ベクトル`a`を 位置ベクトル`b`と同じ場所へ最短距離で回転させるVersorを求める．
+/// パラメータ`t`によって`a`から`b`までの移動量を調整することができ，
+/// t=1のとき完全にbの位置まで移動する．
+/// 
+/// 零ベクトルを入力した場合は，恒等四元数を返す．
+/// 
+/// 常にt=1とするなら`rotate_a_to_b`を使用したほうが計算量が少なく済む．
+#[inline]
+pub fn rotate_a_to_b_param<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
+where T: Float + FloatConst {
+    let dot_ab = dot_vec(a, b);
+    let norm_ab_square = dot_vec(a, a) * dot_vec(b, b);
+    let tmp_acos = dot_ab / norm_ab_square.sqrt();
+    if tmp_acos.is_infinite() {
+        IDENTITY()
+    } else {
+        let theta = acos_safe(tmp_acos);
+        let (sin, cos) = ( t * theta * cast(0.5) ).sin_cos();
+        let coef_v = sin / (norm_ab_square - dot_ab * dot_ab).sqrt();
+        if coef_v.is_finite() {
+            ( cos, scale_vec(coef_v, cross_vec(a, b)) )
+        } else {
+            IDENTITY()
+        }
     }
 }
 

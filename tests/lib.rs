@@ -276,11 +276,15 @@ fn test_rotate_a_to_b() {
     let b = vector_rotation(q, a);
 
     let a_to_b = rotate_a_to_b(a, b);
+    let a_to_b_t = rotate_a_to_b_param(a, b, 1.0);
     println!("a_to_b: {:?}", a_to_b);
     let b_rest = vector_rotation(a_to_b, a);
+    let b_rest_t = vector_rotation(a_to_b_t, a);
 
     let diff = sub_vec(b, b_rest);
+    let diff_t = sub_vec(b, b_rest_t);
     for i in 0..3 {
         assert!(diff[i].abs() < EPSILON, "{}", diff[i]);
+        assert!(diff_t[i].abs() < EPSILON, "{}", diff_t[i]);
     }
 }
