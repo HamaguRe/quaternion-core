@@ -276,39 +276,28 @@ where T: Float {
     ( -q.0, [ q.1[0], -q.1[1], q.1[2] ] )
 }
 
-/// Dot product of vector.
+/// Calculate the sum of each element of Vector3.
 #[inline]
-pub fn dot_vec<T>(a: Vector3<T>, b: Vector3<T>) -> T
+pub fn sum_vec<T>(v: Vector3<T>) -> T
 where T: Float {
-    a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+    v[0] + v[1] + v[2]
 }
 
-/// Dot product of quaternion.
+/// Calculate the sum of each element of Quaternion.
 #[inline]
-pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
+pub fn sum<T>(q: Quaternion<T>) -> T
 where T: Float {
-    a.0 * b.0 + dot_vec(a.1, b.1)
+    q.0 + sum_vec(q.1)
 }
 
-/// Cross product.
-#[inline]
-pub fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
-where T: Float {
-    [
-        a[1]*b[2] - a[2]*b[1],
-        a[2]*b[0] - a[0]*b[2],
-        a[0]*b[1] - a[1]*b[0],
-    ]
-}
-
-/// Calcurate `a + b`
+/// Calculate `a + b`
 #[inline]
 pub fn add_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ a[0]+b[0], a[1]+b[1], a[2]+b[2] ]
 }
 
-/// Calcurate `a + b`
+/// Calculate `a + b`
 #[inline]
 pub fn add<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
@@ -409,6 +398,31 @@ where T: Float {
 pub fn hadamard_add<T>(a: Quaternion<T>, b: Quaternion<T>, c: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( mul_add(a.0, b.0, c.0), hadamard_add_vec(a.1, b.1, c.1) )
+}
+
+/// Dot product of vector.
+#[inline]
+pub fn dot_vec<T>(a: Vector3<T>, b: Vector3<T>) -> T
+where T: Float {
+    sum_vec( hadamard_vec(a, b) )
+}
+
+/// Dot product of quaternion.
+#[inline]
+pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
+where T: Float {
+    sum( hadamard(a, b) )
+}
+
+/// Cross product.
+#[inline]
+pub fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
+where T: Float {
+    [
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0],
+    ]
 }
 
 /// Calculate L2 norm.
