@@ -46,7 +46,7 @@ where T: Float + FloatConst {
 /// 
 /// return: `(axis, angle)`
 /// 
-/// Range of angle: `-PI < angle <= PI`
+/// Range of angle: `[-π, π]`
 #[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
 where T: Float + FloatConst {
@@ -101,22 +101,22 @@ where T: Float {
             q3 = (m[1][0] - m[0][1]) * coef;
         },
         1 => {
-            q1 = half * tmp;
             q0 = (m[2][1] - m[1][2]) * coef;
+            q1 = half * tmp;
             q2 = (m[0][1] + m[1][0]) * coef;
             q3 = (m[0][2] + m[2][0]) * coef;
         },
         2 => {
-            q2 = half * tmp;
             q0 = (m[0][2] - m[2][0]) * coef;
             q1 = (m[0][1] + m[1][0]) * coef;
+            q2 = half * tmp;
             q3 = (m[1][2] + m[2][1]) * coef;
         },
         3 => {
-            q3 = half * tmp;
             q0 = (m[1][0] - m[0][1]) * coef;
             q1 = (m[0][2] + m[2][0]) * coef;
             q2 = (m[1][2] + m[2][1]) * coef;
+            q3 = half * tmp;
         },
         _ => unreachable!(),
     };
@@ -138,10 +138,7 @@ where T: Float {
     let two = cast(2.0);
 
     // Compute these value only once.
-    let q0_q0 = q.0 * q.0;
-    let q0_q1 = q.0 * q.1[0];
-    let q0_q2 = q.0 * q.1[1];
-    let q0_q3 = q.0 * q.1[2];
+    let (q0_q0, [q0_q1, q0_q2, q0_q3]) = scale(q.0, q);
     let q1_q2 = q.1[0] * q.1[1];
     let q1_q3 = q.1[0] * q.1[2];
     let q2_q3 = q.1[1] * q.1[2];
@@ -174,16 +171,16 @@ where T: Float {
     let [alpha, beta, gamma] = scale_vec(cast(0.5), ypr);
 
     // Compute these value only once
-    let (sin_alpha, cos_alpha) = alpha.sin_cos();
-    let (sin_beta,  cos_beta)  = beta.sin_cos();
-    let (sin_gamma, cos_gamma) = gamma.sin_cos();
-    let cos_alpha_cos_beta = cos_alpha * cos_beta;
-    let sin_alpha_sin_beta = sin_alpha * sin_beta;
+    let (sina, cosa) = alpha.sin_cos();
+    let (sinb, cosb) = beta.sin_cos();
+    let (sing, cosg) = gamma.sin_cos();
+    let cosa_cosb = cosa * cosb;
+    let sina_sinb = sina * sinb;
 
-    let q0 = cos_alpha_cos_beta   * cos_gamma + sin_alpha_sin_beta   * sin_gamma;
-    let q1 = cos_alpha_cos_beta   * sin_gamma - sin_alpha_sin_beta   * cos_gamma;
-    let q2 = cos_alpha * sin_beta * cos_gamma + sin_alpha * cos_beta * sin_gamma;
-    let q3 = sin_alpha * cos_beta * cos_gamma - cos_alpha * sin_beta * sin_gamma;
+    let q0 = cosa_cosb*cosg + sina_sinb*sing;
+    let q1 = cosa_cosb*sing - sina_sinb*cosg;
+    let q2 = cosa*sinb*cosg + sina*cosb*sing;
+    let q3 = sina*cosb*cosg - cosa*sinb*sing;
 
     (q0, [q1, q2, q3])
 }
@@ -196,12 +193,14 @@ where T: Float {
 /// ```
 /// とする．
 /// 
+/// ジンバルロック状態（pitch=±π/2 [rad]）では，roll=0 [rad]とする．
+/// 
 /// Aerospace angle/axis sequences is `[yaw, pitch, roll] / [z, y, x]`.  
 /// pitch angle is limited to [-π/2, π/2]．
 /// 
 /// return: `[yaw, pitch, roll]`
 #[inline]
-pub fn to_euler_angle<T>(q: Quaternion<T>) -> Vector3<T>
+pub fn to_euler_angles<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float + FloatConst {
     let [
         [m11,   _, m13],
@@ -209,17 +208,17 @@ where T: Float + FloatConst {
         [m31, m32, m33],
     ] = to_dcm(q);
 
-    if m13.abs() < (T::one() - T::epsilon()) {
+    if m31.abs() < (T::one() - T::epsilon()) {
         [
-            (m32 / m33).atan(),  // yaw
-            (-m31).asin(),       // pitch
-            (m21 / m11).atan(),  // roll
+            m21.atan2(m11), // yaw
+            (-m31).asin(),  // pitch
+            m32.atan2(m33), // roll
         ]
     } else {  // ジンバルロック
         [
-            T::zero(),                       // yaw
-            copysign(T::FRAC_PI_2(), -m13),  // pitch
-            (m23 / m13).atan(),              // roll
+            m23.atan2(m13),                  // yaw
+            copysign(T::FRAC_PI_2(), -m31),  // pitch
+            T::zero(),                       // roll
         ]
     }
 }
@@ -495,11 +494,12 @@ where T: Float {
 #[inline]
 pub fn mul<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
-    let v0 = scale_vec(a.0, b.1);
-    let v1 = scale_vec(b.0, a.1);
-    let s = a.0 * b.0 - dot_vec(a.1, b.1);
-    let v = add_vec( add_vec(v0, v1), cross_vec(a.1, b.1) );
-    (s, v)
+    let a0_b = scale(a.0, b);
+    let b0_a1 = scale_vec(b.0, a.1);
+    (
+        a0_b.0 - dot_vec(a.1, b.1),
+        add_vec( add_vec(a0_b.1, b0_a1), cross_vec(a.1, b.1))
+    )
 }
 
 /// 共役四元数を求める．

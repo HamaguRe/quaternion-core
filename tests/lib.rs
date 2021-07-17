@@ -22,17 +22,23 @@ fn test_get_angle() {
     // 計算精度が一つの変数に依存してしまうのは良くない...？
     // 0 <= angle1 <= 2π
     let angle1 = 2.0 * q.0.acos();
+
     // 方法2
     // 実部の符号を反映することで幾何学的には方法1と同じ結果が得られる．
     // 実部と虚部両方の値を使っているのでなんとなく気持ちが良い．
-    // -π < angle2 <= π
+    // -π <= angle2 <= π
     let angle2 = ( 2.0 * norm_vec(q.1).asin() ).copysign(q.0);
+
+    // 方法3
+    // -π <= angle3 <= π
+    let angle3 = 2.0 * (norm_vec(q.1) / q.0).atan();
 
     println!("axis: {:?}", normalize_vec(q.1));
     println!("angle1: {}PI, angle2: {}PI", angle1/PI, angle2/PI);
 
     assert!( (angle1 - 1.5*PI).abs() < EPSILON );
     assert!( (angle2 + 0.5*PI).abs() < EPSILON );
+    assert!( (angle3 + 0.5*PI).abs() < EPSILON );
 }
 
 #[test]
@@ -104,7 +110,7 @@ fn test_euler() {
     let roll_ori  = PI / 4.0;
     let q = from_euler_angles([yaw_ori, pitch_ori, roll_ori]);
     
-    let [yaw, pitch, roll] = to_euler_angle(q);
+    let [yaw, pitch, roll] = to_euler_angles(q);
     assert!((yaw   - yaw_ori).abs()   < EPSILON);
     assert!((pitch - pitch_ori).abs() < EPSILON);
     assert!((roll  - roll_ori).abs()  < EPSILON);
@@ -202,6 +208,25 @@ fn test_negate() {
     let p = negate(q);
 
     assert_eq!( p, (1.0, [-1.0, -2.0, 1.0]) )
+}
+
+#[test]
+fn test_mul() {
+    let a = (1.0f64, [0.5, -1.2, 3.0]);
+    let b = (0.5f64, [-0.2, 2.5, -3.3]);
+
+    let v0 = scale_vec(a.0, b.1);
+    let v1 = scale_vec(b.0, a.1);
+    let p = (
+        a.0 * b.0 - dot_vec(a.1, b.1),
+        add_vec( add_vec(v0, v1), cross_vec(a.1, b.1) )
+    );
+
+    let q = mul(a, b);
+    assert!( (p.0 - q.0).abs() < EPSILON );
+    for i in 0..3 {
+        assert!( (p.1[i] - q.1[i]).abs() < EPSILON );
+    }
 }
 
 // 回転行列に変換してからベクトルを回転させる．
