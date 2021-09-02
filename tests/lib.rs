@@ -18,7 +18,7 @@ fn test_get_angle() {
     assert!( ( norm(q) - 1.0 ).abs() < EPSILON );
 
     // 方法1
-    // 実部のみを使うので計算量が少ない．
+    // これが一番シンプル．実部のみを使うので計算量が少ない．
     // 計算精度が一つの変数に依存してしまうのは良くない...？
     // 0 <= angle1 <= 2π
     let angle1 = 2.0 * q.0.acos();
@@ -26,11 +26,12 @@ fn test_get_angle() {
     // 方法2
     // 実部の符号を反映することで幾何学的には方法1と同じ結果が得られる．
     // 実部と虚部両方の値を使っているのでなんとなく気持ちが良い．
-    // -π <= angle2 <= π
+    // -π < angle2 <= π
     let angle2 = ( 2.0 * norm_vec(q.1).asin() ).copysign(q.0);
 
     // 方法3
-    // -π <= angle3 <= π
+    // 普通にゼロ除算が発生するが，atanなので計算できる．
+    // -π < angle3 < π
     let angle3 = 2.0 * (norm_vec(q.1) / q.0).atan();
 
     println!("axis: {:?}", normalize_vec(q.1));

@@ -1,4 +1,6 @@
 //! Quaternion Libraly (f32 & f64)
+//! 
+//! 四元数に関する各種演算を提供する．
 
 #![no_std]
 #[cfg(feature = "std")]
@@ -6,13 +8,21 @@ extern crate std;
 
 use num_traits::float::{Float, FloatConst};
 
-/// [i, j, k]
+/// `[i, j, k]`
 pub type Vector3<T> = [T; 3];
 
-/// (1, [i, j, k])
+/// `(1, [i, j, k])`
 pub type Quaternion<T> = (T, Vector3<T>);
 
 /// Direction Cosine Matrix
+/// 
+/// `
+/// [
+///     [m11, m12, m13],
+///     [m21, m22, m23],
+///     [m31, m32, m33]
+/// ]
+/// `
 pub type DCM<T> = [Vector3<T>; 3];
 
 
@@ -24,6 +34,11 @@ pub type DCM<T> = [Vector3<T>; 3];
 /// Generate Versor by specifying rotation angle\[rad\] and axis vector.  
 /// The "axis" need not be unit vector.  
 /// If you enter a zero vector, it returns an identity quaternion.
+/// 
+/// # arguments
+/// 
+/// * `axis`  : 回転軸
+/// * `angle` : 軸回りの回転角 [rad]
 #[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
@@ -44,26 +59,23 @@ where T: Float + FloatConst {
 /// Compute the rotation axis (unit vector) and the rotation angle\[rad\] 
 /// around the axis from the versor.
 /// 
-/// return: `(axis, angle)`
+/// # Returns `(axis, angle)`
 /// 
-/// Range of angle: `[-π, π]`
+/// * `axis`  : 回転軸
+/// * `angle` : 軸回りの回転角 [rad]
+/// 
+/// Range of angle: `(-PI, PI]`
 #[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
-where T: Float + FloatConst {
+where T: Float {
     let norm_q_v = norm_vec(q.1);
     let coef = norm_q_v.recip();
     if coef.is_infinite() {
         ( ZERO_VECTOR(), T::zero() )
     } else {
         // 少しの誤差は見逃す．
-        let theta = if norm_q_v < T::one() {
-            let tmp = norm_q_v.asin();
-            tmp + tmp  // 2*tmp
-        } else {
-            T::PI()
-        };
-        
-        ( scale_vec(coef, q.1), copysign(theta, q.0) )
+        let tmp = ( if norm_q_v < T::one() { norm_q_v } else { T::one() } ).asin();
+        ( scale_vec(coef, q.1), copysign(tmp + tmp, q.0) ) // theta = 2*tmp
     }
 }
 
@@ -244,7 +256,7 @@ where T: Float {
 /// 回転ベクトルはそれ自体が回転軸を表し，ノルムは軸回りの回転角(0, 2π)を表す．
 #[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
-where T: Float + FloatConst {
+where T: Float {
     let tmp = acos_safe(q.0);
     let coef = (tmp + tmp) / norm_vec(q.1);  // 2*tmp
     if coef.is_infinite() {
@@ -445,7 +457,7 @@ where T: Float {
 /// If you enter a zero vector, it returns a zero vector.
 #[inline]
 pub fn normalize_vec<T>(v: Vector3<T>) -> Vector3<T>
-where T: Float + FloatConst {
+where T: Float {
     let coef = norm_vec(v).recip();
     if coef.is_infinite() {
         ZERO_VECTOR()
@@ -564,7 +576,7 @@ where T: Float {
 /// 実部は必ず0になるので省略．
 #[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
-where T: Float + FloatConst {
+where T: Float {
     scale_vec( acos_safe(q.0) / norm_vec(q.1), q.1)
 }
 
@@ -585,7 +597,7 @@ where T: Float {
 /// Versorであることが保証されている場合にはpow関数よりも計算量を減らせる．
 #[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
-where T: Float + FloatConst {
+where T: Float {
     let (sin, cos) = (t * acos_safe(q.0)).sin_cos();
     ( cos, scale_vec(sin / norm_vec(q.1), q.1) )
 }
@@ -644,7 +656,7 @@ where T: Float {
 /// 常にt=1とするなら`rotate_a_to_b`を使用したほうが計算量が少なく済む．
 #[inline]
 pub fn rotate_a_to_b_param<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
-where T: Float + FloatConst {
+where T: Float {
     let dot_ab = dot_vec(a, b);
     let norm_ab_square = dot_vec(a, a) * dot_vec(b, b);
     let tmp_acos = dot_ab / norm_ab_square.sqrt();
@@ -673,11 +685,6 @@ where T: Float + FloatConst {
 #[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    debug_assert!(
-        T::zero() <= t && t <= T::one(),
-        "Lerp: The interpolation parameter `t` is out of range."
-    );
-
     scale_add(t, sub(b, a), a)
 }
 
@@ -690,11 +697,6 @@ where T: Float {
 #[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    debug_assert!(
-        T::zero() <= t && t <= T::one(),
-        "Slerp: The interpolation parameter `t` is out of range."
-    );
-
     // 最短経路で補間
     let mut dot = dot(a, b);
     if dot.is_sign_negative() {
@@ -740,14 +742,10 @@ fn cast<T: Float>(x: f64) -> T {
 
 /// xの絶対値を持ち，かつsignの符号を持つ値を返す．
 /// 
-/// xが零の場合には，+0.0か-0.0のどちらかに従う．
+/// signが零の場合には，+0.0か-0.0のどちらかに従う．
 #[inline(always)]
 fn copysign<T: Float>(x: T, sign: T) -> T {
-    if sign.is_sign_positive() {
-         x.abs()
-    } else {
-        -x.abs()
-    }
+    x.abs() * sign.signum()
 }
 
 /// `fma` featureを有効にした場合は`s.mul_add(a, b)`として展開され，
@@ -777,10 +775,7 @@ fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
 
 /// 定義域外の値をカットして未定義動作を防ぐ．
 #[inline(always)]
-fn acos_safe<T: Float + FloatConst>(x: T) -> T {
-    if x.abs() < T::one() {
-        x.acos()
-    } else {
-        if x.is_sign_positive() { T::zero() } else { T::PI() }
-    }
+fn acos_safe<T: Float>(x: T) -> T {
+    // たまにacosが抜けると計算時間を把握しにくくなるから，この実装とする．
+    ( if x.abs() < T::one() { x } else { x.signum() } ).acos()
 }
