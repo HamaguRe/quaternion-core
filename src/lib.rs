@@ -74,7 +74,7 @@ where T: Float {
         ( ZERO_VECTOR(), T::zero() )
     } else {
         // 少しの誤差は見逃す．
-        let tmp = ( if norm_q_v < T::one() { norm_q_v } else { T::one() } ).asin();
+        let tmp = norm_q_v.min( T::one() ).asin();
         ( scale_vec(coef, q.1), copysign(tmp + tmp, q.0) ) // theta = 2*tmp
     }
 }
@@ -507,10 +507,9 @@ where T: Float {
 pub fn mul<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let a0_b = scale(a.0, b);
-    let b0_a1 = scale_vec(b.0, a.1);
     (
         a0_b.0 - dot_vec(a.1, b.1),
-        add_vec( add_vec(a0_b.1, b0_a1), cross_vec(a.1, b.1))
+        add_vec( scale_add_vec(b.0, a.1, a0_b.1), cross_vec(a.1, b.1) )
     )
 }
 
@@ -630,18 +629,16 @@ where T: Float {
 #[inline]
 pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
 where T: Float {
-    let half = cast(0.5);
+    let half: T = cast(0.5);
 
-    let dot_ab = dot_vec(a, b);
-    let norm_ab_square = dot_vec(a, a) * dot_vec(b, b);
-    let norm_a_cross_b = (norm_ab_square - dot_ab * dot_ab).sqrt();
-    let e = dot_ab / norm_ab_square.sqrt();
-    let tmp = e * half;
-    let v = (half - tmp).sqrt() / norm_a_cross_b;
+    let t = dot_vec(a, b);
+    let s_square = dot_vec(a, a) * dot_vec(b, b);
+    let e_half = half * (t / s_square.sqrt());
+    let v = ((half - e_half) / (s_square - t * t)).sqrt();
 
     // vがfiniteならeもfiniteである．
     if v.is_finite() {
-        ( (half + tmp).sqrt(), scale_vec(v, cross_vec(a, b)) )
+        ( (half + e_half).sqrt(), scale_vec(v, cross_vec(a, b)) )
     } else {
         IDENTITY()
     }
@@ -777,5 +774,5 @@ fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
 #[inline(always)]
 fn acos_safe<T: Float>(x: T) -> T {
     // たまにacosが抜けると計算時間を把握しにくくなるから，この実装とする．
-    ( if x.abs() < T::one() { x } else { x.signum() } ).acos()
+    ( x.abs().min( T::one() ) * x.signum() ).acos()
 }
