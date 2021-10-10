@@ -38,7 +38,7 @@ pub type DCM<T> = [Vector3<T>; 3];
 /// # arguments
 /// 
 /// * `axis`  : 回転軸
-/// * `angle` : 軸回りの回転角 [rad]
+/// * `angle` : 軸回りの回転角 \[rad\]
 #[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
@@ -54,7 +54,7 @@ where T: Float + FloatConst {
 
 /// Versorから回転軸（単位ベクトル）と軸回りの回転角\[rad\]を求める．
 /// 
-/// 恒等四元数を入力した場合，回転角は零[rad]，回転軸は零ベクトルを返す．
+/// 恒等四元数を入力した場合，回転角は零\[rad\]，回転軸は零ベクトルを返す．
 /// 
 /// Compute the rotation axis (unit vector) and the rotation angle\[rad\] 
 /// around the axis from the versor.
@@ -62,9 +62,9 @@ where T: Float + FloatConst {
 /// # Returns `(axis, angle)`
 /// 
 /// * `axis`  : 回転軸
-/// * `angle` : 軸回りの回転角 [rad]
+/// * `angle` : 軸回りの回転角 \[rad\]
 /// 
-/// Range of angle: `(-PI, PI]`
+/// Range of `angle`: `(-PI, PI]`
 #[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
 where T: Float {
@@ -172,7 +172,7 @@ where T: Float {
     ]
 }
 
-/// `z-y-x`系のオイラー角[rad]を四元数に変換する．
+/// `z-y-x`系のオイラー角\[rad\]を四元数に変換する．
 /// 
 /// ypr: [yaw, pitch, roll]
 /// 
@@ -205,7 +205,7 @@ where T: Float {
 /// ```
 /// とする．
 /// 
-/// ジンバルロック状態（pitch=±π/2 [rad]）では，roll=0 [rad]とする．
+/// ジンバルロック状態（pitch=±π/2 \[rad\]）では，roll=0 \[rad\]とする．
 /// 
 /// Aerospace angle/axis sequences is `[yaw, pitch, roll] / [z, y, x]`.  
 /// pitch angle is limited to [-π/2, π/2]．
@@ -266,7 +266,9 @@ where T: Float {
     }
 }
 
-/// 方向余弦行列を用いてベクトルを回転させる．
+/// 行列積
+/// 
+/// 方向余弦行列（DCM）を用いてベクトルを回転させる．
 #[inline]
 pub fn matrix_product<T>(m: DCM<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -673,7 +675,7 @@ where T: Float {
 
 /// Lerp (Linear interpolation)
 /// 
-/// Generate a quaternion that interpolate the route from `a` to `b` 
+/// Generate a quaternion that interpolate the shortest path from `a` to `b` 
 /// (The norm of `a` and `b` must be 1).
 /// The argument `t (0 <= t <= 1)` is the interpolation parameter.
 /// 
@@ -682,19 +684,29 @@ where T: Float {
 #[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    scale_add(t, sub(b, a), a)
+    // 最短経路で補間する
+    if dot(a, b).is_sign_negative() {
+        // bの符号を反転
+        if cfg!(feature = "fma") {
+            scale_add(-t, add(a, b), a)
+        } else {
+            sub( a, scale(t, add(a, b)) )
+        }
+    } else {
+        scale_add( t, sub(b, a), a)
+    }
 }
 
 /// Slerp (Spherical linear interpolation)
 /// 
-/// Generate a quaternion that interpolate the route from `a` to `b`.
+/// Generate a quaternion that interpolate the shortest path from `a` to `b`.
 /// The argument `t(0 <= t <= 1)` is the interpolation parameter.
 /// 
 /// The norm of `a` and `b` must be 1 (Versor).
 #[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    // 最短経路で補間
+    // 最短経路で補間する
     let mut dot = dot(a, b);
     if dot.is_sign_negative() {
         b = negate(b);
@@ -702,7 +714,7 @@ where T: Float {
     }
     // If the distance between quaternions is close enough, use lerp.
     if dot > cast(0.9995) {  // Approximation error < 0.017%
-        lerp(a, b, t)
+        normalize( scale_add(t, sub(b, a), a) )  // lerp
     } else {
         let omega = dot.acos();  // Angle between the two quaternions.
         let tmp = t * omega;

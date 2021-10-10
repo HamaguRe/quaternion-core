@@ -5,10 +5,6 @@ const EPSILON: f64 = 1e-15;  // libmを使う場合は1e-12に落とさないと
 
 
 // 二つの異なる方法でVersorの軸回りの回転角を求める．
-// 正の回転角を指定してVersorを生成した場合は以下の方法で回転角と回転軸を復元できるが，
-// 負の回転角を指定した場合には，回転角は正となり回転軸が反転するので完全には復元できない．
-// とはいえ，回転軸と回転角を合わせて考えれば三次元空間上での回転は変化していないので
-// そこまで大きな問題はないと思われる．
 #[test]
 fn test_get_angle() {
     // 適当なVersorを作る
@@ -84,6 +80,7 @@ fn test_axis_angle() {
 
 #[test]
 fn test_dcm() {
+    // 色々な値でテスト
     let v = [2.5, 1.0, -3.0];
     let diff = [0.2, -0.1, 2.5];
     let mut axis = [1.0, -0.2, 0.9];
@@ -102,6 +99,23 @@ fn test_dcm() {
         assert!( (rotated_q[1] - rotated_q_rest[1]).abs() < EPSILON );
         assert!( (rotated_q[2] - rotated_q_rest[2]).abs() < EPSILON );
     }
+
+    // a <--> b の相互変換が正しく行えるかテスト
+    let a = [1.0f64, 0.0, 0.0];
+    let b = normalize_vec([0.0f64, 1.0, 1.0]);
+    let q = rotate_a_to_b(a, b);
+
+    let m_a2b = to_dcm(q);
+    let b_check = matrix_product(m_a2b, a);
+    assert!( (b[0] - b_check[0]).abs() < EPSILON );
+    assert!( (b[1] - b_check[1]).abs() < EPSILON );
+    assert!( (b[2] - b_check[2]).abs() < EPSILON );
+
+    let m_b2a = to_dcm( conj(q) );
+    let a_check = matrix_product(m_b2a, b);
+    assert!( (a[0] - a_check[0]).abs() < EPSILON );
+    assert!( (a[1] - a_check[1]).abs() < EPSILON );
+    assert!( (a[2] - a_check[2]).abs() < EPSILON );
 }
 
 #[test]
@@ -227,29 +241,6 @@ fn test_mul() {
     assert!( (p.0 - q.0).abs() < EPSILON );
     for i in 0..3 {
         assert!( (p.1[i] - q.1[i]).abs() < EPSILON );
-    }
-}
-
-// 回転行列に変換してからベクトルを回転させる．
-#[test]
-fn test_rotate_by_dcm() {
-    let r: Vector3<f64> = [2.0, 2.0, 0.0];
-    let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
-
-    // 位置ベクトルの回転
-    let m = to_dcm(q);
-    let result = matrix_product(m, r);
-    let diff = sub_vec(result, [0.0, 2.0, -2.0]);
-    for i in 0..3 {
-        assert!( diff[i].abs() < EPSILON );
-    }
-
-    // 座標系の回転
-    let m = to_dcm( conj(q) );
-    let result = matrix_product(m, r);
-    let diff = sub_vec(result, [0.0, 2.0, 2.0]);
-    for i in 0..3 {
-        assert!( diff[i].abs() < EPSILON );
     }
 }
 
