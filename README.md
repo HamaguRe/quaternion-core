@@ -46,7 +46,7 @@ Cargo.toml
 ```toml
 [dependencies.quaternion]
 git = "https://github.com/HamaguRe/quaternion.git"
-version = "2.5"
+version = "2.6"
 
 # Uncomment if you wish to use "mul_add" method.
 #features = ["fma"]

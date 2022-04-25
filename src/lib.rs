@@ -174,6 +174,8 @@ where T: Float {
 
 /// `z-y-x`系のオイラー角\[rad\]を四元数に変換する．
 /// 
+/// オイラー角の範囲は[-π, π].
+/// 
 /// ypr: [yaw, pitch, roll]
 /// 
 /// Aerospace angle/axis sequences is `[yaw, pitch, roll] / [z, y, x]`.  
@@ -208,7 +210,7 @@ where T: Float {
 /// ジンバルロック状態（pitch=±π/2 \[rad\]）では，roll=0 \[rad\]とする．
 /// 
 /// Aerospace angle/axis sequences is `[yaw, pitch, roll] / [z, y, x]`.  
-/// pitch angle is limited to [-π/2, π/2]．
+/// pitch angle is limited to [-π/2, π/2]．yaw and roll angle range is [-π, π].
 /// 
 /// return: `[yaw, pitch, roll]`
 #[inline]
@@ -220,7 +222,7 @@ where T: Float + FloatConst {
         [m31, m32, m33],
     ] = to_dcm(q);
 
-    if m31.abs() < (T::one() - T::epsilon()) {
+    if m31.abs() < cast(0.9999984) {  // < 89.9[deg]
         [
             m21.atan2(m11), // yaw
             (-m31).asin(),  // pitch
