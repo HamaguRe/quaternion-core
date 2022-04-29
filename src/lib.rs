@@ -1,12 +1,13 @@
 //! Quaternion Libraly (f32 & f64)
-//! 
-//! 四元数に関する各種演算を提供する．
 
 #![no_std]
 #[cfg(feature = "std")]
 extern crate std;
 
 use num_traits::float::{Float, FloatConst};
+
+mod simd;
+use simd::FloatSimd;
 
 /// `[i, j, k]`
 pub type Vector3<T> = [T; 3];
@@ -145,7 +146,7 @@ where T: Float {
 /// とする．
 #[inline]
 pub fn to_dcm<T>(q: Quaternion<T>) -> DCM<T>
-where T: Float {
+where T: Float + FloatSimd<T> {
     let neg_one = -T::one();
     let two = cast(2.0);
 
@@ -215,7 +216,7 @@ where T: Float {
 /// return: `[yaw, pitch, roll]`
 #[inline]
 pub fn to_euler_angles<T>(q: Quaternion<T>) -> Vector3<T>
-where T: Float + FloatConst {
+where T: Float + FloatConst + FloatSimd<T> {
     let [
         [m11,   _, m13],
         [m21,   _, m23],
@@ -301,8 +302,8 @@ where T: Float {
 /// Calculate the sum of each element of Quaternion.
 #[inline]
 pub fn sum<T>(q: Quaternion<T>) -> T
-where T: Float {
-    q.0 + sum_vec(q.1)
+where T: FloatSimd<T> {
+    T::sum(q)
 }
 
 /// Calculate `a + b`
@@ -315,8 +316,8 @@ where T: Float {
 /// Calculate `a + b`
 #[inline]
 pub fn add<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    ( a.0 + b.0, add_vec(a.1, b.1) )
+where T: FloatSimd<T> {
+    T::add(a, b)
 }
 
 /// Calculate `a - b`
@@ -329,8 +330,8 @@ where T: Float {
 /// Calculate `a - b`
 #[inline]
 pub fn sub<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    ( a.0 - b.0, sub_vec(a.1, b.1) )
+where T: FloatSimd<T> {
+    T::sub(a, b)
 }
 
 /// Calculate `s * v`
@@ -347,8 +348,8 @@ where T: Float {
 /// Multiplication of scalar and quaternion.
 #[inline]
 pub fn scale<T>(s: T, q: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    ( s * q.0, scale_vec(s, q.1) )
+where T: FloatSimd<T> {
+    T::scale(s, q)
 }
 
 /// Calculate `s*a + b`
@@ -371,8 +372,8 @@ where T: Float {
 /// 有効にしなかった場合は単純な積和（s*a + b）に展開して計算する．
 #[inline]
 pub fn scale_add<T>(s: T, a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    ( mul_add(s, a.0, b.0), scale_add_vec(s, a.1, b.1) )
+where T: FloatSimd<T> {
+    T::scale_add(s, a, b)
 }
 
 /// Hadamard product of Vector.
@@ -389,8 +390,8 @@ where T: Float {
 /// Calculate `a・b`
 #[inline]
 pub fn hadamard<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    ( a.0 * b.0, hadamard_vec(a.1, b.1) )
+where T: FloatSimd<T> {
+    T::hadamard(a, b)
 }
 
 /// Hadamard product and Addiction of Vector.
@@ -411,8 +412,8 @@ where T: Float {
 /// Calculate `a・b + c`
 #[inline]
 pub fn hadamard_add<T>(a: Quaternion<T>, b: Quaternion<T>, c: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    ( mul_add(a.0, b.0, c.0), hadamard_add_vec(a.1, b.1, c.1) )
+where T: FloatSimd<T> {
+    T::hadamard_add(a, b, c)
 }
 
 /// Dot product of vector.
@@ -425,8 +426,8 @@ where T: Float {
 /// Dot product of quaternion.
 #[inline]
 pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
-where T: Float {
-    sum( hadamard(a, b) )
+where T: FloatSimd<T> {
+    T::dot(a, b)
 }
 
 /// Cross product.
@@ -450,7 +451,7 @@ where T: Float {
 /// Calculate L2 norm.
 #[inline]
 pub fn norm<T>(q: Quaternion<T>) -> T 
-where T: Float {
+where T: Float + FloatSimd<T> {
     dot(q, q).sqrt()
 }
 
@@ -473,7 +474,7 @@ where T: Float {
 /// Normalization of quaternion.
 #[inline]
 pub fn normalize<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float {
+where T: Float + FloatSimd<T> {
     scale( norm(q).recip(), q )
 }
 
@@ -491,8 +492,8 @@ where T: Float {
 /// return: `-q`
 #[inline]
 pub fn negate<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    ( -q.0, negate_vec(q.1) )
+where T: FloatSimd<T> {
+    T::negate(q)
 }
 
 /// 純虚四元数同士の積．
@@ -509,7 +510,7 @@ where T: Float {
 /// The product order is `ab (!= ba)`
 #[inline]
 pub fn mul<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: Float {
+where T: Float + FloatSimd<T> {
     let a0_b = scale(a.0, b);
     (
         a0_b.0 - dot_vec(a.1, b.1),
@@ -540,7 +541,7 @@ where T: Float {
 /// Compute the inverse quaternion.
 #[inline]
 pub fn inv<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float {
+where T: Float + FloatSimd<T> {
     scale( dot(q, q).recip(), conj(q) )
 }
 
@@ -685,7 +686,7 @@ where T: Float {
 /// it increases the computational complexity.
 #[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
-where T: Float {
+where T: Float + FloatSimd<T> {
     // 最短経路で補間する
     if dot(a, b).is_sign_negative() {
         // bの符号を反転
@@ -707,7 +708,7 @@ where T: Float {
 /// The norm of `a` and `b` must be 1 (Versor).
 #[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
-where T: Float {
+where T: Float + FloatSimd<T> {
     // 最短経路で補間する
     let mut dot = dot(a, b);
     if dot.is_sign_negative() {

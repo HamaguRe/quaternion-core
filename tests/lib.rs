@@ -1,3 +1,5 @@
+// $ cargo test --features simd --features fma
+
 use quaternion::*;
 
 const PI: f64 = std::f64::consts::PI;
