@@ -4,10 +4,10 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-use num_traits::float::{Float, FloatConst};
+use num_traits::{Float, FloatConst};
 
 mod simd;
-use simd::FloatSimd;
+pub use simd::FloatSimd;
 
 /// `[i, j, k]`
 pub type Vector3<T> = [T; 3];
@@ -76,7 +76,7 @@ where T: Float {
     } else {
         // 少しの誤差は見逃す．
         let tmp = norm_q_v.min( T::one() ).asin();
-        ( scale_vec(coef, q.1), copysign(tmp + tmp, q.0) ) // theta = 2*tmp
+        ( scale_vec(coef, q.1), (tmp + tmp).copysign(q.0) ) // theta = 2*tmp
     }
 }
 
@@ -231,9 +231,9 @@ where T: Float + FloatConst + FloatSimd<T> {
         ]
     } else {  // ジンバルロック
         [
-            m23.atan2(m13),                  // yaw
-            copysign(T::FRAC_PI_2(), -m31),  // pitch
-            T::zero(),                       // roll
+            m23.atan2(m13),                 // yaw
+            T::FRAC_PI_2().copysign(-m31),  // pitch
+            T::zero(),                      // roll
         ]
     }
 }
@@ -750,14 +750,6 @@ fn ZERO_VECTOR<T: Float>() -> Vector3<T> {
 #[inline(always)]
 fn cast<T: Float>(x: f64) -> T {
     num_traits::cast::<f64, T>(x).unwrap()
-}
-
-/// xの絶対値を持ち，かつsignの符号を持つ値を返す．
-/// 
-/// signが零の場合には，+0.0か-0.0のどちらかに従う．
-#[inline(always)]
-fn copysign<T: Float>(x: T, sign: T) -> T {
-    x.abs() * sign.signum()
 }
 
 /// `fma` featureを有効にした場合は`s.mul_add(a, b)`として展開され，
