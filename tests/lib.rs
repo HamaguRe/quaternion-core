@@ -1,6 +1,6 @@
 // $ cargo test --features simd --features fma
 
-use quaternion::*;
+use quaternion_core::*;
 
 const PI: f64 = std::f64::consts::PI;
 const EPSILON: f64 = 1e-15;  // libmを使う場合は1e-12に落とさないと通らない

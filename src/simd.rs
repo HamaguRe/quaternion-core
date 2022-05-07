@@ -15,6 +15,7 @@ use std::arch::x86::*;
 #[cfg(all(feature = "std", feature = "simd", target_arch = "x86_64"))]
 use std::arch::x86_64::*;
 
+/// Provides a SIMD implementation with the `std::arch` module.
 pub trait FloatSimd<T> {
     fn sum(q: Quaternion<T>) -> T;
     fn add(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>;

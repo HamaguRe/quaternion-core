@@ -27,19 +27,11 @@ pub type Quaternion<T> = (T, Vector3<T>);
 pub type DCM<T> = [Vector3<T>; 3];
 
 
-/// 回転角\[rad\]と軸ベクトルを指定してVersorを生成する．
+/// Generate Versor by specifying rotation `angle`\[rad\] and `axis` vector.
 /// 
-/// axisは単位ベクトルでなくても良い．  
-/// 零ベクトルを入力した場合は，恒等四元数を返す．
+/// The `axis` does not have to be a unit vector.
 /// 
-/// Generate Versor by specifying rotation angle\[rad\] and axis vector.  
-/// The "axis" need not be unit vector.  
 /// If you enter a zero vector, it returns an identity quaternion.
-/// 
-/// # arguments
-/// 
-/// * `axis`  : 回転軸
-/// * `angle` : 軸回りの回転角 \[rad\]
 #[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
@@ -53,17 +45,11 @@ where T: Float + FloatConst {
     }
 }
 
-/// Versorから回転軸（単位ベクトル）と軸回りの回転角\[rad\]を求める．
-/// 
-/// 恒等四元数を入力した場合，回転角は零\[rad\]，回転軸は零ベクトルを返す．
-/// 
-/// Compute the rotation axis (unit vector) and the rotation angle\[rad\] 
+/// Compute the rotation `axis` (unit vector) and the rotation `angle`\[rad\] 
 /// around the axis from the versor.
 /// 
-/// # Returns `(axis, angle)`
-/// 
-/// * `axis`  : 回転軸
-/// * `angle` : 軸回りの回転角 \[rad\]
+/// If identity quaternion is entered, `angle` returns zero and 
+/// the `axis` returns a zero vector.
 /// 
 /// Range of `angle`: `(-PI, PI]`
 #[inline]
@@ -80,16 +66,16 @@ where T: Float {
     }
 }
 
-/// 位置ベクトル回転（`q v q*`）を表す方向余弦行列をVersorに変換する．
+/// Converts the direction cosine matrix representing the 
+/// vector rotation (`q v q*`) to versor.
 /// 
-/// 座標系回転（`q* v q`）を表す方向余弦行列を変換する場合には，
-/// ```ignore
+/// To convert from a direction cosine matrix representing 
+/// a frame rotation (`q* v q`), do the following:
+/// ```
+/// # use quaternion_core::{from_dcm, to_dcm, conj};
+/// # let dcm = to_dcm((1.0, [0.0; 3]));
 /// let q = conj( from_dcm(dcm) );
 /// ```
-/// とする．
-/// 
-/// Generate versor from direction cosine matrix, 
-/// representing rotation of position vector.
 #[inline]
 pub fn from_dcm<T>(m: DCM<T>) -> Quaternion<T>
 where T: Float {
@@ -137,13 +123,16 @@ where T: Float {
     (q0, [q1, q2, q3])
 }
 
-/// 位置ベクトル回転（`q v q*`）を表すVersorを，方向余弦行列に変換する．
+/// Converts versor, representing the vector rotation (`q v q*`), 
+/// to a direction cosine matrix.
 /// 
-/// 座標系回転（`q* v q`）を表すVersorを変換する場合には，
-/// ```ignore
+/// When convert a versor representing a 
+/// frame rotation (`q* v q`), do the following:
+/// ```
+/// # use quaternion_core::{to_dcm, conj};
+/// # let q = (1.0, [0.0; 3]);
 /// let dcm = to_dcm( conj(q) );
 /// ```
-/// とする．
 #[inline]
 pub fn to_dcm<T>(q: Quaternion<T>) -> DCM<T>
 where T: Float + FloatSimd<T> {
@@ -173,13 +162,13 @@ where T: Float + FloatSimd<T> {
     ]
 }
 
-/// `z-y-x`系のオイラー角\[rad\]を四元数に変換する．
+/// Convert the `z-y-x` system Euler angles \[rad\] to quaternion.
 /// 
-/// オイラー角の範囲は[-π, π].
+/// The range of Euler angles is `[-π, π]`.
+/// 
+/// Angle/Axis sequences is `[yaw, pitch, roll] / [z, y, x]`.
 /// 
 /// ypr: [yaw, pitch, roll]
-/// 
-/// Aerospace angle/axis sequences is `[yaw, pitch, roll] / [z, y, x]`.  
 #[inline]
 pub fn from_euler_angles<T>(ypr: Vector3<T>) -> Quaternion<T> 
 where T: Float {
@@ -200,18 +189,20 @@ where T: Float {
     (q0, [q1, q2, q3])
 }
 
-/// 位置ベクトル回転（`q v q*`）を表すVersorを`z-y-x系`のオイラー角\[rad\]に変換する．
+/// Convert versor, representing a vector rotation (`q v q*`), 
+/// to `z-y-x` system Euler angles \[rad\].
 /// 
-/// 座標系回転（`q* v q`）を表すVersorを変換する場合には，
-/// ```ignore
-/// let euler_angles = to_euler_angle( conj(q) );
+/// In the gimbal locked state (`pitch=±π/2` \[rad\]), `roll=0` \[rad\].
+/// 
+/// Angle/Axis sequences is `[yaw, pitch, roll] / [z, y, x]`.
+/// pitch angle is limited to `[-π/2, π/2]`．yaw and roll angle range is `[-π, π]`.
+/// 
+/// To convert a Versor representing a frame rotation (`q* v q`), do the following:
 /// ```
-/// とする．
-/// 
-/// ジンバルロック状態（pitch=±π/2 \[rad\]）では，roll=0 \[rad\]とする．
-/// 
-/// Aerospace angle/axis sequences is `[yaw, pitch, roll] / [z, y, x]`.  
-/// pitch angle is limited to [-π/2, π/2]．yaw and roll angle range is [-π, π].
+/// # use quaternion_core::{to_euler_angles, conj};
+/// # let q = (1.0f64, [0.0; 3]);
+/// let euler_angles = to_euler_angles( conj(q) );
+/// ```
 /// 
 /// return: `[yaw, pitch, roll]`
 #[inline]
@@ -238,9 +229,12 @@ where T: Float + FloatConst + FloatSimd<T> {
     }
 }
 
-/// 回転ベクトル(rotation vector)をVersorに変換
+/// Convert rotation vector to Versor.
 /// 
-/// 回転ベクトルはそれ自体が回転軸を表し，ノルムは軸回りの回転角(0, 2π)を表す．
+/// The rotation vector itself represents the axis of rotation, 
+/// and the norm represents the angle of rotation around the axis.
+/// 
+/// `angle` range is: `(0, 2π)`
 #[inline]
 pub fn from_rotation_vector<T>(v: Vector3<T>) -> Quaternion<T>
 where T: Float {
@@ -254,9 +248,12 @@ where T: Float {
     }
 }
 
-/// Versorを回転ベクトル(rotation vector)に変換
+/// Convert Versor to rotation vector.
 /// 
-/// 回転ベクトルはそれ自体が回転軸を表し，ノルムは軸回りの回転角(0, 2π)を表す．
+/// The rotation vector itself represents the axis of rotation, 
+/// and the norm represents the angle of rotation around the axis.
+/// 
+/// `angle` range is: `(0, 2π)`
 #[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
@@ -269,9 +266,9 @@ where T: Float {
     }
 }
 
-/// 行列積
+/// Matrix product.
 /// 
-/// 方向余弦行列（DCM）を用いてベクトルを回転させる．
+/// Rotate vectors using a directional cosine matrix.
 #[inline]
 pub fn matrix_product<T>(m: DCM<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -280,16 +277,6 @@ where T: Float {
         dot_vec(m[1], v),
         dot_vec(m[2], v),
     ]
-}
-
-/// 右手系と左手系の四元数を変換
-/// 
-/// x, z軸の向きはそのままで，y軸と全ての軸回りの回転方向を反転
-#[inline]
-pub fn system_trans<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    // 実部と，ベクトル部の要素どれか一つの符号を反転させれば良い
-    ( -q.0, [ q.1[0], -q.1[1], q.1[2] ] )
 }
 
 /// Calculate the sum of each element of Vector3.
@@ -354,8 +341,8 @@ where T: FloatSimd<T> {
 
 /// Calculate `s*a + b`
 /// 
-/// `fma` featureを有効にした場合は`mul_add`メソッドを用いてFMA計算を行い，
-/// 有効にしなかった場合は単純な積和（s*a + b）に展開して計算する．
+/// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
+/// If not enabled, it's computed by unfused multiply-add (s*a + b).
 #[inline]
 pub fn scale_add_vec<T>(s: T, a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -368,8 +355,8 @@ where T: Float {
 
 /// Calculate `s*a + b`
 /// 
-/// `fma` featureを有効にした場合は`mul_add`メソッドを用いてFMA計算を行い，
-/// 有効にしなかった場合は単純な積和（s*a + b）に展開して計算する．
+/// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
+/// If not enabled, it's computed by unfused multiply-add (s*a + b).
 #[inline]
 pub fn scale_add<T>(s: T, a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: FloatSimd<T> {
@@ -397,6 +384,9 @@ where T: FloatSimd<T> {
 /// Hadamard product and Addiction of Vector.
 /// 
 /// Calculate `a・b + c`
+/// 
+/// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
+/// If not enabled, it's computed by unfused multiply-add (s*a + b).
 #[inline]
 pub fn hadamard_add_vec<T>(a: Vector3<T>, b: Vector3<T>, c: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -410,6 +400,9 @@ where T: Float {
 /// Hadamard product and Addiction of Quaternion.
 /// 
 /// Calculate `a・b + c`
+/// 
+/// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
+/// If not enabled, it's computed by unfused multiply-add (s*a + b).
 #[inline]
 pub fn hadamard_add<T>(a: Quaternion<T>, b: Quaternion<T>, c: Quaternion<T>) -> Quaternion<T>
 where T: FloatSimd<T> {
@@ -457,8 +450,6 @@ where T: Float + FloatSimd<T> {
 
 /// Normalization of vector3.
 /// 
-/// 零ベクトルを入力した場合は零ベクトルを返す．
-/// 
 /// If you enter a zero vector, it returns a zero vector.
 #[inline]
 pub fn normalize_vec<T>(v: Vector3<T>) -> Vector3<T>
@@ -478,7 +469,7 @@ where T: Float + FloatSimd<T> {
     scale( norm(q).recip(), q )
 }
 
-/// ベクトルの符号を反転．
+/// Invert the sign of a vector.
 /// 
 /// return: `-v`
 #[inline]
@@ -487,7 +478,7 @@ where T: Float {
     [ -v[0], -v[1], -v[2] ]
 }
 
-/// 四元数の符号を反転．
+/// Invert the sign of a quaternion.
 /// 
 /// return: `-q`
 #[inline]
@@ -496,7 +487,7 @@ where T: FloatSimd<T> {
     T::negate(q)
 }
 
-/// 純虚四元数同士の積．
+/// Product of pure quaternions.
 /// 
 /// `ab ≡ -a・b + a×b` (!= ba)
 #[inline]
@@ -518,8 +509,6 @@ where T: Float + FloatSimd<T> {
     )
 }
 
-/// 共役四元数を求める．
-/// 
 /// Compute the conjugate quaternion.
 #[inline]
 pub fn conj<T>(q: Quaternion<T>) -> Quaternion<T>
@@ -527,8 +516,6 @@ where T: Float {
     ( q.0, negate_vec(q.1) )
 }
 
-/// 逆純虚四元数を求める．
-/// 
 /// Compute the inverse pure quaternion.
 #[inline]
 pub fn inv_vec<T>(v: Vector3<T>) -> Vector3<T>
@@ -536,8 +523,6 @@ where T: Float {
     scale_vec( dot_vec(v, v).recip(), negate_vec(v) )
 }
 
-/// 逆四元数を求める．
-/// 
 /// Compute the inverse quaternion.
 #[inline]
 pub fn inv<T>(q: Quaternion<T>) -> Quaternion<T>
@@ -576,8 +561,10 @@ where T: Float {
 
 /// Natural logarithm of versor.
 /// 
-/// Versorであることが保証されている場合にはln関数よりも計算量を減らせる．
-/// 実部は必ず0になるので省略．
+/// If it is guaranteed to be a versor, it is less computationally 
+/// expensive than the `ln` function.
+/// 
+/// Only the vector part is returned since the real part is always zero.
 #[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
@@ -598,7 +585,8 @@ where T: Float {
 
 /// Power function of versor.
 /// 
-/// Versorであることが保証されている場合にはpow関数よりも計算量を減らせる．
+/// If it is guaranteed to be a versor, it is less computationally 
+/// expensive than the `pow` function. 
 #[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
@@ -606,7 +594,7 @@ where T: Float {
     ( cos, scale_vec(sin / norm_vec(q.1), q.1) )
 }
 
-/// 位置ベクトルの回転
+/// Rotation of vector (Point Rotation - Frame Fixed)
 /// 
 /// `q v q*  (||q|| = 1)`
 #[inline]
@@ -616,7 +604,7 @@ where T: Float {
     scale_add_vec(cast(2.0), cross_vec(q.1, tmp), v)
 }
 
-/// 座標系の回転
+/// Rotation of frame (Frame Rotation - Point Fixed)
 /// 
 /// `q* v q  (||q|| = 1)`
 #[inline]
@@ -626,10 +614,8 @@ where T: Float {
     scale_add_vec(cast(2.0), cross_vec(tmp, q.1), v)
 }
 
-/// 位置ベクトル`a`を 位置ベクトル`b`と同じ場所へ最短距離で回転させるVersorを求める．
-/// 零ベクトルを入力した場合は，恒等四元数を返す．
-/// 
 /// Calculate a versor to rotate from vector `a` to `b`.
+/// 
 /// If you enter a zero vector, it returns an identity quaternion.
 #[inline]
 pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
@@ -649,13 +635,14 @@ where T: Float {
     }
 }
 
-/// 位置ベクトル`a`を 位置ベクトル`b`と同じ場所へ最短距離で回転させるVersorを求める．
-/// パラメータ`t`によって`a`から`b`までの移動量を調整することができ，
-/// t=1のとき完全にbの位置まで移動する．
+/// Calculate a versor to rotate from vector `a` to `b`.
 /// 
-/// 零ベクトルを入力した場合は，恒等四元数を返す．
+/// The parameter `t` adjusts the amount of movement from `a` to `b`, 
+/// so that When `t=1`, it moves to position `b` completely.
 /// 
-/// 常にt=1とするなら`rotate_a_to_b`を使用したほうが計算量が少なく済む．
+/// If you enter a zero vector, it returns an identity quaternion.
+/// 
+/// If `t=1` at all times, it is less computationally expensive to use `rotate_a_to_b` function.
 #[inline]
 pub fn rotate_a_to_b_param<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
 where T: Float {
@@ -687,6 +674,11 @@ where T: Float {
 #[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatSimd<T> {
+    debug_assert!(
+        t >= T::zero() && t <= T::one(), 
+        "Parameter `t` must be in the range [0, 1]."
+    );
+
     // 最短経路で補間する
     if dot(a, b).is_sign_negative() {
         // bの符号を反転
@@ -709,6 +701,11 @@ where T: Float + FloatSimd<T> {
 #[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatSimd<T> {
+    debug_assert!(
+        t >= T::zero() && t <= T::one(), 
+        "Parameter `t` must be in the range [0, 1]."
+    );
+    
     // 最短経路で補間する
     let mut dot = dot(a, b);
     if dot.is_sign_negative() {
