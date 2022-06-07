@@ -3,41 +3,47 @@
 use quaternion_core::*;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 1e-15;  // libmを使う場合は1e-12に落とさないと通らない
+const EPSILON: f64 = 1e-12;
 
 
-// 二つの異なる方法でVersorの軸回りの回転角を求める．
+// 3通りの方法でVersorの軸回りの回転角を求める．
+//
+// 方法1と2は事前に正規化をしておく必要があるが，方法3は実部とベクトル部の比較を
+// 行っているため事前の正規化が不要という特徴がある．
+// 
+// どれで求めても良いが，一般的には[-π, π]の範囲で計算した方が扱い易いのと
+// atanの計算時間はasinやacosに比べて2〜3倍長いので方法2がおすすめ．
 #[test]
 fn test_get_angle() {
     // 適当なVersorを作る
-    let axis = [0.0, 0.0, 2.0];
-    let angle = -1.5 * PI;
+    let axis = [0.0, 1.0, 1.0];
+    let angle = -0.5 * PI;
     let q = from_axis_angle(axis, angle);
     assert!( ( norm(q) - 1.0 ).abs() < EPSILON );
 
     // 方法1
     // これが一番シンプル．実部のみを使うので計算量が少ない．
     // 計算精度が一つの変数に依存してしまうのは良くない...？
-    // 0 <= angle1 <= 2π
+    // range: [0, 2π]
     let angle1 = 2.0 * q.0.acos();
 
     // 方法2
     // 実部の符号を反映することで幾何学的には方法1と同じ結果が得られる．
     // 実部と虚部両方の値を使っているのでなんとなく気持ちが良い．
-    // -π < angle2 <= π
+    // range: (-π, π]
     let angle2 = ( 2.0 * norm_vec(q.1).asin() ).copysign(q.0);
 
     // 方法3
     // 普通にゼロ除算が発生するが，atanなので計算できる．
-    // -π < angle3 < π
-    let angle3 = 2.0 * (norm_vec(q.1) / q.0).atan();
+    // range: (-π, π)
+    let angle3 = 2.0 * (norm_vec(q.1) / q.0).atan();  // これで正しい．atan2だと値域がおかしくなる．
 
     println!("axis: {:?}", normalize_vec(q.1));
-    println!("angle1: {}PI, angle2: {}PI", angle1/PI, angle2/PI);
+    println!("angle1: {}PI, angle2: {}PI, angle3: {}PI", angle1/PI, angle2/PI, angle3/PI);
 
-    assert!( (angle1 - 1.5*PI).abs() < EPSILON );
-    assert!( (angle2 + 0.5*PI).abs() < EPSILON );
-    assert!( (angle3 + 0.5*PI).abs() < EPSILON );
+    assert!( (angle1 - 0.5*PI).abs() < EPSILON );
+    assert!( (angle2 - 0.5*PI).abs() < EPSILON );
+    assert!( (angle3 - 0.5*PI).abs() < EPSILON );
 }
 
 #[test]
@@ -58,14 +64,10 @@ fn test_axis_angle() {
 
     // 軸ベクトルのチェック
     if angle.is_sign_positive() {
-        for i in 0..3 {
-            assert!( (re_axis[i] - axis[i]).abs() < EPSILON );
-        }
+        assert_eq_vec(re_axis, axis);
     } else {
         // 負の回転角の場合には回転軸が反転する
-        for i in 0..3 {
-            assert!( (re_axis[i] + axis[i]).abs() < EPSILON );
-        }
+        assert_eq_vec(re_axis, negate_vec(axis));
     }
 
     // 回転角のチェック
@@ -94,12 +96,9 @@ fn test_dcm() {
 
         assert!( ( norm(q_rest) - 1.0 ).abs() < EPSILON );
     
-        let rotated_q = vector_rotation(q, v);
-        let rotated_q_rest = vector_rotation(q_rest, v);
-    
-        assert!( (rotated_q[0] - rotated_q_rest[0]).abs() < EPSILON );
-        assert!( (rotated_q[1] - rotated_q_rest[1]).abs() < EPSILON );
-        assert!( (rotated_q[2] - rotated_q_rest[2]).abs() < EPSILON );
+        let rotated_q = point_rotation(q, v);
+        let rotated_q_rest = point_rotation(q_rest, v);
+        assert_eq_vec(rotated_q, rotated_q_rest);
     }
 
     // a <--> b の相互変換が正しく行えるかテスト
@@ -109,28 +108,299 @@ fn test_dcm() {
 
     let m_a2b = to_dcm(q);
     let b_check = matrix_product(m_a2b, a);
-    assert!( (b[0] - b_check[0]).abs() < EPSILON );
-    assert!( (b[1] - b_check[1]).abs() < EPSILON );
-    assert!( (b[2] - b_check[2]).abs() < EPSILON );
+    assert_eq_vec(b, b_check);
 
     let m_b2a = to_dcm( conj(q) );
     let a_check = matrix_product(m_b2a, b);
-    assert!( (a[0] - a_check[0]).abs() < EPSILON );
-    assert!( (a[1] - a_check[1]).abs() < EPSILON );
-    assert!( (a[2] - a_check[2]).abs() < EPSILON );
+    assert_eq_vec(a, a_check);
+}
+
+// ベタ実装の計算結果と比較して実装が正しいことを確認．
+// オイラー角 --> 四元数の変換では特異点は生じない．
+#[test]
+fn test_from_intrinsic_euler_angles() {
+    use RotationType::*;
+    use RotationSequence::*;
+
+    //let angles = [-PI/1.0, PI/4.0, PI/2.5];
+    let angles = [1.8*PI, 1.5*PI, 2.0*PI];
+
+    // ------ Proper Euler angles ------ //
+    // ZXZ
+    let q = from_euler_angles(Intrinsic, ZXZ, angles);
+    let z1 = from_axis_angle([0.0, 0.0, 1.0], angles[0]);
+    let x  = from_axis_angle([1.0, 0.0, 0.0], angles[1]);
+    let z2 = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+    let q_check = mul( mul(z1, x), z2 );
+    assert_eq_quat(q, q_check);
+
+    // XYX
+    let q = from_euler_angles(Intrinsic, XYX, angles);
+    let x1 = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+    let y  = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+    let x2 = from_axis_angle([1.0, 0.0, 0.0], angles[2]);
+    let q_check = mul( mul(x1, y), x2 );
+    assert_eq_quat(q, q_check);
+
+    // YZY
+    let q = from_euler_angles(Intrinsic, YZY, angles);
+    let y1 = from_axis_angle([0.0, 1.0, 0.0], angles[0]);
+    let z  = from_axis_angle([0.0, 0.0, 1.0], angles[1]);
+    let y2 = from_axis_angle([0.0, 1.0, 0.0], angles[2]);
+    let q_check = mul( mul(y1, z), y2 );
+    assert_eq_quat(q, q_check);
+
+    // ZYZ
+    let q = from_euler_angles(Intrinsic, ZYZ, angles);
+    let z1 = from_axis_angle([0.0, 0.0, 1.0], angles[0]);
+    let y  = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+    let z2 = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+    let q_check = mul( mul(z1, y), z2 );
+    assert_eq_quat(q, q_check);
+
+    // XZX
+    let q = from_euler_angles(Intrinsic, XZX, angles);
+    let x1 = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+    let z  = from_axis_angle([0.0, 0.0, 1.0], angles[1]);
+    let x2 = from_axis_angle([1.0, 0.0, 0.0], angles[2]);
+    let q_check = mul( mul(x1, z), x2 );
+    assert_eq_quat(q, q_check);
+
+    // YXY
+    let q = from_euler_angles(Intrinsic, YXY, angles);
+    let y1 = from_axis_angle([0.0, 1.0, 0.0], angles[0]);
+    let x  = from_axis_angle([1.0, 0.0, 0.0], angles[1]);
+    let y2 = from_axis_angle([0.0, 1.0, 0.0], angles[2]);
+    let q_check = mul( mul(y1, x), y2 );
+    assert_eq_quat(q, q_check);
+
+    // ------ Tait–Bryan angles ------ //
+    // XYZ
+    let q = from_euler_angles(Intrinsic, XYZ, angles);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+    let q_check = mul( mul(x, y), z );
+    assert_eq_quat(q, q_check);
+
+    // YZX
+    let q = from_euler_angles(Intrinsic, YZX, angles);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[0]);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[1]);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[2]);
+    let q_check = mul( mul(y, z), x );
+    assert_eq_quat(q, q_check);
+
+    // ZXY
+    let q = from_euler_angles(Intrinsic, ZXY, angles);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[0]);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[1]);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[2]);
+    let q_check = mul( mul(z, x), y );
+    assert_eq_quat(q, q_check);
+
+    // XZY
+    let q = from_euler_angles(Intrinsic, XZY, angles);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[1]);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[2]);
+    let q_check = mul( mul(x, z), y );
+    assert_eq_quat(q, q_check);
+
+    // ZYX
+    let q = from_euler_angles(Intrinsic, ZYX, angles);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[0]);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[2]);
+    let q_check = mul( mul(z, y), x );
+    assert_eq_quat(q, q_check);
+
+    // YXZ
+    let q = from_euler_angles(Intrinsic, YXZ, angles);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[0]);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[1]);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+    let q_check = mul( mul(y, x), z );
+    assert_eq_quat(q, q_check);
 }
 
 #[test]
-fn test_euler() {
-    let yaw_ori   = PI / 4.0;
-    let pitch_ori = PI / 4.0;
-    let roll_ori  = PI / 4.0;
-    let q = from_euler_angles([yaw_ori, pitch_ori, roll_ori]);
-    
-    let [yaw, pitch, roll] = to_euler_angles(q);
-    assert!((yaw   - yaw_ori).abs()   < EPSILON);
-    assert!((pitch - pitch_ori).abs() < EPSILON);
-    assert!((roll  - roll_ori).abs()  < EPSILON);
+fn test_from_extrinsic_euler_angles() {
+    use RotationType::*;
+    use RotationSequence::*;
+
+    let angles = [-PI/3.6, PI/4.5, -PI/2.5];
+
+    // ------ Proper Euler angles ------ //
+    // ZXZ
+    let q = from_euler_angles(Extrinsic, ZXZ, angles);
+    let z1 = from_axis_angle([0.0, 0.0, 1.0], angles[0]);
+    let x  = from_axis_angle([1.0, 0.0, 0.0], angles[1]);
+    let z2 = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+    let q_check = mul( mul(z2, x), z1 );
+    assert_eq_quat(q, q_check);
+
+    // XYX
+    let q = from_euler_angles(Extrinsic, XYX, angles);
+    let x1 = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+    let y  = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+    let x2 = from_axis_angle([1.0, 0.0, 0.0], angles[2]);
+    let q_check = mul( mul(x2, y), x1 );
+    assert_eq_quat(q, q_check);
+
+    // YZY
+    let q = from_euler_angles(Extrinsic, YZY, angles);
+    let y1 = from_axis_angle([0.0, 1.0, 0.0], angles[0]);
+    let z  = from_axis_angle([0.0, 0.0, 1.0], angles[1]);
+    let y2 = from_axis_angle([0.0, 1.0, 0.0], angles[2]);
+    let q_check = mul( mul(y2, z), y1 );
+    assert_eq_quat(q, q_check);
+
+    // ZYZ
+    let q = from_euler_angles(Extrinsic, ZYZ, angles);
+    let z1 = from_axis_angle([0.0, 0.0, 1.0], angles[0]);
+    let y  = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+    let z2 = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+    let q_check = mul( mul(z2, y), z1 );
+    assert_eq_quat(q, q_check);
+
+    // XZX
+    let q = from_euler_angles(Extrinsic, XZX, angles);
+    let x1 = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+    let z  = from_axis_angle([0.0, 0.0, 1.0], angles[1]);
+    let x2 = from_axis_angle([1.0, 0.0, 0.0], angles[2]);
+    let q_check = mul( mul(x2, z), x1 );
+    assert_eq_quat(q, q_check);
+
+    // YXY
+    let q = from_euler_angles(Extrinsic, YXY, angles);
+    let y1 = from_axis_angle([0.0, 1.0, 0.0], angles[0]);
+    let x  = from_axis_angle([1.0, 0.0, 0.0], angles[1]);
+    let y2 = from_axis_angle([0.0, 1.0, 0.0], angles[2]);
+    let q_check = mul( mul(y2, x), y1 );
+    assert_eq_quat(q, q_check);
+
+    // ------ Tait–Bryan angles ------ //
+    // XYZ
+    let q = from_euler_angles(Extrinsic, XYZ, angles);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+    let q_check = mul( mul(z, y), x );
+    assert_eq_quat(q, q_check);
+
+    // YZX
+    let q = from_euler_angles(Extrinsic, YZX, angles);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[0]);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[1]);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[2]);
+    let q_check = mul( mul(x, z), y );
+    assert_eq_quat(q, q_check);
+
+    // ZXY
+    let q = from_euler_angles(Extrinsic, ZXY, angles);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[0]);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[1]);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[2]);
+    let q_check = mul( mul(y, x), z );
+    assert_eq_quat(q, q_check);
+
+    // XZY
+    let q = from_euler_angles(Extrinsic, XZY, angles);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[1]);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[2]);
+    let q_check = mul( mul(y, z), x );
+    assert_eq_quat(q, q_check);
+
+    // ZYX
+    let q = from_euler_angles(Extrinsic, ZYX, angles);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[0]);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[2]);
+    let q_check = mul( mul(x, y), z );
+    assert_eq_quat(q, q_check);
+
+    // YXZ
+    let q = from_euler_angles(Extrinsic, YXZ, angles);
+    let y = from_axis_angle([0.0, 1.0, 0.0], angles[0]);
+    let x = from_axis_angle([1.0, 0.0, 0.0], angles[1]);
+    let z = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+    let q_check = mul( mul(z, x), y );
+    assert_eq_quat(q, q_check);
+}
+
+/// 四元数 ---> オイラー角の変換が正しく出来ているか確認する．
+fn check_quat_to_euler(rt: RotationType, rs: RotationSequence, angles: Vector3<f64>) {
+    let q = from_euler_angles(rt, rs, angles);
+    let q2e = to_euler_angles(rt, rs, q);  // <-- ここで変換している
+    println!("rt: {:?}, rs: {:?}", rt, rs);
+    println!("angles: {:?}", angles);
+    println!("q2e: {:?}", q2e);
+
+    // 元のオイラー角と全く同じものを復元することは出来ないけど，回転としては同じものを表している．
+    // 角度でチェックするよりベクトルの回転で見たほうが楽．
+    let v = [1.0, 0.5, -0.2];
+    let r_angles = point_rotation(q, v);
+    let r_result = point_rotation(from_euler_angles(rt, rs, q2e), v);
+    println!("roteta angles: {:?}", r_angles);
+    println!("roteta q2e: {:?}", r_result);
+    assert_eq_vec(r_angles, r_result);
+    // 向きの異なるベクトルで再チェック
+    let v = [-0.2, 1.5, 0.8];
+    let r_angles = point_rotation(q, v);
+    let r_result = point_rotation(from_euler_angles(rt, rs, q2e), v);
+    println!("roteta angles: {:?}", r_angles);
+    println!("roteta q2e: {:?}", r_result);
+    assert_eq_vec(r_angles, r_result);
+}
+
+#[test]
+fn test_to_intrinsic_euler_angles() {
+    use RotationType::Intrinsic;
+    use RotationSequence::*;
+
+    let angles = [PI/1.6, PI/1.5, PI/2.5];
+
+    // ------ Proper Euler angles ------ //
+    check_quat_to_euler(Intrinsic, ZXZ, angles);
+    check_quat_to_euler(Intrinsic, XYX, angles);
+    check_quat_to_euler(Intrinsic, YZY, angles);
+    check_quat_to_euler(Intrinsic, ZYZ, angles);
+    check_quat_to_euler(Intrinsic, XZX, angles);
+    check_quat_to_euler(Intrinsic, YXY, angles);
+
+    // ------ Tait–Bryan angles ------ //
+    check_quat_to_euler(Intrinsic, XYZ, angles);
+    check_quat_to_euler(Intrinsic, YZX, angles);
+    check_quat_to_euler(Intrinsic, ZXY, angles);
+    check_quat_to_euler(Intrinsic, XZY, angles);
+    check_quat_to_euler(Intrinsic, ZYX, angles);
+    check_quat_to_euler(Intrinsic, YXZ, angles);
+}
+
+#[test]
+fn test_to_extrinsic_euler_angles() {
+    use RotationType::Extrinsic;
+    use RotationSequence::*;
+
+    let angles = [PI/0.6, PI, PI/2.5];
+
+    // ------ Proper Euler angles ------ //
+    check_quat_to_euler(Extrinsic, ZXZ, angles);
+    check_quat_to_euler(Extrinsic, XYX, angles);
+    check_quat_to_euler(Extrinsic, YZY, angles);
+    check_quat_to_euler(Extrinsic, ZYZ, angles);
+    check_quat_to_euler(Extrinsic, XZX, angles);
+    check_quat_to_euler(Extrinsic, YXY, angles);
+
+    // ------ Tait–Bryan angles ------ //
+    check_quat_to_euler(Extrinsic, XYZ, angles);
+    check_quat_to_euler(Extrinsic, YZX, angles);
+    check_quat_to_euler(Extrinsic, ZXY, angles);
+    check_quat_to_euler(Extrinsic, XZY, angles);
+    check_quat_to_euler(Extrinsic, ZYX, angles);
+    check_quat_to_euler(Extrinsic, YXZ, angles);
 }
 
 #[test]
@@ -149,11 +419,7 @@ fn test_rotation_vector() {
         q_rest = negate(q_rest);
     }
 
-    let diff = sub(q, q_rest);
-    assert!(diff.0.abs() < EPSILON);
-    for i in 0..3 {
-        assert!(diff.1[i].abs() < EPSILON);
-    }
+    assert_eq_quat(q, q_rest);
 }
 
 #[test]
@@ -187,11 +453,7 @@ fn test_scale_add() {
 
     let result_1 = scale_add(s, a, b);
     let result_2 = add( scale(s, a), b );
-    let diff = sub(result_1, result_2);
-    assert!( diff.0.abs() < EPSILON );
-    assert!( diff.1[0].abs() < EPSILON );
-    assert!( diff.1[1].abs() < EPSILON );
-    assert!( diff.1[2].abs() < EPSILON );
+    assert_eq_quat(result_1, result_2);
 }
 
 #[test]
@@ -200,10 +462,7 @@ fn test_hadamard() {
     let b = (4.0f64, [3.0, 2.0, 1.0]);
 
     let result = hadamard(a, b);
-    assert!((result.0 - 4.0).abs() < EPSILON);
-    assert!((result.1[0] - 6.0).abs() < EPSILON);
-    assert!((result.1[1] - 6.0).abs() < EPSILON);
-    assert!((result.1[2] - 4.0).abs() < EPSILON);
+    assert_eq_quat(result, (4.0, [6.0, 6.0, 4.0]));
 }
 
 #[test]
@@ -224,7 +483,7 @@ fn test_negate() {
     let q = (-1.0, [1.0, 2.0, -1.0]);
     let p = negate(q);
 
-    assert_eq!( p, (1.0, [-1.0, -2.0, 1.0]) )
+    assert_eq!( p, (1.0, [-1.0, -2.0, 1.0]) );
 }
 
 #[test]
@@ -240,23 +499,17 @@ fn test_mul() {
     );
 
     let q = mul(a, b);
-    assert!( (p.0 - q.0).abs() < EPSILON );
-    for i in 0..3 {
-        assert!( (p.1[i] - q.1[i]).abs() < EPSILON );
-    }
+    assert_eq_quat(q, p);
 }
 
 // 手計算した結果で動作確認
 #[test]
-fn test_vector_rotation() {
+fn test_point_rotation() {
     let r: Vector3<f64> = [2.0, 2.0, 0.0];
     let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
-    let result = vector_rotation(q, r);
+    let result = point_rotation(q, r);
 
-    let diff = sub_vec(result, [0.0, 2.0, -2.0]);
-    for i in 0..3 {
-        assert!( diff[i].abs() < EPSILON );
-    }
+    assert_eq_vec(result, [0.0, 2.0, -2.0]);
 }
 
 #[test]
@@ -265,10 +518,7 @@ fn test_frame_rotation() {
     let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
     let result = frame_rotation(q, r);
 
-    let diff = sub_vec(result, [0.0, 2.0, 2.0]);
-    for i in 0..3 {
-        assert!( diff[i].abs() < EPSILON );
-    }
+    assert_eq_vec(result, [0.0, 2.0, 2.0]);
 }
 
 // 回転軸と回転角を取り出す
@@ -292,18 +542,34 @@ fn test_rotate_a_to_b() {
     let a = normalize_vec([1.0f64, -0.5, -2.0]);
     
     let q = from_axis_angle([1.0, 0.5, -0.5], PI);
-    let b = vector_rotation(q, a);
+    let b = point_rotation(q, a);
 
     let a_to_b = rotate_a_to_b(a, b);
     let a_to_b_t = rotate_a_to_b_param(a, b, 1.0);
     println!("a_to_b: {:?}", a_to_b);
-    let b_rest = vector_rotation(a_to_b, a);
-    let b_rest_t = vector_rotation(a_to_b_t, a);
+    let b_rest = point_rotation(a_to_b, a);
+    let b_rest_t = point_rotation(a_to_b_t, a);
 
-    let diff = sub_vec(b, b_rest);
-    let diff_t = sub_vec(b, b_rest_t);
-    for i in 0..3 {
-        assert!(diff[i].abs() < EPSILON, "{}", diff[i]);
-        assert!(diff_t[i].abs() < EPSILON, "{}", diff_t[i]);
+    assert_eq_vec(b, b_rest);
+    assert_eq_vec(b, b_rest_t);
+}
+
+fn assert_eq_vec(a: Vector3<f64>, b: Vector3<f64>) {
+    assert!((a[0] - b[0]).abs() < EPSILON);
+    assert!((a[1] - b[1]).abs() < EPSILON);
+    assert!((a[2] - b[2]).abs() < EPSILON);
+}
+
+/// 二つの四元数を比較する．
+/// 
+/// 表す回転が等しければ良いので符号が反転していても気にしない．
+fn assert_eq_quat(a: Quaternion<f64>, b: Quaternion<f64>) {
+    if dot(a, b).is_sign_positive() {
+        assert!((a.0 - b.0).abs() < EPSILON);
+        assert_eq_vec(a.1, b.1);
+    } else {
+        // bの符号を反転
+        assert!((a.0 + b.0).abs() < EPSILON);
+        assert_eq_vec(a.1, negate_vec(b.1));
     }
 }

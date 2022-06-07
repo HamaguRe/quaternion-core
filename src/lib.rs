@@ -7,6 +7,7 @@ extern crate std;
 use num_traits::{Float, FloatConst};
 
 mod simd;
+mod euler;
 pub use simd::FloatSimd;
 
 /// `[i, j, k]`
@@ -26,6 +27,42 @@ pub type Quaternion<T> = (T, Vector3<T>);
 /// `
 pub type DCM<T> = [Vector3<T>; 3];
 
+/// Specify the rotation type of Euler angles.
+/// 
+/// Considering a fixed `Reference frame` and a rotating `Body frame`, 
+/// `Intrinsic rotation` and `Extrinsic rotation` represent the following rotations:
+/// 
+/// * `Intrinsic`: Rotate around the axes of the `Body-frame`
+/// * `Extrinsic`: Rotate around the axes of the `Reference-frame`
+#[derive(Debug, Clone, Copy)]
+pub enum RotationType {
+    Intrinsic,
+    Extrinsic,
+}
+
+/// Represents 12 different rotations.
+/// 
+/// Each variant reads from left to right.
+/// For example, `RotationSequence::XYZ` represents rotation around the X axis first, 
+/// then the Y axis, and finally the Z axis in that order (X ---> Y ---> Z).
+#[derive(Debug, Clone, Copy)]
+pub enum RotationSequence {
+    // Proper (z-x-z, x-y-x, y-z-y, z-y-z, x-z-x, y-x-y)
+    ZXZ,
+    XYX,
+    YZY,
+    ZYZ,
+    XZX,
+    YXY,
+    // Tait–Bryan (x-y-z, y-z-x, z-x-y, x-z-y, z-y-x, y-x-z)
+    XYZ,
+    YZX,
+    ZXY,
+    XZY,
+    ZYX,
+    YXZ,
+}
+
 
 /// Generate Versor by specifying rotation `angle`\[rad\] and `axis` vector.
 /// 
@@ -35,8 +72,8 @@ pub type DCM<T> = [Vector3<T>; 3];
 #[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
-    let tmp = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
-    let f = ( tmp * cast(0.5) ).sin_cos();
+    let theta = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
+    let f = ( theta * cast(0.5) ).sin_cos();
     let coef = f.0 / norm_vec(axis);
     if coef.is_infinite() {
         IDENTITY()
@@ -51,7 +88,7 @@ where T: Float + FloatConst {
 /// If identity quaternion is entered, `angle` returns zero and 
 /// the `axis` returns a zero vector.
 /// 
-/// Range of `angle`: `(-PI, PI]`
+/// Range of `angle`: `(-π, π]`
 #[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
 where T: Float {
@@ -66,15 +103,51 @@ where T: Float {
     }
 }
 
-/// Converts the direction cosine matrix representing the 
-/// vector rotation (`q v q*`) to versor.
+/// Convert a DCM to a Quaternion representing 
+/// the `q v q*` rotation (Point Rotation - Frame Fixed).
 /// 
-/// To convert from a direction cosine matrix representing 
-/// a frame rotation (`q* v q`), do the following:
+/// When convert to a DCM representing `q* v q` rotation
+/// (Frame Rotation - Point Fixed) to a Quaternion, do the following:
+/// 
 /// ```
 /// # use quaternion_core::{from_dcm, to_dcm, conj};
 /// # let dcm = to_dcm((1.0, [0.0; 3]));
 /// let q = conj( from_dcm(dcm) );
+/// ```
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{
+/// #     from_axis_angle, dot, conj, negate, to_dcm, from_dcm,
+/// #     matrix_product, point_rotation, frame_rotation
+/// # };
+/// # let pi = std::f64::consts::PI;
+/// // Make these as you like.
+/// let v = [1.0, 0.5, -8.0];
+/// let q = from_axis_angle([0.2, 1.0, -2.0], pi/4.0);
+/// 
+/// // --- Point rotation --- //
+/// {
+///     let m = to_dcm(q);
+///     let q_check = from_dcm(m);
+///     
+///     assert!( (q.0 - q_check.0).abs() < 1e-12 );
+///     assert!( (q.1[0] - q_check.1[0]).abs() < 1e-12 );
+///     assert!( (q.1[1] - q_check.1[1]).abs() < 1e-12 );
+///     assert!( (q.1[2] - q_check.1[2]).abs() < 1e-12 );
+/// }
+/// 
+/// // --- Frame rotation --- //
+/// {
+///     let m = to_dcm( conj(q) );
+///     let q_check = conj( from_dcm(m) );
+///     
+///     assert!( (q.0 - q_check.0).abs() < 1e-12 );
+///     assert!( (q.1[0] - q_check.1[0]).abs() < 1e-12 );
+///     assert!( (q.1[1] - q_check.1[1]).abs() < 1e-12 );
+///     assert!( (q.1[2] - q_check.1[2]).abs() < 1e-12 );
+/// }
 /// ```
 #[inline]
 pub fn from_dcm<T>(m: DCM<T>) -> Quaternion<T>
@@ -123,15 +196,50 @@ where T: Float {
     (q0, [q1, q2, q3])
 }
 
-/// Converts versor, representing the vector rotation (`q v q*`), 
-/// to a direction cosine matrix.
+/// Convert a Quaternion to a DCM representing 
+/// the `q v q*` rotation (Point Rotation - Frame Fixed).
 /// 
-/// When convert a versor representing a 
-/// frame rotation (`q* v q`), do the following:
+/// When convert to a DCM representing the 
+/// `q* v q` rotation (Frame Rotation - Point Fixed), do the following:
+/// 
 /// ```
 /// # use quaternion_core::{to_dcm, conj};
 /// # let q = (1.0, [0.0; 3]);
 /// let dcm = to_dcm( conj(q) );
+/// ```
+/// 
+/// # Examples
+/// ```
+/// # use quaternion_core::{
+/// #     from_axis_angle, to_dcm, conj, 
+/// #     matrix_product, point_rotation, frame_rotation
+/// # };
+/// # let pi = std::f64::consts::PI;
+/// // Make these as you like.
+/// let v = [1.0, 0.5, -8.0];
+/// let q = from_axis_angle([0.2, 1.0, -2.0], pi/4.0);
+/// 
+/// // --- Point rotation --- //
+/// {
+///     let m = to_dcm(q);
+/// 
+///     let rm = matrix_product(m, v);
+///     let rq = point_rotation(q, v);
+///     assert!( (rm[0] - rq[0]).abs() < 1e-12 );
+///     assert!( (rm[1] - rq[1]).abs() < 1e-12 );
+///     assert!( (rm[2] - rq[2]).abs() < 1e-12 );
+/// }
+/// 
+/// // --- Frame rotation --- //
+/// {
+///     let m = to_dcm( conj(q) );
+/// 
+///     let rm = matrix_product(m, v);
+///     let rq = frame_rotation(q, v);
+///     assert!( (rm[0] - rq[0]).abs() < 1e-12 );
+///     assert!( (rm[1] - rq[1]).abs() < 1e-12 );
+///     assert!( (rm[2] - rq[2]).abs() < 1e-12 );
+/// }
 /// ```
 #[inline]
 pub fn to_dcm<T>(q: Quaternion<T>) -> DCM<T>
@@ -162,76 +270,136 @@ where T: Float + FloatSimd<T> {
     ]
 }
 
-/// Convert the `z-y-x` system Euler angles \[rad\] to quaternion.
+/// Convert Euler angles to Quaternion.
 /// 
-/// The range of Euler angles is `[-π, π]`.
+/// The type of rotation (Intrinsic or Extrinsic) is specified by `RotationType` enum, 
+/// and the rotation sequence (XZX, XYZ, ...) is specified by `RotationSequence` enum.
 /// 
-/// Angle/Axis sequences is `[yaw, pitch, roll] / [z, y, x]`.
+/// Each element of `angles` should be specified in the range `[-2π, 2π]`.
 /// 
-/// ypr: [yaw, pitch, roll]
-#[inline]
-pub fn from_euler_angles<T>(ypr: Vector3<T>) -> Quaternion<T> 
-where T: Float {
-    let [alpha, beta, gamma] = scale_vec(cast(0.5), ypr);
-
-    // Compute these value only once
-    let (sina, cosa) = alpha.sin_cos();
-    let (sinb, cosb) = beta.sin_cos();
-    let (sing, cosg) = gamma.sin_cos();
-    let cosa_cosb = cosa * cosb;
-    let sina_sinb = sina * sinb;
-
-    let q0 = cosa_cosb*cosg + sina_sinb*sing;
-    let q1 = cosa_cosb*sing - sina_sinb*cosg;
-    let q2 = cosa*sinb*cosg + sina*cosb*sing;
-    let q3 = sina*cosb*cosg - cosa*sinb*sing;
-
-    (q0, [q1, q2, q3])
-}
-
-/// Convert versor, representing a vector rotation (`q v q*`), 
-/// to `z-y-x` system Euler angles \[rad\].
+/// Sequences: `angles[0]` ---> `angles[1]` ---> `angles[2]`
 /// 
-/// In the gimbal locked state (`pitch=±π/2` \[rad\]), `roll=0` \[rad\].
+/// # Example
 /// 
-/// Angle/Axis sequences is `[yaw, pitch, roll] / [z, y, x]`.
-/// pitch angle is limited to `[-π/2, π/2]`．yaw and roll angle range is `[-π, π]`.
-/// 
-/// To convert a Versor representing a frame rotation (`q* v q`), do the following:
 /// ```
-/// # use quaternion_core::{to_euler_angles, conj};
-/// # let q = (1.0f64, [0.0; 3]);
-/// let euler_angles = to_euler_angles( conj(q) );
-/// ```
+/// # use quaternion_core::{from_axis_angle, mul, from_euler_angles, point_rotation};
+/// # let pi = std::f64::consts::PI;
+/// use quaternion_core::{RotationType::*, RotationSequence::XYZ};
 /// 
-/// return: `[yaw, pitch, roll]`
+/// let angles = [pi/6.0, 1.6*pi, -pi/4.0];
+/// let v = [1.0, 0.5, -0.4];
+/// 
+/// // Quaternions representing rotation around each axis.
+/// let x = from_axis_angle([1.0, 0.0, 0.0], angles[0]);
+/// let y = from_axis_angle([0.0, 1.0, 0.0], angles[1]);
+/// let z = from_axis_angle([0.0, 0.0, 1.0], angles[2]);
+/// 
+/// // ---- Intrinsic (X-Y-Z) ---- //
+/// // These represent the same rotation.
+/// let q_in = mul( mul(x, y), z );
+/// let e2q_in = from_euler_angles(Intrinsic, XYZ, angles);
+/// // Confirmation
+/// let a_in = point_rotation(q_in, v);
+/// let b_in = point_rotation(e2q_in, v);
+/// assert!( (a_in[0] - b_in[0]).abs() < 1e-12 );
+/// assert!( (a_in[1] - b_in[1]).abs() < 1e-12 );
+/// assert!( (a_in[2] - b_in[2]).abs() < 1e-12 );
+/// 
+/// // ---- Extrinsic (X-Y-Z) ---- //
+/// // These represent the same rotation.
+/// let q_ex = mul( mul(z, y), x );
+/// let e2q_ex = from_euler_angles(Extrinsic, XYZ, angles);
+/// // Confirmation
+/// let a_ex = point_rotation(q_ex, v);
+/// let b_ex = point_rotation(e2q_ex, v);
+/// assert!( (a_ex[0] - b_ex[0]).abs() < 1e-12 );
+/// assert!( (a_ex[1] - b_ex[1]).abs() < 1e-12 );
+/// assert!( (a_ex[2] - b_ex[2]).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn to_euler_angles<T>(q: Quaternion<T>) -> Vector3<T>
-where T: Float + FloatConst + FloatSimd<T> {
-    let [
-        [m11,   _, m13],
-        [m21,   _, m23],
-        [m31, m32, m33],
-    ] = to_dcm(q);
+pub fn from_euler_angles<T>(rt: RotationType, rs: RotationSequence, angles: Vector3<T>) -> Quaternion<T>
+where T: Float + FloatConst {
+    debug_assert!( angles[0].abs() <= T::PI() + T::PI(), "angles[0] is out of range!");
+    debug_assert!( angles[1].abs() <= T::PI() + T::PI(), "angles[1] is out of range!");
+    debug_assert!( angles[2].abs() <= T::PI() + T::PI(), "angles[2] is out of range!");
 
-    if m31.abs() < cast(0.9999984) {  // < 89.9[deg]
-        [
-            m21.atan2(m11), // yaw
-            (-m31).asin(),  // pitch
-            m32.atan2(m33), // roll
-        ]
-    } else {  // ジンバルロック
-        [
-            m23.atan2(m13),                 // yaw
-            T::FRAC_PI_2().copysign(-m31),  // pitch
-            T::zero(),                      // roll
-        ]
+    match rt {
+        RotationType::Intrinsic => euler::from_intrinsic_euler_angles(rs, angles),
+        RotationType::Extrinsic => euler::from_extrinsic_euler_angles(rs, angles),
     }
 }
 
-/// Convert rotation vector to Versor.
+/// Convert Quaternion (Unit quaternion) to Euler angles.
 /// 
-/// The rotation vector itself represents the axis of rotation, 
+/// The type of rotation (Intrinsic or Extrinsic) is specified by `RotationType` enum, 
+/// and the rotation sequence (XZX, XYZ, ...) is specified by `RotationSequence` enum.
+/// 
+/// ```
+/// # use quaternion_core::{RotationType::Intrinsic, RotationSequence::XYZ, to_euler_angles};
+/// # let q = (1.0, [0.0; 3]);
+/// let angles = to_euler_angles(Intrinsic, XYZ, q);
+/// ```
+/// 
+/// Sequences: `angles[0]` ---> `angles[1]` ---> `angles[2]`
+/// 
+/// # Singularity
+/// 
+/// ## RotationType::Intrinsic
+/// 
+/// For Proper Euler angles (ZXZ, XYX, YZY, ZYZ, XZX, YXY), the singularity is reached 
+/// when the sine of the second rotation angle is 0 (angle = 0, ±π, ...), and for 
+/// Tait-Bryan angles (XYZ, YZX, ZXY, XZY, ZYX, YXZ), the singularity is reached when 
+/// the cosine of the second rotation angle is 0 (angle = ±π/2).
+/// 
+/// At the singularity, the third rotation angle is set to 0\[rad\].
+/// 
+/// ## RotationType::Extrinsic
+/// 
+/// As in the case of Intrinsic rotation, for Proper Euler angles, the singularity occurs 
+/// when the sine of the second rotation angle is 0 (angle = 0, ±π, ...), and for 
+/// Tait-Bryan angles, the singularity occurs when the cosine of the second rotation angle 
+/// is 0 (angle = ±π/2).
+/// 
+/// At the singularity, the first rotation angle is set to 0\[rad\].
+/// 
+/// # Example
+/// 
+/// Depending on the rotation angle of each axis, it may not be possible to recover the 
+/// same rotation angle as the original. However, they represent the same rotation in 3D space.
+/// 
+/// ```
+/// # use quaternion_core::{from_euler_angles, to_euler_angles, point_rotation};
+/// # let pi = std::f64::consts::PI;
+/// use quaternion_core::{RotationType::*, RotationSequence::XYZ};
+/// 
+/// let angles = [pi/6.0, pi/4.0, pi/3.0];
+/// 
+/// // ---- Intrinsic (X-Y-Z) ---- //
+/// let q_in = from_euler_angles(Intrinsic, XYZ, angles);
+/// let e_in = to_euler_angles(Intrinsic, XYZ, q_in);
+/// assert!( (angles[0] - e_in[0]).abs() < 1e-12 );
+/// assert!( (angles[1] - e_in[1]).abs() < 1e-12 );
+/// assert!( (angles[2] - e_in[2]).abs() < 1e-12 );
+/// 
+/// // ---- Extrinsic (X-Y-Z) ---- //
+/// let q_ex = from_euler_angles(Extrinsic, XYZ, angles);
+/// let e_ex = to_euler_angles(Extrinsic, XYZ, q_ex);
+/// assert!( (angles[0] - e_ex[0]).abs() < 1e-12 );
+/// assert!( (angles[1] - e_ex[1]).abs() < 1e-12 );
+/// assert!( (angles[2] - e_ex[2]).abs() < 1e-12 );
+/// ```
+#[inline]
+pub fn to_euler_angles<T>(rt: RotationType, rs: RotationSequence, q: Quaternion<T>) -> Vector3<T>
+where T: Float + FloatConst + FloatSimd<T> {
+    match rt {
+        RotationType::Intrinsic => euler::to_intrinsic_euler_angles(rs, q),
+        RotationType::Extrinsic => euler::to_extrinsic_euler_angles(rs, q),
+    }
+}
+
+/// Convert Rotation vector to Quaternion (Unit quaternion).
+/// 
+/// The Rotation vector itself represents the axis of rotation, 
 /// and the norm represents the angle of rotation around the axis.
 /// 
 /// `angle` range is: `(0, 2π)`
@@ -266,7 +434,7 @@ where T: Float {
     }
 }
 
-/// Matrix product.
+/// Product of matrix and vector
 /// 
 /// Rotate vectors using a directional cosine matrix.
 #[inline]
@@ -365,7 +533,7 @@ where T: FloatSimd<T> {
 
 /// Hadamard product of Vector.
 /// 
-/// Calculate `a・b`
+/// Calculate `a ∘ b`
 #[inline]
 pub fn hadamard_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -374,7 +542,7 @@ where T: Float {
 
 /// Hadamard product of Quaternion.
 /// 
-/// Calculate `a・b`
+/// Calculate `a ∘ b`
 #[inline]
 pub fn hadamard<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: FloatSimd<T> {
@@ -383,7 +551,7 @@ where T: FloatSimd<T> {
 
 /// Hadamard product and Addiction of Vector.
 /// 
-/// Calculate `a・b + c`
+/// Calculate `a ∘ b + c`
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
 /// If not enabled, it's computed by unfused multiply-add (s*a + b).
@@ -399,7 +567,7 @@ where T: Float {
 
 /// Hadamard product and Addiction of Quaternion.
 /// 
-/// Calculate `a・b + c`
+/// Calculate `a ∘ b + c`
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
 /// If not enabled, it's computed by unfused multiply-add (s*a + b).
@@ -594,11 +762,38 @@ where T: Float {
     ( cos, scale_vec(sin / norm_vec(q.1), q.1) )
 }
 
-/// Rotation of vector (Point Rotation - Frame Fixed)
+/// Rotation of point (Point Rotation - Frame Fixed)
 /// 
 /// `q v q*  (||q|| = 1)`
+/// 
+/// Since it is implemented with an optimized formula, 
+/// it can be calculated with the amount of operations shown in the table below:
+/// 
+/// | Operation    | Num |
+/// |:------------:|:---:|
+/// | Multiply     | 18  |
+/// | Add/Subtract | 12  |
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{from_axis_angle, point_rotation, mul, conj};
+/// # let pi = std::f64::consts::PI;
+/// // Make these as you like.
+/// let v = [1.0, 0.5, -8.0];
+/// let q = from_axis_angle([0.2, 1.0, -2.0], pi);
+/// 
+/// let r = point_rotation(q, v);
+/// 
+/// // This makes a lot of wasted calculations.
+/// let r_check = mul( mul(q, (0.0, v)), conj(q) ).1;
+/// 
+/// assert!( (r[0] - r_check[0]).abs() < 1e-12 );
+/// assert!( (r[1] - r_check[1]).abs() < 1e-12 );
+/// assert!( (r[2] - r_check[2]).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn vector_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
+pub fn point_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     let tmp = scale_add_vec(q.0, v, cross_vec(q.1, v));
     scale_add_vec(cast(2.0), cross_vec(q.1, tmp), v)
@@ -607,6 +802,33 @@ where T: Float {
 /// Rotation of frame (Frame Rotation - Point Fixed)
 /// 
 /// `q* v q  (||q|| = 1)`
+/// 
+/// Since it is implemented with an optimized formula, 
+/// it can be calculated with the amount of operations shown in the table below:
+/// 
+/// | Operation    | Num |
+/// |:------------:|:---:|
+/// | Multiply     | 18  |
+/// | Add/Subtract | 12  |
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{from_axis_angle, point_rotation, mul, conj};
+/// # let pi = std::f64::consts::PI;
+/// // Make these as you like.
+/// let v = [1.0, 0.5, -8.0];
+/// let q = from_axis_angle([0.2, 1.0, -2.0], pi);
+/// 
+/// let r = point_rotation(q, v);
+/// 
+/// // This makes a lot of wasted calculations.
+/// let r_check = mul( mul(conj(q), (0.0, v)), q ).1;
+/// 
+/// assert!( (r[0] - r_check[0]).abs() < 1e-12 );
+/// assert!( (r[1] - r_check[1]).abs() < 1e-12 );
+/// assert!( (r[2] - r_check[2]).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn frame_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -617,6 +839,23 @@ where T: Float {
 /// Calculate a versor to rotate from vector `a` to `b`.
 /// 
 /// If you enter a zero vector, it returns an identity quaternion.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, cross_vec, rotate_a_to_b, point_rotation};
+/// 
+/// let a: Vector3<f64> = [1.5, -0.5, 0.2];
+/// let b: Vector3<f64> = [0.1, 0.6, 1.0];
+/// 
+/// let q = rotate_a_to_b(a, b);
+/// let b_check = point_rotation(q, a);
+/// 
+/// let cross = cross_vec(b, b_check);
+/// assert!( cross[0].abs() < 1e-12 );
+/// assert!( cross[1].abs() < 1e-12 );
+/// assert!( cross[2].abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
 where T: Float {

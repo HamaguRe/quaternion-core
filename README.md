@@ -2,15 +2,7 @@
 
 `Quaternion` library written in Rust.
 
-## About
-
-### Japanese
-
-四元数に関する基本的な演算や各種回転表現との変換を関数として提供します。
-
-### English
-
-It provides basic operations on quaternions and conversions to and from several attitude representations as functions.
+This provides basic operations on Quaternion and conversions to and from several attitude representations as generic functions (Supports f32 & f64).
 
 ## Usage
 
@@ -18,16 +10,22 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-quaternion-core = "0.1"
+quaternion-core = "0.2"
 ```
+
+## Conversion
+
+![conversion](./conversion.png)
+
+Interconversion with 24 different Euler angles (12 each of `Intrinsic` and `Extrinsic`) is possible!!
 
 ## Features
 
-Cargo.toml
+`Cargo.toml`:
 
 ```toml
 [dependencies.quaternion-core]
-version = "0.1"
+version = "0.2"
 
 # Uncomment if you wish to use FMA and SIMD.
 #features = ["fma", "simd"]
@@ -49,7 +47,7 @@ ___Attension!! : This feature may have bugs and should not be enabled at first._
 
 By enabling this feature, the SIMD implementation using the [std::arch](https://docs.rs/rustc-std-workspace-std/1.0.1/std/arch/index.html) module can be used in some functions.
 
-Currently (`version="0.1.0"`) only `x86` and `x86_64` architectures are supported.
+Currently (`version="0.2.0"`) only `x86` and `x86_64` architectures are supported.
 
 To enable this feature, CPU must support these instruction sets:
 ```
@@ -64,11 +62,12 @@ $ RUSTFLAGS='-C target-cpu=native' cargo build
 
 ### The `libm` feature and `default-feature = false`
 
-These options allow for use in the `no_std` environment. In this case, mathematical functions (e.g. sin, cos, sqrt ...) are provided by `libm`.
+These options allow for use in the `no_std` environment. 
+In this case, mathematical functions (e.g. sin, cos, sqrt ...) are provided by `libm`.
 
 ## Example
 
-src/main.rs
+`src/main.rs`:
 
 ```rust
 use quaternion_core as quat;
@@ -77,19 +76,18 @@ const PI: f64 = std::f64::consts::PI;
 const EPSILON: f64 = 1e-14;
 
 fn main() {
-    // Position vector
+    // Point
     let r = [2.0, 2.0, 0.0];
 
     // Generates a quaternion representing the
     // rotation of π/2[rad] around the y-axis.
     let q = quat::from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
 
-    let result = quat::vector_rotation(q, r);
+    let result = quat::point_rotation(q, r);
 
     // Check if the calculation is correct.
-    let true_val = [0.0, 2.0, -2.0];
-    let diff = quat::sub_vec(true_val, result);
-    for val in diff.iter() {
+    let diff = quat::sub_vec([0.0, 2.0, -2.0], result);
+    for val in diff {
         assert!( val.abs() < EPSILON );
     }
 }
@@ -105,4 +103,6 @@ at your option.
 
 ### Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted 
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall 
+be dual licensed as above, without any additional terms or conditions.

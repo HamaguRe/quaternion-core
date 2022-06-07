@@ -1,11 +1,12 @@
 [package]
 name = "quaternion-core"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HamaguRe <hamagure@space-denpa.jp>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/HamaguRe/quaternion-core.git"
 homepage = "https://github.com/HamaguRe/quaternion-core.git"
+documentation = "https://docs.rs/quaternion-core"
 description = "Quaternion library written in Rust"
 keywords = ["mathematics", "science", "no-std"]
 readme = "README.md"
