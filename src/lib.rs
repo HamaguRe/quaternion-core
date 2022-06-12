@@ -1,4 +1,15 @@
-//! Quaternion Libraly (f32 & f64)
+//! Quaternion library written in Rust.
+//! 
+//! This provides basic operations on Quaternion and interconversion with several 
+//! attitude representations as generic functions (Supports f32 & f64).
+//! 
+//! ## Versor
+//! 
+//! Versor refers to a Quaternion representing a rotation, the norm of which is 1.
+//! 
+//! The documentation for this crate basically writes Versor instead of Unit Quaternion, 
+//! but the difference in usage is not clear.
+//! Please think Versor = Unit Quaternion.
 
 #![no_std]
 #[cfg(feature = "std")]
@@ -10,9 +21,13 @@ mod simd;
 mod euler;
 pub use simd::FloatSimd;
 
+/// Vector3 (Pure Quaternion)
+/// 
 /// `[i, j, k]`
 pub type Vector3<T> = [T; 3];
 
+/// Quaternion
+/// 
 /// `(1, [i, j, k])`
 pub type Quaternion<T> = (T, Vector3<T>);
 
@@ -32,8 +47,8 @@ pub type DCM<T> = [Vector3<T>; 3];
 /// Considering a fixed `Reference frame` and a rotating `Body frame`, 
 /// `Intrinsic rotation` and `Extrinsic rotation` represent the following rotations:
 /// 
-/// * `Intrinsic`: Rotate around the axes of the `Body-frame`
-/// * `Extrinsic`: Rotate around the axes of the `Reference-frame`
+/// * `Intrinsic`: Rotate around the axes of the `Body frame`
+/// * `Extrinsic`: Rotate around the axes of the `Reference frame`
 #[derive(Debug, Clone, Copy)]
 pub enum RotationType {
     Intrinsic,
@@ -66,9 +81,28 @@ pub enum RotationSequence {
 
 /// Generate Versor by specifying rotation `angle`\[rad\] and `axis` vector.
 /// 
-/// The `axis` does not have to be a unit vector.
+/// The `axis` vector does not have to be a unit vector.
 /// 
 /// If you enter a zero vector, it returns an identity quaternion.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{from_axis_angle, point_rotation, sub_vec};
+/// # let PI = std::f64::consts::PI;
+/// // Generates a quaternion representing the
+/// // rotation of π/2[rad] around the y-axis.
+/// let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
+/// 
+/// // Rotate the point.
+/// let r = point_rotation(q, [2.0, 2.0, 0.0]);
+/// 
+/// // Check if the calculation is correct.
+/// let diff = sub_vec([0.0, 2.0, -2.0], r);
+/// for val in diff {
+///     assert!( val.abs() < 1e-12 );
+/// }
+/// ```
 #[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
@@ -82,8 +116,8 @@ where T: Float + FloatConst {
     }
 }
 
-/// Compute the rotation `axis` (unit vector) and the rotation `angle`\[rad\] 
-/// around the axis from the versor.
+/// Calculate the rotation `axis` (unit vector) and the rotation `angle`\[rad\] 
+/// around the `axis` from the Versor.
 /// 
 /// If identity quaternion is entered, `angle` returns zero and 
 /// the `axis` returns a zero vector.
@@ -103,11 +137,11 @@ where T: Float {
     }
 }
 
-/// Convert a DCM to a Quaternion representing 
+/// Convert a DCM to a Versor representing 
 /// the `q v q*` rotation (Point Rotation - Frame Fixed).
 /// 
 /// When convert to a DCM representing `q* v q` rotation
-/// (Frame Rotation - Point Fixed) to a Quaternion, do the following:
+/// (Frame Rotation - Point Fixed) to a Versor, do the following:
 /// 
 /// ```
 /// # use quaternion_core::{from_dcm, to_dcm, conj};
@@ -115,17 +149,17 @@ where T: Float {
 /// let q = conj( from_dcm(dcm) );
 /// ```
 /// 
-/// # Examples
+/// # Example
 /// 
 /// ```
 /// # use quaternion_core::{
 /// #     from_axis_angle, dot, conj, negate, to_dcm, from_dcm,
 /// #     matrix_product, point_rotation, frame_rotation
 /// # };
-/// # let pi = std::f64::consts::PI;
+/// # let PI = std::f64::consts::PI;
 /// // Make these as you like.
 /// let v = [1.0, 0.5, -8.0];
-/// let q = from_axis_angle([0.2, 1.0, -2.0], pi/4.0);
+/// let q = from_axis_angle([0.2, 1.0, -2.0], PI/4.0);
 /// 
 /// // --- Point rotation --- //
 /// {
@@ -196,7 +230,7 @@ where T: Float {
     (q0, [q1, q2, q3])
 }
 
-/// Convert a Quaternion to a DCM representing 
+/// Convert a Versor to a DCM representing 
 /// the `q v q*` rotation (Point Rotation - Frame Fixed).
 /// 
 /// When convert to a DCM representing the 
@@ -209,15 +243,16 @@ where T: Float {
 /// ```
 /// 
 /// # Examples
+/// 
 /// ```
 /// # use quaternion_core::{
 /// #     from_axis_angle, to_dcm, conj, 
 /// #     matrix_product, point_rotation, frame_rotation
 /// # };
-/// # let pi = std::f64::consts::PI;
+/// # let PI = std::f64::consts::PI;
 /// // Make these as you like.
 /// let v = [1.0, 0.5, -8.0];
-/// let q = from_axis_angle([0.2, 1.0, -2.0], pi/4.0);
+/// let q = from_axis_angle([0.2, 1.0, -2.0], PI/4.0);
 /// 
 /// // --- Point rotation --- //
 /// {
@@ -270,23 +305,23 @@ where T: Float + FloatSimd<T> {
     ]
 }
 
-/// Convert Euler angles to Quaternion.
+/// Convert Euler angles to Versor.
 /// 
 /// The type of rotation (Intrinsic or Extrinsic) is specified by `RotationType` enum, 
 /// and the rotation sequence (XZX, XYZ, ...) is specified by `RotationSequence` enum.
 /// 
-/// Each element of `angles` should be specified in the range `[-2π, 2π]`.
+/// Each element of `angles` should be specified in the range: `[-2π, 2π]`.
 /// 
 /// Sequences: `angles[0]` ---> `angles[1]` ---> `angles[2]`
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{from_axis_angle, mul, from_euler_angles, point_rotation};
-/// # let pi = std::f64::consts::PI;
+/// # let PI = std::f64::consts::PI;
 /// use quaternion_core::{RotationType::*, RotationSequence::XYZ};
 /// 
-/// let angles = [pi/6.0, 1.6*pi, -pi/4.0];
+/// let angles = [PI/6.0, 1.6*PI, -PI/4.0];
 /// let v = [1.0, 0.5, -0.4];
 /// 
 /// // Quaternions representing rotation around each axis.
@@ -329,7 +364,7 @@ where T: Float + FloatConst {
     }
 }
 
-/// Convert Quaternion (Unit quaternion) to Euler angles.
+/// Convert Versor to Euler angles.
 /// 
 /// The type of rotation (Intrinsic or Extrinsic) is specified by `RotationType` enum, 
 /// and the rotation sequence (XZX, XYZ, ...) is specified by `RotationSequence` enum.
@@ -362,17 +397,17 @@ where T: Float + FloatConst {
 /// 
 /// At the singularity, the first rotation angle is set to 0\[rad\].
 /// 
-/// # Example
+/// # Examples
 /// 
 /// Depending on the rotation angle of each axis, it may not be possible to recover the 
 /// same rotation angle as the original. However, they represent the same rotation in 3D space.
 /// 
 /// ```
 /// # use quaternion_core::{from_euler_angles, to_euler_angles, point_rotation};
-/// # let pi = std::f64::consts::PI;
+/// # let PI = std::f64::consts::PI;
 /// use quaternion_core::{RotationType::*, RotationSequence::XYZ};
 /// 
-/// let angles = [pi/6.0, pi/4.0, pi/3.0];
+/// let angles = [PI/6.0, PI/4.0, PI/3.0];
 /// 
 /// // ---- Intrinsic (X-Y-Z) ---- //
 /// let q_in = from_euler_angles(Intrinsic, XYZ, angles);
@@ -397,12 +432,33 @@ where T: Float + FloatConst + FloatSimd<T> {
     }
 }
 
-/// Convert Rotation vector to Quaternion (Unit quaternion).
+/// Convert Rotation vector to Versor.
 /// 
 /// The Rotation vector itself represents the axis of rotation, 
 /// and the norm represents the angle of rotation around the axis.
 /// 
-/// `angle` range is: `(0, 2π)`
+/// Range of the norm of the rotation vector: `[0, 2π]`
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{from_rotation_vector, scale_vec, point_rotation};
+/// # let PI = std::f64::consts::PI;
+/// let angle = PI / 2.0;
+/// let axis = [1.0, 0.0, 0.0];
+/// 
+/// // This represents a rotation of π/2 around the x-axis.
+/// let rot_vec = scale_vec(angle, axis);  // Rotation vector
+/// 
+/// // Rotation vector ---> Quaternion
+/// let q = from_rotation_vector(rot_vec);
+/// 
+/// let r = point_rotation(q, [1.0, 1.0, 0.0]);
+/// 
+/// assert!( (r[0] - 1.0).abs() < 1e-12 );
+/// assert!( (r[1] - 0.0).abs() < 1e-12 );
+/// assert!( (r[2] - 1.0).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn from_rotation_vector<T>(v: Vector3<T>) -> Quaternion<T>
 where T: Float {
@@ -416,12 +472,32 @@ where T: Float {
     }
 }
 
-/// Convert Versor to rotation vector.
+/// Convert Versor to Rotation vector.
 /// 
-/// The rotation vector itself represents the axis of rotation, 
+/// The Rotation vector itself represents the axis of rotation, 
 /// and the norm represents the angle of rotation around the axis.
 /// 
-/// `angle` range is: `(0, 2π)`
+/// Range of the norm of the rotation vector: `[0, 2π]`
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{from_axis_angle, to_rotation_vector, scale_vec};
+/// # let PI = std::f64::consts::PI;
+/// let angle = PI / 2.0;
+/// let axis = [1.0, 0.0, 0.0];
+/// 
+/// // These represent the same rotation.
+/// let rv = scale_vec(angle, axis);  // Rotation vector
+/// let q = from_axis_angle(axis, angle);  // Quaternion
+/// 
+/// // Quaternion ---> Rotation vector
+/// let q2rv = to_rotation_vector(q);
+/// 
+/// assert!( (rv[0] - q2rv[0]).abs() < 1e-12 );
+/// assert!( (rv[1] - q2rv[1]).abs() < 1e-12 );
+/// assert!( (rv[2] - q2rv[2]).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
@@ -434,9 +510,7 @@ where T: Float {
     }
 }
 
-/// Product of matrix and vector
-/// 
-/// Rotate vectors using a directional cosine matrix.
+/// Product of DCM and Vector3
 #[inline]
 pub fn matrix_product<T>(m: DCM<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -461,53 +535,49 @@ where T: FloatSimd<T> {
     T::sum(q)
 }
 
-/// Calculate `a + b`
+/// `a + b`
 #[inline]
 pub fn add_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ a[0]+b[0], a[1]+b[1], a[2]+b[2] ]
 }
 
-/// Calculate `a + b`
+/// `a + b`
 #[inline]
 pub fn add<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: FloatSimd<T> {
     T::add(a, b)
 }
 
-/// Calculate `a - b`
+/// `a - b`
 #[inline]
 pub fn sub_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ a[0]-b[0], a[1]-b[1], a[2]-b[2] ]
 }
 
-/// Calculate `a - b`
+/// `a - b`
 #[inline]
 pub fn sub<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: FloatSimd<T> {
     T::sub(a, b)
 }
 
-/// Calculate `s * v`
-/// 
-/// Multiplication of scalar and vector.
+/// `s * v`
 #[inline]
 pub fn scale_vec<T>(s: T, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ s*v[0], s*v[1], s*v[2] ]
 }
 
-/// Calculate `s * q`
-/// 
-/// Multiplication of scalar and quaternion.
+/// `s * q`
 #[inline]
 pub fn scale<T>(s: T, q: Quaternion<T>) -> Quaternion<T>
 where T: FloatSimd<T> {
     T::scale(s, q)
 }
 
-/// Calculate `s*a + b`
+/// `s*a + b`
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
 /// If not enabled, it's computed by unfused multiply-add (s*a + b).
@@ -521,7 +591,7 @@ where T: Float {
     ]
 }
 
-/// Calculate `s*a + b`
+/// `s*a + b`
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
 /// If not enabled, it's computed by unfused multiply-add (s*a + b).
@@ -531,27 +601,27 @@ where T: FloatSimd<T> {
     T::scale_add(s, a, b)
 }
 
-/// Hadamard product of Vector.
+/// `a ∘ b`
 /// 
-/// Calculate `a ∘ b`
+/// Hadamard product of Vector3.
 #[inline]
 pub fn hadamard_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ a[0]*b[0], a[1]*b[1], a[2]*b[2] ]
 }
 
-/// Hadamard product of Quaternion.
+/// `a ∘ b`
 /// 
-/// Calculate `a ∘ b`
+/// Hadamard product of Quaternions.
 #[inline]
 pub fn hadamard<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
 where T: FloatSimd<T> {
     T::hadamard(a, b)
 }
 
-/// Hadamard product and Addiction of Vector.
+/// `a ∘ b + c`
 /// 
-/// Calculate `a ∘ b + c`
+/// Hadamard product and addiction of Vector3.
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
 /// If not enabled, it's computed by unfused multiply-add (s*a + b).
@@ -565,9 +635,9 @@ where T: Float {
     ]
 }
 
-/// Hadamard product and Addiction of Quaternion.
+/// `a ∘ b + c`
 /// 
-/// Calculate `a ∘ b + c`
+/// Hadamard product and addiction of Quaternions.
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
 /// If not enabled, it's computed by unfused multiply-add (s*a + b).
@@ -577,21 +647,29 @@ where T: FloatSimd<T> {
     T::hadamard_add(a, b, c)
 }
 
-/// Dot product of vector.
+/// `a · b`
+/// 
+/// Dot product of Vector3.
 #[inline]
 pub fn dot_vec<T>(a: Vector3<T>, b: Vector3<T>) -> T
 where T: Float {
     sum_vec( hadamard_vec(a, b) )
 }
 
-/// Dot product of quaternion.
+/// `a · b`
+/// 
+/// Dot product of Quaternions.
 #[inline]
 pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
 where T: FloatSimd<T> {
     T::dot(a, b)
 }
 
+/// `a × b`
+/// 
 /// Cross product.
+/// 
+/// The product order is `a × b (!= b × a)`
 #[inline]
 pub fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -602,23 +680,36 @@ where T: Float {
     ]
 }
 
-/// Calculate L2 norm.
+/// Calculate L2 norm of Vector3.
 #[inline]
 pub fn norm_vec<T>(v: Vector3<T>) -> T
 where T: Float {
     dot_vec(v, v).sqrt()
 }
 
-/// Calculate L2 norm.
+/// Calculate L2 norm of Quaternion.
 #[inline]
 pub fn norm<T>(q: Quaternion<T>) -> T 
 where T: Float + FloatSimd<T> {
     dot(q, q).sqrt()
 }
 
-/// Normalization of vector3.
+/// Normalization of Vector3.
 /// 
 /// If you enter a zero vector, it returns a zero vector.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, norm_vec, normalize_vec};
+/// // This norm is not 1.
+/// let v: Vector3<f64> = [1.0, 2.0, 3.0];
+/// assert!( (1.0 - norm_vec(v)).abs() > 1e-12 );
+/// 
+/// // Now that normalized, this norm is 1!
+/// let v_n = normalize_vec(v);
+/// assert!( (1.0 - norm_vec(v_n)).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn normalize_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float {
@@ -630,41 +721,75 @@ where T: Float {
     }
 }
 
-/// Normalization of quaternion.
+/// Normalization of Quaternion.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, norm, normalize};
+/// // This norm is not 1.
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// assert!( (1.0 - norm(q)).abs() > 1e-12 );
+/// 
+/// // Now that normalized, this norm is 1!
+/// let q_n = normalize(q);
+/// assert!( (1.0 - norm(q_n)).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn normalize<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatSimd<T> {
     scale( norm(q).recip(), q )
 }
 
-/// Invert the sign of a vector.
+/// Invert the sign of a Vector3.
 /// 
-/// return: `-v`
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, negate_vec};
+/// let v: Vector3<f64> = [1.0, 2.0, 3.0];
+/// let v_n = negate_vec(v);
+/// 
+/// assert_eq!(-v[0], v_n[0]);
+/// assert_eq!(-v[1], v_n[1]);
+/// assert_eq!(-v[2], v_n[2]);
+/// ```
 #[inline]
 pub fn negate_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float {
     [ -v[0], -v[1], -v[2] ]
 }
 
-/// Invert the sign of a quaternion.
+/// Invert the sign of a Quaternion.
 /// 
-/// return: `-q`
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, negate};
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q_n = negate(q);
+/// 
+/// assert_eq!(-q.0, q_n.0);
+/// assert_eq!(-q.1[0], q_n.1[0]);
+/// assert_eq!(-q.1[1], q_n.1[1]);
+/// assert_eq!(-q.1[2], q_n.1[2]);
+/// ```
 #[inline]
 pub fn negate<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: FloatSimd<T> {
     T::negate(q)
 }
 
-/// Product of pure quaternions.
+/// Product of Pure Quaternions.
 /// 
-/// `ab ≡ -a・b + a×b` (!= ba)
+/// `ab ≡ -a·b + a×b` (!= ba)
 #[inline]
 pub fn mul_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
 where T: Float {
     ( -dot_vec(a, b), cross_vec(a, b) )
 }
 
-/// Hamilton product.
+/// Hamilton product (Product of Quaternions).
 /// 
 /// The product order is `ab (!= ba)`
 #[inline]
@@ -677,28 +802,71 @@ where T: Float + FloatSimd<T> {
     )
 }
 
-/// Compute the conjugate quaternion.
+/// Calculate the conjugate of Quaternion.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, conj};
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q_conj = conj(q);
+/// 
+/// assert_eq!(q.0, q_conj.0);
+/// assert_eq!(-q.1[0], q_conj.1[0]);
+/// assert_eq!(-q.1[1], q_conj.1[1]);
+/// assert_eq!(-q.1[2], q_conj.1[2]);
+/// ```
 #[inline]
 pub fn conj<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     ( q.0, negate_vec(q.1) )
 }
 
-/// Compute the inverse pure quaternion.
+/// Calculate the inverse of Pure Quaternion (Vector3).
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, inv_vec, mul_vec};
+/// let v: Vector3<f64> = [1.0, 2.0, 3.0];
+/// 
+/// // Identity quaternion
+/// let id = mul_vec( v, inv_vec(v) );  // = mul_vec( inv_vec(v), v );
+/// 
+/// assert!( (id.0.abs() - 1.0) < 1e-12);
+/// assert!( id.1[0] < 1e-12 );
+/// assert!( id.1[1] < 1e-12 );
+/// assert!( id.1[2] < 1e-12 );
+/// ```
 #[inline]
 pub fn inv_vec<T>(v: Vector3<T>) -> Vector3<T>
 where T: Float {
     scale_vec( dot_vec(v, v).recip(), negate_vec(v) )
 }
 
-/// Compute the inverse quaternion.
+/// Calcurate the inverse of Quaternion.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, inv, mul};
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// 
+/// // Identity quaternion
+/// let id = mul( q, inv(q) );  // = mul( inv(q), q );
+/// 
+/// assert!( (id.0.abs() - 1.0) < 1e-12);
+/// assert!( id.1[0] < 1e-12 );
+/// assert!( id.1[1] < 1e-12 );
+/// assert!( id.1[2] < 1e-12 );
+/// ```
 #[inline]
 pub fn inv<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float + FloatSimd<T> {
     scale( dot(q, q).recip(), conj(q) )
 }
 
-/// Exponential function of vector3.
+/// Exponential function of Pure Quaternion (Vector3).
 #[inline]
 pub fn exp_vec<T>(v: Vector3<T>) -> Quaternion<T>
 where T: Float {
@@ -707,7 +875,7 @@ where T: Float {
     ( cos, scale_vec(sin / norm_v, v) )
 }
 
-/// Exponential function of quaternion.
+/// Exponential function of Quaternion.
 #[inline]
 pub fn exp<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
@@ -717,7 +885,7 @@ where T: Float {
     ( coef * cos, scale_vec((coef * sin) / norm_q_v, q.1) )
 }
 
-/// Natural logarithm of quaternion.
+/// Natural logarithm of Quaternion.
 #[inline]
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
@@ -727,10 +895,10 @@ where T: Float {
     ( norm_q.ln(), scale_vec(coef, q.1) )
 }
 
-/// Natural logarithm of versor.
+/// Natural logarithm of Versor.
 /// 
-/// If it is guaranteed to be a versor, it is less computationally 
-/// expensive than the `ln` function.
+/// If the argument `q` is guaranteed to be a Versor,
+/// it is less computationally expensive than the `ln(...)` function.
 /// 
 /// Only the vector part is returned since the real part is always zero.
 #[inline]
@@ -739,7 +907,7 @@ where T: Float {
     scale_vec( acos_safe(q.0) / norm_vec(q.1), q.1)
 }
 
-/// Power function of quaternion.
+/// Power function of Quaternion.
 #[inline]
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
@@ -751,10 +919,10 @@ where T: Float {
     ( coef * cos, scale_vec((coef * sin) / tmp.sqrt(), q.1) )
 }
 
-/// Power function of versor.
+/// Power function of Versor.
 /// 
-/// If it is guaranteed to be a versor, it is less computationally 
-/// expensive than the `pow` function. 
+/// If the argument `q` is guaranteed to be a Versor, it is less 
+/// computationally expensive than the `pow(...)` function. 
 #[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
@@ -774,14 +942,14 @@ where T: Float {
 /// | Multiply     | 18  |
 /// | Add/Subtract | 12  |
 /// 
-/// # Examples
+/// # Example
 /// 
 /// ```
 /// # use quaternion_core::{from_axis_angle, point_rotation, mul, conj};
-/// # let pi = std::f64::consts::PI;
+/// # let PI = std::f64::consts::PI;
 /// // Make these as you like.
 /// let v = [1.0, 0.5, -8.0];
-/// let q = from_axis_angle([0.2, 1.0, -2.0], pi);
+/// let q = from_axis_angle([0.2, 1.0, -2.0], PI);
 /// 
 /// let r = point_rotation(q, v);
 /// 
@@ -811,14 +979,14 @@ where T: Float {
 /// | Multiply     | 18  |
 /// | Add/Subtract | 12  |
 /// 
-/// # Examples
+/// # Example
 /// 
 /// ```
 /// # use quaternion_core::{from_axis_angle, point_rotation, mul, conj};
-/// # let pi = std::f64::consts::PI;
+/// # let PI = std::f64::consts::PI;
 /// // Make these as you like.
 /// let v = [1.0, 0.5, -8.0];
-/// let q = from_axis_angle([0.2, 1.0, -2.0], pi);
+/// let q = from_axis_angle([0.2, 1.0, -2.0], PI);
 /// 
 /// let r = point_rotation(q, v);
 /// 
@@ -836,15 +1004,14 @@ where T: Float {
     scale_add_vec(cast(2.0), cross_vec(tmp, q.1), v)
 }
 
-/// Calculate a versor to rotate from vector `a` to `b`.
+/// Calculate a Versor to rotate from vector `a` to `b`.
 /// 
 /// If you enter a zero vector, it returns an identity quaternion.
 /// 
-/// # Examples
+/// # Example
 /// 
 /// ```
 /// # use quaternion_core::{Vector3, cross_vec, rotate_a_to_b, point_rotation};
-/// 
 /// let a: Vector3<f64> = [1.5, -0.5, 0.2];
 /// let b: Vector3<f64> = [0.1, 0.6, 1.0];
 /// 
@@ -874,14 +1041,15 @@ where T: Float {
     }
 }
 
-/// Calculate a versor to rotate from vector `a` to `b`.
+/// Calculate a Versor to rotate from vector `a` to `b`.
 /// 
 /// The parameter `t` adjusts the amount of movement from `a` to `b`, 
-/// so that When `t=1`, it moves to position `b` completely.
+/// so that When `t = 1`, it moves to position `b` completely.
 /// 
 /// If you enter a zero vector, it returns an identity quaternion.
 /// 
-/// If `t=1` at all times, it is less computationally expensive to use `rotate_a_to_b` function.
+/// If `t = 1` at all times, it is less computationally expensive to 
+/// use `rotate_a_to_b(...)` function.
 #[inline]
 pub fn rotate_a_to_b_param<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
 where T: Float {
@@ -904,9 +1072,10 @@ where T: Float {
 
 /// Lerp (Linear interpolation)
 /// 
-/// Generate a quaternion that interpolate the shortest path from `a` to `b` 
-/// (The norm of `a` and `b` must be 1).
+/// Generate a Versor that interpolate the shortest path from `a` to `b`.
 /// The argument `t (0 <= t <= 1)` is the interpolation parameter.
+/// 
+/// The arguments `a` and `b` must be Versor.
 /// 
 /// Normalization is not performed internally because 
 /// it increases the computational complexity.
@@ -915,7 +1084,7 @@ pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatSimd<T> {
     debug_assert!(
         t >= T::zero() && t <= T::one(), 
-        "Parameter `t` must be in the range [0, 1]."
+        "Parameter `t` is out of range!"
     );
 
     // 最短経路で補間する
@@ -933,16 +1102,16 @@ where T: Float + FloatSimd<T> {
 
 /// Slerp (Spherical linear interpolation)
 /// 
-/// Generate a quaternion that interpolate the shortest path from `a` to `b`.
-/// The argument `t(0 <= t <= 1)` is the interpolation parameter.
+/// Generate a Versor that interpolate the shortest path from `a` to `b`.
+/// The argument `t (0 <= t <= 1)` is the interpolation parameter.
 /// 
-/// The norm of `a` and `b` must be 1 (Versor).
+/// The arguments `a` and `b` must be Versor.
 #[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float + FloatSimd<T> {
     debug_assert!(
         t >= T::zero() && t <= T::one(), 
-        "Parameter `t` must be in the range [0, 1]."
+        "Parameter `t` is out of range!"
     );
     
     // 最短経路で補間する
@@ -1016,6 +1185,5 @@ fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
 /// 定義域外の値をカットして未定義動作を防ぐ．
 #[inline(always)]
 fn acos_safe<T: Float>(x: T) -> T {
-    // たまにacosが抜けると計算時間を把握しにくくなるから，この実装とする．
-    ( x.abs().min( T::one() ) * x.signum() ).acos()
+    x.abs().min( T::one() ).copysign(x).acos()
 }
