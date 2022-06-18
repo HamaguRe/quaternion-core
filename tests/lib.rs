@@ -31,14 +31,14 @@ fn test_get_angle() {
     // 実部の符号を反映することで幾何学的には方法1と同じ結果が得られる．
     // 実部と虚部両方の値を使っているのでなんとなく気持ちが良い．
     // range: (-π, π]
-    let angle2 = ( 2.0 * norm_vec(q.1).asin() ).copysign(q.0);
+    let angle2 = ( 2.0 * norm(q.1).asin() ).copysign(q.0);
 
     // 方法3
     // 普通にゼロ除算が発生するが，atanなので計算できる．
     // range: (-π, π)
-    let angle3 = 2.0 * (norm_vec(q.1) / q.0).atan();  // これで正しい．atan2だと値域がおかしくなる．
+    let angle3 = 2.0 * (norm(q.1) / q.0).atan();  // これで正しい．atan2だと値域がおかしくなる．
 
-    println!("axis: {:?}", normalize_vec(q.1));
+    println!("axis: {:?}", normalize(q.1));
     println!("angle1: {}PI, angle2: {}PI, angle3: {}PI", angle1/PI, angle2/PI, angle3/PI);
 
     assert!( (angle1 - 0.5*PI).abs() < EPSILON );
@@ -50,7 +50,7 @@ fn test_get_angle() {
 fn test_axis_angle() {
     // to_axis_angle関数はどのような回転角を入れても正常に変換できるが，
     // テストコードの実装上，angleの範囲は(-2π, 2π)とする．
-    let axis = normalize_vec([0.0, 1.0, 1.0]);
+    let axis = normalize([0.0, 1.0, 1.0]);
     let angle = -1.5*PI;
     let q = from_axis_angle(axis, angle);
     println!("q: {:?}", q);
@@ -67,7 +67,7 @@ fn test_axis_angle() {
         assert_eq_vec(re_axis, axis);
     } else {
         // 負の回転角の場合には回転軸が反転する
-        assert_eq_vec(re_axis, negate_vec(axis));
+        assert_eq_vec(re_axis, negate(axis));
     }
 
     // 回転角のチェック
@@ -89,7 +89,7 @@ fn test_dcm() {
     let diff = [0.2, -0.1, 2.5];
     let mut axis = [1.0, -0.2, 0.9];
     for i in 0..20 {
-        axis = add_vec(axis, diff);
+        axis = add(axis, diff);
         let q = from_axis_angle(axis, PI * (i as f64));  // Versor
         let dcm = to_dcm(q);
         let q_rest = from_dcm(dcm);
@@ -103,7 +103,7 @@ fn test_dcm() {
 
     // a <--> b の相互変換が正しく行えるかテスト
     let a = [1.0f64, 0.0, 0.0];
-    let b = normalize_vec([0.0f64, 1.0, 1.0]);
+    let b = normalize([0.0f64, 1.0, 1.0]);
     let q = rotate_a_to_b(a, b);
 
     let m_a2b = to_dcm(q);
@@ -423,79 +423,15 @@ fn test_rotation_vector() {
 }
 
 #[test]
-fn test_cross() {
-    let r1 = [1.0, 0.0, 0.0];
-    let r2 = [0.0, 1.0, 0.0];
-
-    let r = cross_vec(r1, r2);
-    assert_eq!( [0.0, 0.0, 1.0] , r );
-}
-
-#[test]
-fn test_add() {
-    let a: Quaternion<f64> = (0.5, [1.0, 1.0, 1.0]);
-    let b: Quaternion<f64> = (0.5, [1.0, 1.0, 1.0]);
-    assert_eq!( add(a, b), (1.0, [2.0; 3]) );
-}
-
-#[test]
-fn test_sub() {
-    let a = (0.5, [1.0, 1.0, 1.0]);
-    let b = (0.5, [1.0, 1.0, 1.0]);
-    assert_eq!( sub(a, b), (0.0, [0.0; 3]) );
-}
-
-#[test]
-fn test_scale_add() {
-    let s = 2.0_f64;
-    let a = (0.5, [1.0, 2.5, 1.2]);
-    let b = (2.2, [6.5, 1.0, 3.4]);
-
-    let result_1 = scale_add(s, a, b);
-    let result_2 = add( scale(s, a), b );
-    assert_eq_quat(result_1, result_2);
-}
-
-#[test]
-fn test_hadamard() {
-    let a = (1.0f64, [2.0, 3.0, 4.0]);
-    let b = (4.0f64, [3.0, 2.0, 1.0]);
-
-    let result = hadamard(a, b);
-    assert_eq_quat(result, (4.0, [6.0, 6.0, 4.0]));
-}
-
-#[test]
-fn test_norm() {
-    let q = from_axis_angle([1.0, 2.0, 0.5], 1.5);
-    assert!( (norm(q) - 1.0f64).abs() < EPSILON);
-}
-
-#[test]
-fn test_normalize() {
-    let q = (1.0, [2.0, 3.0, 4.0]);
-    let q_n = normalize(q);
-    assert!( (norm(q_n) - 1.0f64).abs() < EPSILON );
-}
-
-#[test]
-fn test_negate() {
-    let q = (-1.0, [1.0, 2.0, -1.0]);
-    let p = negate(q);
-
-    assert_eq!( p, (1.0, [-1.0, -2.0, 1.0]) );
-}
-
-#[test]
 fn test_mul() {
     let a = (1.0f64, [0.5, -1.2, 3.0]);
     let b = (0.5f64, [-0.2, 2.5, -3.3]);
 
-    let v0 = scale_vec(a.0, b.1);
-    let v1 = scale_vec(b.0, a.1);
+    let v0 = scale(a.0, b.1);
+    let v1 = scale(b.0, a.1);
     let p = (
-        a.0 * b.0 - dot_vec(a.1, b.1),
-        add_vec( add_vec(v0, v1), cross_vec(a.1, b.1) )
+        a.0 * b.0 - dot(a.1, b.1),
+        add( add(v0, v1), cross(a.1, b.1) )
     );
 
     let q = mul(a, b);
@@ -512,6 +448,7 @@ fn test_point_rotation() {
     assert_eq_vec(result, [0.0, 2.0, -2.0]);
 }
 
+// 手計算した結果で動作確認
 #[test]
 fn test_frame_rotation() {
     let r = [2.0, 2.0, 0.0];
@@ -529,7 +466,7 @@ fn test_to_axis_angle() {
     let q = from_axis_angle(axis, angle);
 
     // 軸の方向は分かるが，元の大きさはわからない．
-    let n = normalize_vec(axis);
+    let n = normalize(axis);
     let f = to_axis_angle(q);
     assert!( (f.1 - angle).abs() < EPSILON );
     for i in 0..3 {
@@ -539,7 +476,7 @@ fn test_to_axis_angle() {
 
 #[test]
 fn test_rotate_a_to_b() {
-    let a = normalize_vec([1.0f64, -0.5, -2.0]);
+    let a = normalize([1.0f64, -0.5, -2.0]);
     
     let q = from_axis_angle([1.0, 0.5, -0.5], PI);
     let b = point_rotation(q, a);
@@ -570,6 +507,6 @@ fn assert_eq_quat(a: Quaternion<f64>, b: Quaternion<f64>) {
     } else {
         // bの符号を反転
         assert!((a.0 + b.0).abs() < EPSILON);
-        assert_eq_vec(a.1, negate_vec(b.1));
+        assert_eq_vec(a.1, negate(b.1));
     }
 }

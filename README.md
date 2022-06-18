@@ -2,8 +2,8 @@
 
 Quaternion library written in Rust.
 
-This provides basic operations on Quaternion and interconversion with several 
-attitude representations as generic functions (Supports f32 & f64).
+This provides Quaternion operations and interconversion with several attitude 
+representations as generic functions (Supports f32 & f64).
 
 ## Usage
 
@@ -11,12 +11,12 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-quaternion-core = "0.2"
+quaternion-core = "0.3"
 ```
 
 ## Conversion
 
-![conversion](./conversion.png)
+![conversion](https://raw.githubusercontent.com/HamaguRe/quaternion-core/master/conversion.png)
 
 Interconversion with 24 different Euler angles (12 each of `Intrinsic` and `Extrinsic`) is possible!!
 
@@ -26,10 +26,10 @@ Interconversion with 24 different Euler angles (12 each of `Intrinsic` and `Extr
 
 ```toml
 [dependencies.quaternion-core]
-version = "0.2"
+version = "0.3"
 
-# Uncomment if you wish to use FMA and SIMD.
-#features = ["fma", "simd"]
+# Uncomment if you wish to use FMA.
+#features = ["fma"]
 
 # Uncomment if you wish to use in "no_std" environment.
 #default-features = false
@@ -47,28 +47,7 @@ If your CPU does not support FMA instructions, or if you use `libm` (running in 
 environment), enabling the `fma` feature may cause slowdown of computation speed. Also, 
 due to rounding error, results of `s.mul_add(a, b)` and `s*a + b` will not match perfectly.
 
-### simd
-
-___Attension!! : This feature may have bugs and should not be enabled at first.___
-
-By enabling this feature, the SIMD implementation using the 
-[std::arch](https://docs.rs/rustc-std-workspace-std/1.0.1/std/arch/index.html) 
-module can be used in some functions.
-
-Currently (`version="0.2.0"`) only `x86` and `x86_64` architectures are supported.
-
-To enable this feature, CPU must support these instruction sets:
-```
-SSE, SSE2, SSE3, SSE4.1, AVX, FMA
-```
-
-Also, specify the `-C target-cpu` flag to the compiler as follows:
-
-```console
-$ RUSTFLAGS='-C target-cpu=native' cargo build
-```
-
-### libm & default-feature = false
+### libm & default-features = false
 
 These options allow for use in the `no_std` environment. 
 In this case, mathematical functions (e.g. sin, cos, sqrt ...) are provided by 
@@ -82,7 +61,7 @@ In this case, mathematical functions (e.g. sin, cos, sqrt ...) are provided by
 use quaternion_core as quat;
 
 const PI: f64 = std::f64::consts::PI;
-const EPSILON: f64 = 1e-14;
+const EPSILON: f64 = 1e-12;
 
 fn main() {
     // Generates a quaternion representing the
@@ -93,7 +72,7 @@ fn main() {
     let r = quat::point_rotation(q, [2.0, 2.0, 0.0]);
 
     // Check if the calculation is correct.
-    let diff = quat::sub_vec([0.0, 2.0, -2.0], r);
+    let diff = quat::sub([0.0, 2.0, -2.0], r);
     for val in diff {
         assert!( val.abs() < EPSILON );
     }

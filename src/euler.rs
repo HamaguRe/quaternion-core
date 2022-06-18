@@ -1,8 +1,8 @@
 //! オイラー角関係の処理を実装
 
-use super::{Float, FloatConst, FloatSimd};
+use super::{Float, FloatConst};
 use super::{RotationSequence, Vector3, Quaternion};
-use super::{scale_vec, cast, to_dcm};
+use super::{scale, cast, to_dcm};
 
 /// 特異点判定の閾値
 /// 
@@ -14,7 +14,7 @@ const THRESHOLD: f64 = 0.9999984;
 pub fn from_intrinsic_euler_angles<T>(rs: RotationSequence, angles: Vector3<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     use RotationSequence::*;
-    let [alpha, beta, gamma] = scale_vec(cast(0.5), angles);
+    let [alpha, beta, gamma] = scale(cast(0.5), angles);
     let (sinb, cosb) = beta.sin_cos();
 
     let (q0, [q1, q2, q3]): Quaternion<T>;
@@ -128,7 +128,7 @@ where T: Float + FloatConst {
 pub fn from_extrinsic_euler_angles<T>(rs: RotationSequence, angles: Vector3<T>) -> Quaternion<T>
 where T: Float + FloatConst {
     use RotationSequence::*;
-    let [alpha, beta, gamma] = scale_vec(cast(0.5), angles);
+    let [alpha, beta, gamma] = scale(cast(0.5), angles);
     let (sinb, cosb) = beta.sin_cos();
 
     let (q0, [q1, q2, q3]): Quaternion<T>;
@@ -238,7 +238,7 @@ where T: Float + FloatConst {
 /// 特異点では第三回転角を0[rad]にする．
 #[inline]
 pub fn to_intrinsic_euler_angles<T>(rs: RotationSequence, q: Quaternion<T>) -> Vector3<T>
-where T: Float + FloatConst + FloatSimd<T> {
+where T: Float + FloatConst {
     use RotationSequence::*;
     let [
         [m11, m12, m13],
@@ -399,7 +399,7 @@ where T: Float + FloatConst + FloatSimd<T> {
 /// Intrinsicの実装から第一軸と第三軸をひっくり返せば良い．
 #[inline]
 pub fn to_extrinsic_euler_angles<T>(rs: RotationSequence, q: Quaternion<T>) -> Vector3<T>
-where T: Float + FloatConst + FloatSimd<T> {
+where T: Float + FloatConst {
     use RotationSequence::*;
     let [
         [m11, m12, m13],

@@ -1,22 +1,23 @@
 [package]
 name = "quaternion-core"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["HamaguRe <hamagure@space-denpa.jp>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/HamaguRe/quaternion-core.git"
 homepage = "https://github.com/HamaguRe/quaternion-core.git"
 documentation = "https://docs.rs/quaternion-core"
-description = "Quaternion library written in Rust"
-keywords = ["mathematics", "science", "no-std"]
+description = "Provides quaternion operations and interconversion with several attitude representations."
+keywords = ["math", "quaternion", "vector"]
+categories = ["mathematics", "science", "no-std"]
 readme = "README.md"
 build = "build.rs"
+exclude = [".gitignore", "conversion.png"]
 
 [features]
 default = ["std"]
 std = ["num-traits/std"]
 fma = []
-simd = []
 libm = ["num-traits/libm"]
 
 [dependencies.num-traits]

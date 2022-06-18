@@ -1,7 +1,27 @@
 //! Quaternion library written in Rust.
 //! 
-//! This provides basic operations on Quaternion and interconversion with several 
-//! attitude representations as generic functions (Supports f32 & f64).
+//! This provides Quaternion operations and interconversion with several attitude 
+//! representations as generic functions (Supports `f32` & `f64`).
+//! 
+//! ## Generics
+//! 
+//! Functions implementing the `QuaternionOps` trait can take both `Quaternion<T>` 
+//! and `Vector3<T>` as arguments. In this case, `Vector3<T>` is treated as a Pure Quaternion.
+//! 
+//! For example:
+//! ```
+//! use quaternion_core::{Vector3, Quaternion, add};
+//! 
+//! // --- Vector3 --- //
+//! let v1: Vector3<f32> = [1.0, 2.0, 3.0];
+//! let v2: Vector3<f32> = [0.1, 0.2, 0.3];
+//! println!("{:?}", add(v1, v2));  // <--- It's [1.1, 2.2, 3.3]
+//! 
+//! // --- Quaternion --- //
+//! let q1: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+//! let q2: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+//! println!("{:?}", add(q1, q2));  // <--- It's (1.1, [2.2, 3.3, 4.4])
+//! ```
 //! 
 //! ## Versor
 //! 
@@ -17,9 +37,9 @@ extern crate std;
 
 use num_traits::{Float, FloatConst};
 
-mod simd;
 mod euler;
-pub use simd::FloatSimd;
+mod generics;
+pub use generics::QuaternionOps;
 
 /// Vector3 (Pure Quaternion)
 /// 
@@ -78,7 +98,6 @@ pub enum RotationSequence {
     YXZ,
 }
 
-
 /// Generate Versor by specifying rotation `angle`\[rad\] and `axis` vector.
 /// 
 /// The `axis` vector does not have to be a unit vector.
@@ -88,7 +107,7 @@ pub enum RotationSequence {
 /// # Example
 /// 
 /// ```
-/// # use quaternion_core::{from_axis_angle, point_rotation, sub_vec};
+/// # use quaternion_core::{from_axis_angle, point_rotation, sub};
 /// # let PI = std::f64::consts::PI;
 /// // Generates a quaternion representing the
 /// // rotation of π/2[rad] around the y-axis.
@@ -98,7 +117,7 @@ pub enum RotationSequence {
 /// let r = point_rotation(q, [2.0, 2.0, 0.0]);
 /// 
 /// // Check if the calculation is correct.
-/// let diff = sub_vec([0.0, 2.0, -2.0], r);
+/// let diff = sub([0.0, 2.0, -2.0], r);
 /// for val in diff {
 ///     assert!( val.abs() < 1e-12 );
 /// }
@@ -108,11 +127,11 @@ pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let theta = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
     let f = ( theta * cast(0.5) ).sin_cos();
-    let coef = f.0 / norm_vec(axis);
+    let coef = f.0 / norm(axis);
     if coef.is_infinite() {
         IDENTITY()
     } else {
-        ( f.1, scale_vec(coef, axis) )
+        ( f.1, scale(coef, axis) )
     }
 }
 
@@ -126,14 +145,14 @@ where T: Float + FloatConst {
 #[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
 where T: Float {
-    let norm_q_v = norm_vec(q.1);
+    let norm_q_v = norm(q.1);
     let coef = norm_q_v.recip();
     if coef.is_infinite() {
         ( ZERO_VECTOR(), T::zero() )
     } else {
         // 少しの誤差は見逃す．
         let tmp = norm_q_v.min( T::one() ).asin();
-        ( scale_vec(coef, q.1), (tmp + tmp).copysign(q.0) ) // theta = 2*tmp
+        ( scale(coef, q.1), (tmp + tmp).copysign(q.0) ) // theta = 2*tmp
     }
 }
 
@@ -278,7 +297,7 @@ where T: Float {
 /// ```
 #[inline]
 pub fn to_dcm<T>(q: Quaternion<T>) -> DCM<T>
-where T: Float + FloatSimd<T> {
+where T: Float {
     let neg_one = -T::one();
     let two = cast(2.0);
 
@@ -425,7 +444,7 @@ where T: Float + FloatConst {
 /// ```
 #[inline]
 pub fn to_euler_angles<T>(rt: RotationType, rs: RotationSequence, q: Quaternion<T>) -> Vector3<T>
-where T: Float + FloatConst + FloatSimd<T> {
+where T: Float + FloatConst {
     match rt {
         RotationType::Intrinsic => euler::to_intrinsic_euler_angles(rs, q),
         RotationType::Extrinsic => euler::to_extrinsic_euler_angles(rs, q),
@@ -442,13 +461,13 @@ where T: Float + FloatConst + FloatSimd<T> {
 /// # Example
 /// 
 /// ```
-/// # use quaternion_core::{from_rotation_vector, scale_vec, point_rotation};
+/// # use quaternion_core::{from_rotation_vector, scale, point_rotation};
 /// # let PI = std::f64::consts::PI;
 /// let angle = PI / 2.0;
 /// let axis = [1.0, 0.0, 0.0];
 /// 
 /// // This represents a rotation of π/2 around the x-axis.
-/// let rot_vec = scale_vec(angle, axis);  // Rotation vector
+/// let rot_vec = scale(angle, axis);  // Rotation vector
 /// 
 /// // Rotation vector ---> Quaternion
 /// let q = from_rotation_vector(rot_vec);
@@ -462,13 +481,13 @@ where T: Float + FloatConst + FloatSimd<T> {
 #[inline]
 pub fn from_rotation_vector<T>(v: Vector3<T>) -> Quaternion<T>
 where T: Float {
-    let theta = norm_vec(v);
+    let theta = norm(v);
     let f = ( theta * cast(0.5) ).sin_cos();
     let coef = f.0 / theta;
     if coef.is_infinite() {
         IDENTITY()
     } else {
-        ( f.1, scale_vec(coef, v) )
+        ( f.1, scale(coef, v) )
     }
 }
 
@@ -482,13 +501,13 @@ where T: Float {
 /// # Example
 /// 
 /// ```
-/// # use quaternion_core::{from_axis_angle, to_rotation_vector, scale_vec};
+/// # use quaternion_core::{from_axis_angle, to_rotation_vector, scale};
 /// # let PI = std::f64::consts::PI;
 /// let angle = PI / 2.0;
 /// let axis = [1.0, 0.0, 0.0];
 /// 
 /// // These represent the same rotation.
-/// let rv = scale_vec(angle, axis);  // Rotation vector
+/// let rv = scale(angle, axis);  // Rotation vector
 /// let q = from_axis_angle(axis, angle);  // Quaternion
 /// 
 /// // Quaternion ---> Rotation vector
@@ -502,11 +521,11 @@ where T: Float {
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
     let tmp = acos_safe(q.0);
-    let coef = (tmp + tmp) / norm_vec(q.1);  // 2*tmp
+    let coef = (tmp + tmp) / norm(q.1);  // 2*tmp
     if coef.is_infinite() {
         ZERO_VECTOR()
     } else {
-        scale_vec(coef, q.1)
+        scale(coef, q.1)
     }
 }
 
@@ -515,163 +534,277 @@ where T: Float {
 pub fn matrix_product<T>(m: DCM<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     [
-        dot_vec(m[0], v),
-        dot_vec(m[1], v),
-        dot_vec(m[2], v),
+        dot(m[0], v),
+        dot(m[1], v),
+        dot(m[2], v),
     ]
 }
 
-/// Calculate the sum of each element of Vector3.
+/// Calculate the sum of each element of Quaternion or Vector3.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, sum};
+/// // --- Vector3 --- //
+/// let v: Vector3<f64> = [1.0, 2.0, 3.0];
+/// 
+/// assert!( (6.0 - sum(v)).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// 
+/// assert!( (10.0 - sum(q)).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn sum_vec<T>(v: Vector3<T>) -> T
-where T: Float {
-    v[0] + v[1] + v[2]
-}
-
-/// Calculate the sum of each element of Quaternion.
-#[inline]
-pub fn sum<T>(q: Quaternion<T>) -> T
-where T: FloatSimd<T> {
-    T::sum(q)
+pub fn sum<T, U>(a: U) -> T
+where T: Float, U: QuaternionOps<T> {
+    a.sum()
 }
 
 /// `a + b`
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, add};
+/// // --- Vector3 --- //
+/// let v1: Vector3<f64> = [1.0, 2.0, 3.0];
+/// let v2: Vector3<f64> = [0.1, 0.2, 0.3];
+/// let v_result = add(v1, v2);
+/// 
+/// assert!( (1.1 - v_result[0]).abs() < 1e-12 );
+/// assert!( (2.2 - v_result[1]).abs() < 1e-12 );
+/// assert!( (3.3 - v_result[2]).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q1: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q2: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+/// let q_result = add(q1, q2);
+/// 
+/// assert!( (1.1 - q_result.0).abs() < 1e-12 );
+/// assert!( (2.2 - q_result.1[0]).abs() < 1e-12 );
+/// assert!( (3.3 - q_result.1[1]).abs() < 1e-12 );
+/// assert!( (4.4 - q_result.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn add_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
-where T: Float {
-    [ a[0]+b[0], a[1]+b[1], a[2]+b[2] ]
-}
-
-/// `a + b`
-#[inline]
-pub fn add<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: FloatSimd<T> {
-    T::add(a, b)
+pub fn add<T, U>(a: U, b: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.add(b)
 }
 
 /// `a - b`
-#[inline]
-pub fn sub_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
-where T: Float {
-    [ a[0]-b[0], a[1]-b[1], a[2]-b[2] ]
-}
-
-/// `a - b`
-#[inline]
-pub fn sub<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: FloatSimd<T> {
-    T::sub(a, b)
-}
-
-/// `s * v`
-#[inline]
-pub fn scale_vec<T>(s: T, v: Vector3<T>) -> Vector3<T>
-where T: Float {
-    [ s*v[0], s*v[1], s*v[2] ]
-}
-
-/// `s * q`
-#[inline]
-pub fn scale<T>(s: T, q: Quaternion<T>) -> Quaternion<T>
-where T: FloatSimd<T> {
-    T::scale(s, q)
-}
-
-/// `s*a + b`
 /// 
-/// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
-/// If not enabled, it's computed by unfused multiply-add (s*a + b).
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, sub};
+/// // --- Vector3 --- //
+/// let v1: Vector3<f64> = [1.0, 2.0, 3.0];
+/// let v2: Vector3<f64> = [0.1, 0.2, 0.3];
+/// let v_result = sub(v1, v2);
+/// 
+/// assert!( (0.9 - v_result[0]).abs() < 1e-12 );
+/// assert!( (1.8 - v_result[1]).abs() < 1e-12 );
+/// assert!( (2.7 - v_result[2]).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q1: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q2: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+/// let q_result = sub(q1, q2);
+/// 
+/// assert!( (0.9 - q_result.0).abs() < 1e-12 );
+/// assert!( (1.8 - q_result.1[0]).abs() < 1e-12 );
+/// assert!( (2.7 - q_result.1[1]).abs() < 1e-12 );
+/// assert!( (3.6 - q_result.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn scale_add_vec<T>(s: T, a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
-where T: Float {
-    [
-        mul_add(s, a[0], b[0]),
-        mul_add(s, a[1], b[1]),
-        mul_add(s, a[2], b[2]),
-    ]
+pub fn sub<T, U>(a: U, b: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.sub(b)
 }
 
-/// `s*a + b`
+/// `s * a`
 /// 
-/// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
-/// If not enabled, it's computed by unfused multiply-add (s*a + b).
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, scale};
+/// // --- Vector3 --- //
+/// let v: Vector3<f64> = [1.0, 2.0, 3.0];
+/// let v_result = scale(2.0, v);
+/// 
+/// assert!( (2.0 - v_result[0]).abs() < 1e-12 );
+/// assert!( (4.0 - v_result[1]).abs() < 1e-12 );
+/// assert!( (6.0 - v_result[2]).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q_result = scale(2.0, q);
+/// 
+/// assert!( (2.0 - q_result.0).abs() < 1e-12 );
+/// assert!( (4.0 - q_result.1[0]).abs() < 1e-12 );
+/// assert!( (6.0 - q_result.1[1]).abs() < 1e-12 );
+/// assert!( (8.0 - q_result.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn scale_add<T>(s: T, a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: FloatSimd<T> {
-    T::scale_add(s, a, b)
+pub fn scale<T, U>(s: T, a: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.scale(s)
+}
+
+/// `s * a + b`
+/// 
+/// If the `fma` feature is enabled, the FMA calculation is performed using 
+/// the `mul_add` method (`s.mul_add(a, b)`). 
+/// If not enabled, it's computed by unfused multiply-add (`s * a + b`).
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, scale_add};
+/// // --- Vector3 --- //
+/// let v1: Vector3<f64> = [1.0, 2.0, 3.0];
+/// let v2: Vector3<f64> = [0.1, 0.2, 0.3];
+/// let v_result = scale_add(2.0, v1, v2);
+/// 
+/// assert!( (2.1 - v_result[0]).abs() < 1e-12 );
+/// assert!( (4.2 - v_result[1]).abs() < 1e-12 );
+/// assert!( (6.3 - v_result[2]).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q1: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q2: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+/// let q_result = scale_add(2.0, q1, q2);
+/// 
+/// assert!( (2.1 - q_result.0).abs() < 1e-12 );
+/// assert!( (4.2 - q_result.1[0]).abs() < 1e-12 );
+/// assert!( (6.3 - q_result.1[1]).abs() < 1e-12 );
+/// assert!( (8.4 - q_result.1[2]).abs() < 1e-12 );
+/// ```
+#[inline]
+pub fn scale_add<T, U>(s: T, a: U, b: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.scale_add(s, b)
 }
 
 /// `a ∘ b`
 /// 
-/// Hadamard product of Vector3.
-#[inline]
-pub fn hadamard_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
-where T: Float {
-    [ a[0]*b[0], a[1]*b[1], a[2]*b[2] ]
-}
-
-/// `a ∘ b`
+/// Hadamard product of Vector3 or Quaternion.
 /// 
-/// Hadamard product of Quaternions.
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, hadamard};
+/// // --- Vector3 --- //
+/// let v1: Vector3<f64> = [1.0, 2.0, 3.0];
+/// let v2: Vector3<f64> = [0.1, 0.2, 0.3];
+/// let v_result = hadamard(v1, v2);
+/// 
+/// assert!( (0.1 - v_result[0]).abs() < 1e-12 );
+/// assert!( (0.4 - v_result[1]).abs() < 1e-12 );
+/// assert!( (0.9 - v_result[2]).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q1: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q2: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+/// let q_result = hadamard(q1, q2);
+/// 
+/// assert!( (0.1 - q_result.0).abs() < 1e-12 );
+/// assert!( (0.4 - q_result.1[0]).abs() < 1e-12 );
+/// assert!( (0.9 - q_result.1[1]).abs() < 1e-12 );
+/// assert!( (1.6 - q_result.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn hadamard<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: FloatSimd<T> {
-    T::hadamard(a, b)
+pub fn hadamard<T, U>(a: U, b: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.hadamard(b)
 }
 
 /// `a ∘ b + c`
 /// 
-/// Hadamard product and addiction of Vector3.
+/// Hadamard product and addiction of Quaternion or Vector3.
 /// 
-/// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
-/// If not enabled, it's computed by unfused multiply-add (s*a + b).
+/// If the `fma` feature is enabled, the FMA calculation is performed using 
+/// the `mul_add` method (`s.mul_add(a, b)`). 
+/// If not enabled, it's computed by unfused multiply-add (`s * a + b`).
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, hadamard_add};
+/// // --- Vector3 --- //
+/// let v1: Vector3<f64> = [1.0, 2.0, 3.0];
+/// let v2: Vector3<f64> = [0.1, 0.2, 0.3];
+/// let v3: Vector3<f64> = [0.4, 0.5, 0.6];
+/// let v_result = hadamard_add(v1, v2, v3);
+/// 
+/// assert!( (0.5 - v_result[0]).abs() < 1e-12 );
+/// assert!( (0.9 - v_result[1]).abs() < 1e-12 );
+/// assert!( (1.5 - v_result[2]).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q1: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q2: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+/// let q3: Quaternion<f64> = (0.5, [0.6, 0.7, 0.8]);
+/// let q_result = hadamard_add(q1, q2, q3);
+/// 
+/// assert!( (0.6 - q_result.0).abs() < 1e-12 );
+/// assert!( (1.0 - q_result.1[0]).abs() < 1e-12 );
+/// assert!( (1.6 - q_result.1[1]).abs() < 1e-12 );
+/// assert!( (2.4 - q_result.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn hadamard_add_vec<T>(a: Vector3<T>, b: Vector3<T>, c: Vector3<T>) -> Vector3<T>
-where T: Float {
-    [
-        mul_add(a[0], b[0], c[0]),
-        mul_add(a[1], b[1], c[1]),
-        mul_add(a[2], b[2], c[2]),
-    ]
-}
-
-/// `a ∘ b + c`
-/// 
-/// Hadamard product and addiction of Quaternions.
-/// 
-/// If the `fma` feature is enabled, the FMA calculation is performed using the `mul_add` method. 
-/// If not enabled, it's computed by unfused multiply-add (s*a + b).
-#[inline]
-pub fn hadamard_add<T>(a: Quaternion<T>, b: Quaternion<T>, c: Quaternion<T>) -> Quaternion<T>
-where T: FloatSimd<T> {
-    T::hadamard_add(a, b, c)
+pub fn hadamard_add<T, U>(a: U, b: U, c: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.hadamard_add(b, c)
 }
 
 /// `a · b`
 /// 
-/// Dot product of Vector3.
+/// Dot product of Vector3 or Quaternion.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, dot};
+/// // --- Vector3 --- //
+/// let v1: Vector3<f64> = [1.0, 2.0, 3.0];
+/// let v2: Vector3<f64> = [0.1, 0.2, 0.3];
+/// 
+/// assert!( (1.4 - dot(v1, v2)).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q1: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q2: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+/// 
+/// assert!( (3.0 - dot(q1, q2)).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn dot_vec<T>(a: Vector3<T>, b: Vector3<T>) -> T
-where T: Float {
-    sum_vec( hadamard_vec(a, b) )
+pub fn dot<T, U>(a: U, b: U) -> T 
+where T: Float, U: QuaternionOps<T> {
+    sum( hadamard(a, b) )
 }
 
-/// `a · b`
-/// 
-/// Dot product of Quaternions.
-#[inline]
-pub fn dot<T>(a: Quaternion<T>, b: Quaternion<T>) -> T 
-where T: FloatSimd<T> {
-    T::dot(a, b)
-}
-
-/// `a × b`
-/// 
-/// Cross product.
+/// Cross product (vector product): `a × b`
 /// 
 /// The product order is `a × b (!= b × a)`
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, scale, cross};
+/// let v1: Vector3<f64> = [0.5, -1.0, 0.8];
+/// let v2: Vector3<f64> = scale(2.0, v1);
+/// let v_result = cross(v1, v2);
+/// 
+/// // The cross product of parallel vectors is a zero vector.
+/// assert!( v_result[0].abs() < 1e-12 );
+/// assert!( v_result[1].abs() < 1e-12 );
+/// assert!( v_result[2].abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn cross_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
+pub fn cross<T>(a: Vector3<T>, b: Vector3<T>) -> Vector3<T>
 where T: Float {
     [
         a[1]*b[2] - a[2]*b[1],
@@ -680,53 +813,46 @@ where T: Float {
     ]
 }
 
-/// Calculate L2 norm of Vector3.
+/// Calculate L2 norm of Vector3 or Quaternion.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, norm};
+/// // --- Vector3 --- //
+/// let v: Vector3<f64> = [1.0, 2.0, 3.0];
+/// 
+/// assert!( (14.0_f64.sqrt() - norm(v)).abs() < 1e-12 );
+/// 
+/// // --- Quaternion --- //
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// 
+/// assert!( (30.0_f64.sqrt() - norm(q)).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn norm_vec<T>(v: Vector3<T>) -> T
-where T: Float {
-    dot_vec(v, v).sqrt()
+pub fn norm<T, U>(a: U) -> T 
+where T: Float, U: QuaternionOps<T> {
+    dot(a, a).sqrt()
 }
 
-/// Calculate L2 norm of Quaternion.
-#[inline]
-pub fn norm<T>(q: Quaternion<T>) -> T 
-where T: Float + FloatSimd<T> {
-    dot(q, q).sqrt()
-}
-
-/// Normalization of Vector3.
+/// Normalization of Vector3 or Quaternion.
 /// 
 /// If you enter a zero vector, it returns a zero vector.
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{Vector3, norm_vec, normalize_vec};
+/// # use quaternion_core::{Vector3, Quaternion, norm, normalize};
+/// // --- Vector3 --- //
 /// // This norm is not 1.
 /// let v: Vector3<f64> = [1.0, 2.0, 3.0];
-/// assert!( (1.0 - norm_vec(v)).abs() > 1e-12 );
+/// assert!( (1.0 - norm(v)).abs() > 1e-12 );
 /// 
 /// // Now that normalized, this norm is 1!
-/// let v_n = normalize_vec(v);
-/// assert!( (1.0 - norm_vec(v_n)).abs() < 1e-12 );
-/// ```
-#[inline]
-pub fn normalize_vec<T>(v: Vector3<T>) -> Vector3<T>
-where T: Float {
-    let coef = norm_vec(v).recip();
-    if coef.is_infinite() {
-        ZERO_VECTOR()
-    } else {
-        scale_vec(coef, v)
-    }
-}
-
-/// Normalization of Quaternion.
+/// let v_n = normalize(v);
+/// assert!( (1.0 - norm(v_n)).abs() < 1e-12 );
 /// 
-/// # Example
-/// 
-/// ```
-/// # use quaternion_core::{Quaternion, norm, normalize};
+/// // --- Quaternion --- //
 /// // This norm is not 1.
 /// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
 /// assert!( (1.0 - norm(q)).abs() > 1e-12 );
@@ -736,36 +862,26 @@ where T: Float {
 /// assert!( (1.0 - norm(q_n)).abs() < 1e-12 );
 /// ```
 #[inline]
-pub fn normalize<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float + FloatSimd<T> {
-    scale( norm(q).recip(), q )
+pub fn normalize<T, U>(a: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.normalize()
 }
 
-/// Invert the sign of a Vector3.
+/// Invert the sign of a Vector3 or Quaternion.
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{Vector3, negate_vec};
+/// # use quaternion_core::{Vector3, Quaternion, negate};
+/// // --- Vector3 --- //
 /// let v: Vector3<f64> = [1.0, 2.0, 3.0];
-/// let v_n = negate_vec(v);
+/// let v_n = negate(v);
 /// 
 /// assert_eq!(-v[0], v_n[0]);
 /// assert_eq!(-v[1], v_n[1]);
 /// assert_eq!(-v[2], v_n[2]);
-/// ```
-#[inline]
-pub fn negate_vec<T>(v: Vector3<T>) -> Vector3<T>
-where T: Float {
-    [ -v[0], -v[1], -v[2] ]
-}
-
-/// Invert the sign of a Quaternion.
 /// 
-/// # Example
-/// 
-/// ```
-/// # use quaternion_core::{Quaternion, negate};
+/// // --- Quaternion --- //
 /// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
 /// let q_n = negate(q);
 /// 
@@ -775,31 +891,45 @@ where T: Float {
 /// assert_eq!(-q.1[2], q_n.1[2]);
 /// ```
 #[inline]
-pub fn negate<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: FloatSimd<T> {
-    T::negate(q)
+pub fn negate<T, U>(a: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.negate()
 }
 
-/// Product of Pure Quaternions.
-/// 
-/// `ab ≡ -a·b + a×b` (!= ba)
-#[inline]
-pub fn mul_vec<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
-where T: Float {
-    ( -dot_vec(a, b), cross_vec(a, b) )
-}
-
-/// Hamilton product (Product of Quaternions).
+/// Hamilton product (Product of Quaternion or Pure Quaternion)
 /// 
 /// The product order is `ab (!= ba)`
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, inv, mul};
+/// // ---- Pure Quaternion (Vector3) ---- //
+/// let v: Vector3<f64> = [1.0, 2.0, 3.0];
+/// 
+/// // Identity quaternion
+/// let id = mul( v, inv(v) );  // = mul( inv(v), v );
+/// 
+/// assert!( (1.0 - id.0).abs() < 1e-12 );
+/// assert!( id.1[0].abs() < 1e-12 );
+/// assert!( id.1[1].abs() < 1e-12 );
+/// assert!( id.1[2].abs() < 1e-12 );
+/// 
+/// // ---- Quaternion ---- //
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// 
+/// // Identity quaternion
+/// let id = mul( q, inv(q) );  // = mul( inv(q), q );
+/// 
+/// assert!( (1.0 - id.0).abs() < 1e-12 );
+/// assert!( id.1[0].abs() < 1e-12 );
+/// assert!( id.1[1].abs() < 1e-12 );
+/// assert!( id.1[2].abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn mul<T>(a: Quaternion<T>, b: Quaternion<T>) -> Quaternion<T>
-where T: Float + FloatSimd<T> {
-    let a0_b = scale(a.0, b);
-    (
-        a0_b.0 - dot_vec(a.1, b.1),
-        add_vec( scale_add_vec(b.0, a.1, a0_b.1), cross_vec(a.1, b.1) )
-    )
+pub fn mul<T, U>(a: U, b: U) -> Quaternion<T>
+where T: Float, U: QuaternionOps<T> {
+    a.mul(b)
 }
 
 /// Calculate the conjugate of Quaternion.
@@ -819,80 +949,98 @@ where T: Float + FloatSimd<T> {
 #[inline]
 pub fn conj<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
-    ( q.0, negate_vec(q.1) )
+    ( q.0, negate(q.1) )
 }
 
-/// Calculate the inverse of Pure Quaternion (Vector3).
+/// Calculate the inverse of Quaternion or Pure Quaternion (Vector3).
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{Vector3, inv_vec, mul_vec};
+/// # use quaternion_core::{Vector3, Quaternion, inv, mul};
+/// // ---- Pure Quaternion (Vector3) ---- //
 /// let v: Vector3<f64> = [1.0, 2.0, 3.0];
 /// 
 /// // Identity quaternion
-/// let id = mul_vec( v, inv_vec(v) );  // = mul_vec( inv_vec(v), v );
+/// let id = mul( v, inv(v) );  // = mul( inv(v), v );
 /// 
-/// assert!( (id.0.abs() - 1.0) < 1e-12);
-/// assert!( id.1[0] < 1e-12 );
-/// assert!( id.1[1] < 1e-12 );
-/// assert!( id.1[2] < 1e-12 );
-/// ```
-#[inline]
-pub fn inv_vec<T>(v: Vector3<T>) -> Vector3<T>
-where T: Float {
-    scale_vec( dot_vec(v, v).recip(), negate_vec(v) )
-}
-
-/// Calcurate the inverse of Quaternion.
+/// assert!( (id.0 - 1.0).abs() < 1e-12 );
+/// assert!( id.1[0].abs() < 1e-12 );
+/// assert!( id.1[1].abs() < 1e-12 );
+/// assert!( id.1[2].abs() < 1e-12 );
 /// 
-/// # Example
-/// 
-/// ```
-/// # use quaternion_core::{Quaternion, inv, mul};
+/// // ---- Quaternion ---- //
 /// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
 /// 
 /// // Identity quaternion
 /// let id = mul( q, inv(q) );  // = mul( inv(q), q );
 /// 
-/// assert!( (id.0.abs() - 1.0) < 1e-12);
-/// assert!( id.1[0] < 1e-12 );
-/// assert!( id.1[1] < 1e-12 );
-/// assert!( id.1[2] < 1e-12 );
+/// assert!( (id.0 - 1.0).abs() < 1e-12 );
+/// assert!( id.1[0].abs() < 1e-12 );
+/// assert!( id.1[1].abs() < 1e-12 );
+/// assert!( id.1[2].abs() < 1e-12 );
 /// ```
 #[inline]
-pub fn inv<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float + FloatSimd<T> {
-    scale( dot(q, q).recip(), conj(q) )
+pub fn inv<T, U>(a: U) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.inv()
 }
 
-/// Exponential function of Pure Quaternion (Vector3).
+// acosは[-π/2, π/2]の範囲でしか値を返さないので、qのとり方によってはlnで完全に復元できない。
+// q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-π/2, π/2]の範囲内にある場合のみ。
+/// Exponential function of Quaternion or Pure Quaternion (Vector3).
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, exp, ln};
+/// // ---- Pure Quaternion (Vector3) ---- //
+/// let v: Vector3<f64> = [0.1, 0.2, 0.3];
+/// let v_r = ln( exp(v) );
+/// 
+/// assert!( v_r.0.abs() < 1e-12 );
+/// assert!( (v[0] - v_r.1[0]).abs() < 1e-12 );
+/// assert!( (v[1] - v_r.1[1]).abs() < 1e-12 );
+/// assert!( (v[2] - v_r.1[2]).abs() < 1e-12 );
+/// 
+/// // ---- Quaternion ---- //
+/// let q: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+/// let q_r = ln( exp(q) );
+/// 
+/// assert!( (q.0 - q_r.0).abs() < 1e-12 );
+/// assert!( (q.1[0] - q_r.1[0]).abs() < 1e-12 );
+/// assert!( (q.1[1] - q_r.1[1]).abs() < 1e-12 );
+/// assert!( (q.1[2] - q_r.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
-pub fn exp_vec<T>(v: Vector3<T>) -> Quaternion<T>
-where T: Float {
-    let norm_v = norm_vec(v);
-    let (sin, cos) = norm_v.sin_cos();
-    ( cos, scale_vec(sin / norm_v, v) )
+pub fn exp<T, U>(a: U) -> Quaternion<T>
+where T: Float, U: QuaternionOps<T> {
+    a.exp()
 }
 
-/// Exponential function of Quaternion.
-#[inline]
-pub fn exp<T>(q: Quaternion<T>) -> Quaternion<T>
-where T: Float {
-    let norm_q_v = norm_vec(q.1);
-    let (sin, cos) = norm_q_v.sin_cos();
-    let coef = q.0.exp();
-    ( coef * cos, scale_vec((coef * sin) / norm_q_v, q.1) )
-}
-
+// acosは[-π/2, π/2]の範囲でしか値を返さないので、qのとり方によってはlnで完全に復元できない。
+// q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-π/2, π/2]の範囲内にある場合のみ。
 /// Natural logarithm of Quaternion.
+/// 
+/// # Example
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, exp, ln};
+/// let q: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
+/// let q_r = ln( exp(q) );
+/// 
+/// assert!( (q.0 - q_r.0).abs() < 1e-12 );
+/// assert!( (q.1[0] - q_r.1[0]).abs() < 1e-12 );
+/// assert!( (q.1[1] - q_r.1[1]).abs() < 1e-12 );
+/// assert!( (q.1[2] - q_r.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
-    let tmp = dot_vec(q.1, q.1);
+    let tmp = dot(q.1, q.1);
     let norm_q = (q.0*q.0 + tmp).sqrt();
     let coef = (q.0 / norm_q).acos() / tmp.sqrt();
-    ( norm_q.ln(), scale_vec(coef, q.1) )
+    ( norm_q.ln(), scale(coef, q.1) )
 }
 
 /// Natural logarithm of Versor.
@@ -904,19 +1052,19 @@ where T: Float {
 #[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
-    scale_vec( acos_safe(q.0) / norm_vec(q.1), q.1)
+    scale( acos_safe(q.0) / norm(q.1), q.1)
 }
 
 /// Power function of Quaternion.
 #[inline]
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    let tmp = dot_vec(q.1, q.1);
+    let tmp = dot(q.1, q.1);
     let norm_q = (q.0*q.0 + tmp).sqrt();
     let omega = (q.0 / norm_q).acos();
     let (sin, cos) = (t * omega).sin_cos();
     let coef = norm_q.powf(t);
-    ( coef * cos, scale_vec((coef * sin) / tmp.sqrt(), q.1) )
+    ( coef * cos, scale((coef * sin) / tmp.sqrt(), q.1) )
 }
 
 /// Power function of Versor.
@@ -927,7 +1075,7 @@ where T: Float {
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     let (sin, cos) = (t * acos_safe(q.0)).sin_cos();
-    ( cos, scale_vec(sin / norm_vec(q.1), q.1) )
+    ( cos, scale(sin / norm(q.1), q.1) )
 }
 
 /// Rotation of point (Point Rotation - Frame Fixed)
@@ -963,8 +1111,8 @@ where T: Float {
 #[inline]
 pub fn point_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
-    let tmp = scale_add_vec(q.0, v, cross_vec(q.1, v));
-    scale_add_vec(cast(2.0), cross_vec(q.1, tmp), v)
+    let tmp = scale_add(q.0, v, cross(q.1, v));
+    scale_add(cast(2.0), cross(q.1, tmp), v)
 }
 
 /// Rotation of frame (Frame Rotation - Point Fixed)
@@ -1000,8 +1148,8 @@ where T: Float {
 #[inline]
 pub fn frame_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
-    let tmp = scale_add_vec(q.0, v, cross_vec(v, q.1));
-    scale_add_vec(cast(2.0), cross_vec(tmp, q.1), v)
+    let tmp = scale_add(q.0, v, cross(v, q.1));
+    scale_add(cast(2.0), cross(tmp, q.1), v)
 }
 
 /// Calculate a Versor to rotate from vector `a` to `b`.
@@ -1011,14 +1159,14 @@ where T: Float {
 /// # Example
 /// 
 /// ```
-/// # use quaternion_core::{Vector3, cross_vec, rotate_a_to_b, point_rotation};
+/// # use quaternion_core::{Vector3, cross, rotate_a_to_b, point_rotation};
 /// let a: Vector3<f64> = [1.5, -0.5, 0.2];
 /// let b: Vector3<f64> = [0.1, 0.6, 1.0];
 /// 
 /// let q = rotate_a_to_b(a, b);
 /// let b_check = point_rotation(q, a);
 /// 
-/// let cross = cross_vec(b, b_check);
+/// let cross = cross(b, b_check);
 /// assert!( cross[0].abs() < 1e-12 );
 /// assert!( cross[1].abs() < 1e-12 );
 /// assert!( cross[2].abs() < 1e-12 );
@@ -1028,14 +1176,14 @@ pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
 where T: Float {
     let half: T = cast(0.5);
 
-    let t = dot_vec(a, b);
-    let s_square = dot_vec(a, a) * dot_vec(b, b);
+    let t = dot(a, b);
+    let s_square = dot(a, a) * dot(b, b);
     let e_half = half * (t / s_square.sqrt());
     let v = ((half - e_half) / (s_square - t * t)).sqrt();
 
     // vがfiniteならeもfiniteである．
     if v.is_finite() {
-        ( (half + e_half).sqrt(), scale_vec(v, cross_vec(a, b)) )
+        ( (half + e_half).sqrt(), scale(v, cross(a, b)) )
     } else {
         IDENTITY()
     }
@@ -1053,8 +1201,8 @@ where T: Float {
 #[inline]
 pub fn rotate_a_to_b_param<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
 where T: Float {
-    let dot_ab = dot_vec(a, b);
-    let norm_ab_square = dot_vec(a, a) * dot_vec(b, b);
+    let dot_ab = dot(a, b);
+    let norm_ab_square = dot(a, a) * dot(b, b);
     let tmp_acos = dot_ab / norm_ab_square.sqrt();
     if tmp_acos.is_infinite() {
         IDENTITY()
@@ -1063,7 +1211,7 @@ where T: Float {
         let (sin, cos) = ( t * theta * cast(0.5) ).sin_cos();
         let coef_v = sin / (norm_ab_square - dot_ab * dot_ab).sqrt();
         if coef_v.is_finite() {
-            ( cos, scale_vec(coef_v, cross_vec(a, b)) )
+            ( cos, scale(coef_v, cross(a, b)) )
         } else {
             IDENTITY()
         }
@@ -1081,7 +1229,7 @@ where T: Float {
 /// it increases the computational complexity.
 #[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
-where T: Float + FloatSimd<T> {
+where T: Float {
     debug_assert!(
         t >= T::zero() && t <= T::one(), 
         "Parameter `t` is out of range!"
@@ -1108,7 +1256,7 @@ where T: Float + FloatSimd<T> {
 /// The arguments `a` and `b` must be Versor.
 #[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
-where T: Float + FloatSimd<T> {
+where T: Float {
     debug_assert!(
         t >= T::zero() && t <= T::one(), 
         "Parameter `t` is out of range!"
