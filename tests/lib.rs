@@ -1,4 +1,4 @@
-// $ cargo test --features simd --features fma
+// $ cargo test --features fma
 
 use quaternion_core::*;
 

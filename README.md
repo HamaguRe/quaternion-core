@@ -3,7 +3,7 @@
 Quaternion library written in Rust.
 
 This provides Quaternion operations and interconversion with several attitude 
-representations as generic functions (Supports f32 & f64).
+representations as generic functions (Supports `f32` & `f64`).
 
 ## Usage
 
@@ -19,6 +19,8 @@ quaternion-core = "0.3"
 ![conversion](https://raw.githubusercontent.com/HamaguRe/quaternion-core/master/conversion.png)
 
 Interconversion with 24 different Euler angles (12 each of `Intrinsic` and `Extrinsic`) is possible!!
+
+Other interconversions with Axis/Angle and Rotation vector are also possible.
 
 ## Features
 

@@ -4,8 +4,7 @@
 // 普通無いと思うから実装しない．同じ理由でpowの実装も無し．
 // どうしてもPure Quaternionを入れたければln((0.0, pure))みたいにすれば良い．
 
-use super::{Vector3, Quaternion, dot, norm, cross, conj, mul_add, ZERO_VECTOR};
-use super::Float;
+use super::{Vector3, Quaternion, Float};
 
 
 /// This trait provides operations common to Quaternions and Pure Quaternions (Vector3).
@@ -68,9 +67,9 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     #[inline]
     fn scale_add(self, s: T, b: Self) -> Self {
         [
-            mul_add(s, self[0], b[0]),
-            mul_add(s, self[1], b[1]),
-            mul_add(s, self[2], b[2]),
+            super::mul_add(s, self[0], b[0]),
+            super::mul_add(s, self[1], b[1]),
+            super::mul_add(s, self[2], b[2]),
         ]
     }
 
@@ -86,18 +85,18 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     #[inline]
     fn hadamard_add(self, b: Self, c: Self) -> Self {
         [
-            mul_add(self[0], b[0], c[0]),
-            mul_add(self[1], b[1], c[1]),
-            mul_add(self[2], b[2], c[2]),
+            super::mul_add(self[0], b[0], c[0]),
+            super::mul_add(self[1], b[1], c[1]),
+            super::mul_add(self[2], b[2], c[2]),
         ]
     }
 
     // 零ベクトルを入力した時は零ベクトルを返す
     #[inline]
     fn normalize(self) -> Self {
-        let coef = norm(self).recip();
+        let coef = super::norm(self).recip();
         if coef.is_infinite() {
-            ZERO_VECTOR()
+            super::ZERO_VECTOR()
         } else {
             self.scale(coef)
         }
@@ -111,18 +110,18 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     // Product of Pure Quaternions
     #[inline]
     fn mul(self, rhs: Self) -> Quaternion<T> {
-        ( -dot(self, rhs), cross(self, rhs) )
+        ( -super::dot(self, rhs), super::cross(self, rhs) )
     }
 
     // 零ベクトルで特異点
     #[inline]
     fn inv(self) -> Self {
-        self.negate().scale( dot(self, self).recip() )
+        self.negate().scale( super::dot(self, self).recip() )
     }
 
     #[inline]
     fn exp(self) -> Quaternion<T> {
-        let norm_v = norm(self);
+        let norm_v = super::norm(self);
         let (sin, cos) = norm_v.sin_cos();
         ( cos, self.scale(sin / norm_v) )
     }
@@ -151,7 +150,7 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
 
     #[inline]
     fn scale_add(self, s: T, b: Self) -> Self {
-        ( mul_add(s, self.0, b.0), self.1.scale_add(s, b.1) )
+        ( super::mul_add(s, self.0, b.0), self.1.scale_add(s, b.1) )
     }
 
     #[inline]
@@ -161,12 +160,12 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
 
     #[inline]
     fn hadamard_add(self, b: Self, c: Self) -> Self {
-        ( mul_add(self.0, b.0, c.0), self.1.hadamard_add(b.1, c.1) )
+        ( super::mul_add(self.0, b.0, c.0), self.1.hadamard_add(b.1, c.1) )
     }
 
     #[inline]
     fn normalize(self) -> Self {
-        self.scale( norm(self).recip() )
+        self.scale( super::norm(self).recip() )
     }
 
     #[inline]
@@ -178,19 +177,19 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
     fn mul(self, rhs: Self) -> Quaternion<T> {
         let self0_b = rhs.scale(self.0);
         (
-            self0_b.0 - dot(self.1, rhs.1),
-            self.1.scale_add(rhs.0, self0_b.1).add( cross(self.1, rhs.1) )
+            self0_b.0 - super::dot(self.1, rhs.1),
+            self.1.scale_add(rhs.0, self0_b.1).add( super::cross(self.1, rhs.1) )
         )
     }
 
     #[inline]
     fn inv(self) -> Self {
-        conj(self).scale( dot(self, self).recip() )
+        super::conj(self).scale( super::dot(self, self).recip() )
     }
 
     #[inline]
     fn exp(self) -> Quaternion<T> {
-        let norm_v = norm(self.1);
+        let norm_v = super::norm(self.1);
         let (sin, cos) = norm_v.sin_cos();
         let coef = self.0.exp();
         ( coef * cos, self.1.scale((coef * sin) / norm_v) )

@@ -53,6 +53,8 @@ pub type Quaternion<T> = (T, Vector3<T>);
 
 /// Direction Cosine Matrix
 /// 
+/// `mij`: row `i`, column `j`
+/// 
 /// `
 /// [
 ///     [m11, m12, m13],
@@ -104,7 +106,7 @@ pub enum RotationSequence {
 /// 
 /// If you enter a zero vector, it returns an identity quaternion.
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{from_axis_angle, point_rotation, sub};
@@ -168,7 +170,7 @@ where T: Float {
 /// let q = conj( from_dcm(dcm) );
 /// ```
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{
@@ -185,7 +187,7 @@ where T: Float {
 ///     let m = to_dcm(q);
 ///     let q_check = from_dcm(m);
 ///     
-///     assert!( (q.0 - q_check.0).abs() < 1e-12 );
+///     assert!( (q.0    - q_check.0).abs() < 1e-12 );
 ///     assert!( (q.1[0] - q_check.1[0]).abs() < 1e-12 );
 ///     assert!( (q.1[1] - q_check.1[1]).abs() < 1e-12 );
 ///     assert!( (q.1[2] - q_check.1[2]).abs() < 1e-12 );
@@ -196,7 +198,7 @@ where T: Float {
 ///     let m = to_dcm( conj(q) );
 ///     let q_check = conj( from_dcm(m) );
 ///     
-///     assert!( (q.0 - q_check.0).abs() < 1e-12 );
+///     assert!( (q.0    - q_check.0).abs() < 1e-12 );
 ///     assert!( (q.1[0] - q_check.1[0]).abs() < 1e-12 );
 ///     assert!( (q.1[1] - q_check.1[1]).abs() < 1e-12 );
 ///     assert!( (q.1[2] - q_check.1[2]).abs() < 1e-12 );
@@ -458,7 +460,7 @@ where T: Float + FloatConst {
 /// 
 /// Range of the norm of the rotation vector: `[0, 2π]`
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{from_rotation_vector, scale, point_rotation};
@@ -498,7 +500,7 @@ where T: Float {
 /// 
 /// Range of the norm of the rotation vector: `[0, 2π]`
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{from_axis_angle, to_rotation_vector, scale};
@@ -790,7 +792,7 @@ where T: Float, U: QuaternionOps<T> {
 /// 
 /// The product order is `a × b (!= b × a)`
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{Vector3, scale, cross};
@@ -885,7 +887,7 @@ where T: Float, U: QuaternionOps<T> {
 /// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
 /// let q_n = negate(q);
 /// 
-/// assert_eq!(-q.0, q_n.0);
+/// assert_eq!(-q.0,    q_n.0);
 /// assert_eq!(-q.1[0], q_n.1[0]);
 /// assert_eq!(-q.1[1], q_n.1[1]);
 /// assert_eq!(-q.1[2], q_n.1[2]);
@@ -934,14 +936,14 @@ where T: Float, U: QuaternionOps<T> {
 
 /// Calculate the conjugate of Quaternion.
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{Quaternion, conj};
 /// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
 /// let q_conj = conj(q);
 /// 
-/// assert_eq!(q.0, q_conj.0);
+/// assert_eq!( q.0,    q_conj.0);
 /// assert_eq!(-q.1[0], q_conj.1[0]);
 /// assert_eq!(-q.1[1], q_conj.1[1]);
 /// assert_eq!(-q.1[2], q_conj.1[2]);
@@ -993,7 +995,7 @@ where T: Float, U: QuaternionOps<T> {
 /// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{Vector3, Quaternion, exp, ln};
+/// # use quaternion_core::{Vector3, Quaternion, scale, exp, ln};
 /// // ---- Pure Quaternion (Vector3) ---- //
 /// let v: Vector3<f64> = [0.1, 0.2, 0.3];
 /// let v_r = ln( exp(v) );
@@ -1007,10 +1009,18 @@ where T: Float, U: QuaternionOps<T> {
 /// let q: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
 /// let q_r = ln( exp(q) );
 /// 
-/// assert!( (q.0 - q_r.0).abs() < 1e-12 );
+/// assert!( (q.0    - q_r.0).abs() < 1e-12 );
 /// assert!( (q.1[0] - q_r.1[0]).abs() < 1e-12 );
 /// assert!( (q.1[1] - q_r.1[1]).abs() < 1e-12 );
 /// assert!( (q.1[2] - q_r.1[2]).abs() < 1e-12 );
+/// 
+/// // The relationship between exp(q) and exp(q.1)
+/// let exp_q = exp(q);
+/// let exp_check = scale( q.0.exp(), exp(q.1) );
+/// assert!( (exp_q.0    - exp_check.0).abs() < 1e-12 );
+/// assert!( (exp_q.1[0] - exp_check.1[0]).abs() < 1e-12 );
+/// assert!( (exp_q.1[1] - exp_check.1[1]).abs() < 1e-12 );
+/// assert!( (exp_q.1[2] - exp_check.1[2]).abs() < 1e-12 );
 /// ```
 #[inline]
 pub fn exp<T, U>(a: U) -> Quaternion<T>
@@ -1022,14 +1032,14 @@ where T: Float, U: QuaternionOps<T> {
 // q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-π/2, π/2]の範囲内にある場合のみ。
 /// Natural logarithm of Quaternion.
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{Vector3, Quaternion, exp, ln};
 /// let q: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
 /// let q_r = ln( exp(q) );
 /// 
-/// assert!( (q.0 - q_r.0).abs() < 1e-12 );
+/// assert!( (q.0    - q_r.0).abs() < 1e-12 );
 /// assert!( (q.1[0] - q_r.1[0]).abs() < 1e-12 );
 /// assert!( (q.1[1] - q_r.1[1]).abs() < 1e-12 );
 /// assert!( (q.1[2] - q_r.1[2]).abs() < 1e-12 );
@@ -1038,7 +1048,7 @@ where T: Float, U: QuaternionOps<T> {
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let tmp = dot(q.1, q.1);
-    let norm_q = (q.0*q.0 + tmp).sqrt();
+    let norm_q = mul_add(q.0, q.0, tmp).sqrt();
     let coef = (q.0 / norm_q).acos() / tmp.sqrt();
     ( norm_q.ln(), scale(coef, q.1) )
 }
@@ -1056,11 +1066,39 @@ where T: Float {
 }
 
 /// Power function of Quaternion.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, mul, inv, pow, sqrt};
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// 
+/// let q_q = mul(q, q);
+/// let q_pow_2 = pow(q, 2.0);
+/// assert!( (q_q.0    - q_pow_2.0).abs() < 1e-12 );
+/// assert!( (q_q.1[0] - q_pow_2.1[0]).abs() < 1e-12 );
+/// assert!( (q_q.1[1] - q_pow_2.1[1]).abs() < 1e-12 );
+/// assert!( (q_q.1[2] - q_pow_2.1[2]).abs() < 1e-12 );
+/// 
+/// let q_sqrt = sqrt(q);
+/// let q_pow_0p5 = pow(q, 0.5);
+/// assert!( (q_sqrt.0    - q_pow_0p5.0).abs() < 1e-12 );
+/// assert!( (q_sqrt.1[0] - q_pow_0p5.1[0]).abs() < 1e-12 );
+/// assert!( (q_sqrt.1[1] - q_pow_0p5.1[1]).abs() < 1e-12 );
+/// assert!( (q_sqrt.1[2] - q_pow_0p5.1[2]).abs() < 1e-12 );
+/// 
+/// let q_inv = inv(q);
+/// let q_pow_m1 = pow(q, -1.0);
+/// assert!( (q_inv.0    - q_pow_m1.0).abs() < 1e-12 );
+/// assert!( (q_inv.1[0] - q_pow_m1.1[0]).abs() < 1e-12 );
+/// assert!( (q_inv.1[1] - q_pow_m1.1[1]).abs() < 1e-12 );
+/// assert!( (q_inv.1[2] - q_pow_m1.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     let tmp = dot(q.1, q.1);
-    let norm_q = (q.0*q.0 + tmp).sqrt();
+    let norm_q = mul_add(q.0, q.0, tmp).sqrt();
     let omega = (q.0 / norm_q).acos();
     let (sin, cos) = (t * omega).sin_cos();
     let coef = norm_q.powf(t);
@@ -1078,6 +1116,31 @@ where T: Float {
     ( cos, scale(sin / norm(q.1), q.1) )
 }
 
+/// Square root of Quaternion.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, mul, pow, sqrt};
+/// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
+/// let q_sqrt = sqrt(q);
+/// 
+/// let result = mul(q_sqrt, q_sqrt);
+/// assert!( (q.0    - result.0).abs() < 1e-12 );
+/// assert!( (q.1[0] - result.1[0]).abs() < 1e-12 );
+/// assert!( (q.1[1] - result.1[1]).abs() < 1e-12 );
+/// assert!( (q.1[2] - result.1[2]).abs() < 1e-12 );
+/// ```
+#[inline]
+pub fn sqrt<T>(q: Quaternion<T>) -> Quaternion<T>
+where T: Float {
+    let half = cast(0.5);
+    let dot_v = dot(q.1, q.1);
+    let norm_q = mul_add(q.0, q.0, dot_v).sqrt();
+    let coef = (((norm_q - q.0) * half) / dot_v).sqrt();
+    ( ((norm_q + q.0) * half).sqrt(), scale(coef, q.1) )
+}
+
 /// Rotation of point (Point Rotation - Frame Fixed)
 /// 
 /// `q v q*  (||q|| = 1)`
@@ -1090,7 +1153,7 @@ where T: Float {
 /// | Multiply     | 18  |
 /// | Add/Subtract | 12  |
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{from_axis_angle, point_rotation, mul, conj};
@@ -1127,7 +1190,7 @@ where T: Float {
 /// | Multiply     | 18  |
 /// | Add/Subtract | 12  |
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{from_axis_angle, point_rotation, mul, conj};
@@ -1156,7 +1219,7 @@ where T: Float {
 /// 
 /// If you enter a zero vector, it returns an identity quaternion.
 /// 
-/// # Example
+/// # Examples
 /// 
 /// ```
 /// # use quaternion_core::{Vector3, cross, rotate_a_to_b, point_rotation};
