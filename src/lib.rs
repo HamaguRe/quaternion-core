@@ -35,6 +35,7 @@
 #[cfg(feature = "std")]
 extern crate std;
 
+use core::mem;
 use num_traits::{Float, FloatConst};
 
 mod euler;
@@ -817,24 +818,30 @@ where T: Float {
 
 /// Calculate L2 norm of Vector3 or Quaternion.
 /// 
+/// Compared to `dot(a, a).sqrt()`, this function is less likely
+/// to cause overflow even when the argument `a` has large values.
+/// 
 /// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{Vector3, Quaternion, norm};
+/// # use quaternion_core::{Vector3, Quaternion, sum, dot, norm};
 /// // --- Vector3 --- //
 /// let v: Vector3<f64> = [1.0, 2.0, 3.0];
-/// 
 /// assert!( (14.0_f64.sqrt() - norm(v)).abs() < 1e-12 );
 /// 
 /// // --- Quaternion --- //
 /// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
-/// 
 /// assert!( (30.0_f64.sqrt() - norm(q)).abs() < 1e-12 );
+/// 
+/// // --- Check about overflow --- //
+/// let v: Vector3<f32> = [1e15, 2e20, -3e15];
+/// assert_eq!( dot(v, v).sqrt(), f32::INFINITY );  // Oh...
+/// assert_eq!( norm(v), 2e20 );  // Excellent!
 /// ```
 #[inline]
 pub fn norm<T, U>(a: U) -> T 
 where T: Float, U: QuaternionOps<T> {
-    dot(a, a).sqrt()
+    a.norm()
 }
 
 /// Normalization of Vector3 or Quaternion.
@@ -1047,9 +1054,9 @@ where T: Float, U: QuaternionOps<T> {
 #[inline]
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
-    let tmp = dot(q.1, q.1);
-    let norm_q = mul_add(q.0, q.0, tmp).sqrt();
-    let coef = (q.0 / norm_q).acos() / tmp.sqrt();
+    let norm_v = norm(q.1);
+    let norm_q = pythag(q.0, norm_v);
+    let coef = (q.0 / norm_q).acos() / norm_v;
     ( norm_q.ln(), scale(coef, q.1) )
 }
 
@@ -1097,12 +1104,12 @@ where T: Float {
 #[inline]
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    let tmp = dot(q.1, q.1);
-    let norm_q = mul_add(q.0, q.0, tmp).sqrt();
+    let norm_v = norm(q.1);
+    let norm_q = pythag(q.0, norm_v);
     let omega = (q.0 / norm_q).acos();
     let (sin, cos) = (t * omega).sin_cos();
     let coef = norm_q.powf(t);
-    ( coef * cos, scale((coef * sin) / tmp.sqrt(), q.1) )
+    ( coef * cos, scale((coef / norm_v) * sin, q.1) )
 }
 
 /// Power function of Versor.
@@ -1135,9 +1142,9 @@ where T: Float {
 pub fn sqrt<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let half = cast(0.5);
-    let dot_v = dot(q.1, q.1);
-    let norm_q = mul_add(q.0, q.0, dot_v).sqrt();
-    let coef = (((norm_q - q.0) * half) / dot_v).sqrt();
+    let norm_v = norm(q.1);
+    let norm_q = pythag(q.0, norm_v);
+    let coef = ((norm_q - q.0) * half).sqrt() / norm_v;
     ( ((norm_q + q.0) * half).sqrt(), scale(coef, q.1) )
 }
 
@@ -1397,4 +1404,38 @@ fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
 #[inline(always)]
 fn acos_safe<T: Float>(x: T) -> T {
     x.abs().min( T::one() ).copysign(x).acos()
+}
+
+/// Moler-Morrison algorithmにより，ピタゴラスの定理
+/// `c^2 = a^2 + b^2`
+/// を満たすcを求める．
+/// 
+/// 反復回数は有効数字6桁なら2回, 20桁なら3回, 60桁なら4回．
+/// aとbの絶対値が大きく異なる場合（例えば|a| >> |b|）には，
+/// 少ない反復回数で結果が求まる．
+#[inline]
+fn pythag<T: Float>(a: T, b: T) -> T {
+    let mut a = a.abs();
+    let mut b = b.abs();
+    if a < b {
+        mem::swap(&mut a, &mut b);
+    }
+    if b == T::zero() {
+        return a;
+    }
+
+    let two : T = cast(2.0);
+    let four: T = cast(4.0);
+    for _ in 0..4 {
+        let mut s = b / a;
+        s = s * s;
+        let tmp = four + s;
+        if tmp == four {  // 収束判定（これでちゃんとbreakできる）
+            break;
+        }
+        s = s / tmp;
+        a = mul_add(two, a * s, a);
+        b = s * b;
+    }
+    a
 }
