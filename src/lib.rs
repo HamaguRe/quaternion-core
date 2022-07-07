@@ -44,12 +44,18 @@ pub use generics::QuaternionOps;
 
 /// Vector3 (Pure Quaternion)
 /// 
-/// `[i, j, k]`
+/// The type `[q1, q2, q3]` is equivalent to the expression `q1i + q2j + q3k`,
+/// where `i`, `j`, `k` are basis of quaternions and satisfy the following equality:
+/// 
+/// `i^2 = j^2 = k^2 = ijk = -1`
 pub type Vector3<T> = [T; 3];
 
 /// Quaternion
 /// 
-/// `(1, [i, j, k])`
+/// The type `(q0, [q1, q2, q3])` is equivalent to the expression `q0 + q1i + q2j + q3k`, 
+/// where `1`, `i`, `j`, `k` are basis of quaternions and satisfy the following equality:
+/// 
+/// `i^2 = j^2 = k^2 = ijk = -1`
 pub type Quaternion<T> = (T, Vector3<T>);
 
 /// Direction Cosine Matrix
@@ -110,7 +116,7 @@ pub enum RotationSequence {
 /// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{from_axis_angle, point_rotation, sub};
+/// # use quaternion_core::{from_axis_angle, point_rotation};
 /// # let PI = std::f64::consts::PI;
 /// // Generates a quaternion representing the
 /// // rotation of π/2[rad] around the y-axis.
@@ -119,11 +125,9 @@ pub enum RotationSequence {
 /// // Rotate the point.
 /// let r = point_rotation(q, [2.0, 2.0, 0.0]);
 /// 
-/// // Check if the calculation is correct.
-/// let diff = sub([0.0, 2.0, -2.0], r);
-/// for val in diff {
-///     assert!( val.abs() < 1e-12 );
-/// }
+/// assert!( (r[0] - 0.0).abs() < 1e-12 );
+/// assert!( (r[1] - 2.0).abs() < 1e-12 );
+/// assert!( (r[2] + 2.0).abs() < 1e-12 );
 /// ```
 #[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
@@ -145,6 +149,23 @@ where T: Float + FloatConst {
 /// the `axis` returns a zero vector.
 /// 
 /// Range of `angle`: `(-π, π]`
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{from_axis_angle, to_axis_angle};
+/// # let PI = std::f64::consts::PI;
+/// let axis_ori = [0.0, 1.0, 2.0];
+/// let angle_ori = PI / 2.0;
+/// let q = from_axis_angle(axis_ori, angle_ori);
+/// 
+/// let (axis, angle) = to_axis_angle(q);
+/// 
+/// assert!( (axis_ori[0] - axis[0]).abs() < 1e-12 );
+/// assert!( (axis_ori[0] - axis[0]).abs() < 1e-12 );
+/// assert!( (axis_ori[0] - axis[0]).abs() < 1e-12 );
+/// assert!( (angle_ori - angle).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
 where T: Float {
@@ -153,8 +174,7 @@ where T: Float {
     if coef.is_infinite() {
         ( ZERO_VECTOR(), T::zero() )
     } else {
-        // 少しの誤差は見逃す．
-        let tmp = norm_q_v.min( T::one() ).asin();
+        let tmp = norm_q_v.asin();
         ( scale(coef, q.1), (tmp + tmp).copysign(q.0) ) // theta = 2*tmp
     }
 }
@@ -209,11 +229,13 @@ where T: Float {
 pub fn from_dcm<T>(m: DCM<T>) -> Quaternion<T>
 where T: Float {
     // ゼロ除算を避けるために，4通りの式で求めたうちの最大値を係数として使う．
+    let m22_p_m33 = m[1][1] + m[2][2];
+    let m22_m_m33 = m[1][1] - m[2][2];
     let (index, max_num) = max4([
-        m[0][0] + m[1][1] + m[2][2],
-        m[0][0] - m[1][1] - m[2][2],
-       -m[0][0] + m[1][1] - m[2][2],
-       -m[0][0] - m[1][1] + m[2][2],
+        m[0][0] + m22_p_m33,
+        m[0][0] - m22_p_m33,
+       -m[0][0] + m22_m_m33,
+       -m[0][0] - m22_m_m33,
     ]);
 
     let half: T = cast(0.5);
@@ -523,8 +545,8 @@ where T: Float {
 #[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
-    let tmp = acos_safe(q.0);
-    let coef = (tmp + tmp) / norm(q.1);  // 2*tmp
+    let tmp = q.0.acos();
+    let coef = (tmp + tmp) / norm(q.1);
     if coef.is_infinite() {
         ZERO_VECTOR()
     } else {
@@ -533,14 +555,35 @@ where T: Float {
 }
 
 /// Product of DCM and Vector3
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, matrix_product};
+/// # let PI = std::f64::consts::PI;
+/// let theta = PI / 2.0;
+/// let rot_x = [
+///     [1.0, 0.0, 0.0],
+///     [0.0, theta.cos(), -theta.sin()],
+///     [0.0, theta.sin(),  theta.cos()]
+/// ];
+/// let v = [0.0, 1.0, 0.0];
+/// 
+/// let r = matrix_product(rot_x, v);
+/// assert!( (r[0] - 0.0).abs() < 1e-12 );
+/// assert!( (r[1] - 0.0).abs() < 1e-12 );
+/// assert!( (r[2] - 1.0).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn matrix_product<T>(m: DCM<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
-    [
-        dot(m[0], v),
-        dot(m[1], v),
-        dot(m[2], v),
-    ]
+    let mut r = [T::zero(); 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            r[i] = mul_add(m[i][j], v[j], r[i]);
+        }
+    }
+    r
 }
 
 /// Calculate the sum of each element of Quaternion or Vector3.
@@ -1060,16 +1103,30 @@ where T: Float {
     ( norm_q.ln(), scale(coef, q.1) )
 }
 
+// exp(q)の結果がVersorとなる条件は，qのスカラー部が0（つまりqが純虚四元数）．
+// 
 /// Natural logarithm of Versor.
 /// 
 /// If the argument `q` is guaranteed to be a Versor,
-/// it is less computationally expensive than the `ln(...)` function.
+/// it is less calculation cost than the `ln(...)` function.
 /// 
 /// Only the vector part is returned since the real part is always zero.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, exp, ln_versor};
+/// let v: Vector3<f64> = [0.1, 0.2, 0.3];
+/// let r = ln_versor( exp(v) );
+/// 
+/// assert!( (v[0] - r[0]).abs() < 1e-12 );
+/// assert!( (v[1] - r[1]).abs() < 1e-12 );
+/// assert!( (v[2] - r[2]).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
-    scale( acos_safe(q.0) / norm(q.1), q.1)
+    scale( q.0.acos() / norm(q.1), q.1)
 }
 
 /// Power function of Quaternion.
@@ -1114,12 +1171,40 @@ where T: Float {
 
 /// Power function of Versor.
 /// 
-/// If the argument `q` is guaranteed to be a Versor, it is less 
-/// computationally expensive than the `pow(...)` function. 
+/// If the argument `q` is guaranteed to be a Versor, 
+/// it is less calculation cost than the `pow(...)` function.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, normalize, mul, inv, pow_versor, sqrt};
+/// let q: Quaternion<f64> = normalize( (1.0, [2.0, 3.0, 4.0]) );
+/// 
+/// let q_q = mul(q, q);
+/// let q_pow_2 = pow_versor(q, 2.0);
+/// assert!( (q_q.0    - q_pow_2.0).abs() < 1e-12 );
+/// assert!( (q_q.1[0] - q_pow_2.1[0]).abs() < 1e-12 );
+/// assert!( (q_q.1[1] - q_pow_2.1[1]).abs() < 1e-12 );
+/// assert!( (q_q.1[2] - q_pow_2.1[2]).abs() < 1e-12 );
+/// 
+/// let q_sqrt = sqrt(q);
+/// let q_pow_0p5 = pow_versor(q, 0.5);
+/// assert!( (q_sqrt.0    - q_pow_0p5.0).abs() < 1e-12 );
+/// assert!( (q_sqrt.1[0] - q_pow_0p5.1[0]).abs() < 1e-12 );
+/// assert!( (q_sqrt.1[1] - q_pow_0p5.1[1]).abs() < 1e-12 );
+/// assert!( (q_sqrt.1[2] - q_pow_0p5.1[2]).abs() < 1e-12 );
+/// 
+/// let q_inv = inv(q);
+/// let q_pow_m1 = pow_versor(q, -1.0);
+/// assert!( (q_inv.0    - q_pow_m1.0).abs() < 1e-12 );
+/// assert!( (q_inv.1[0] - q_pow_m1.1[0]).abs() < 1e-12 );
+/// assert!( (q_inv.1[1] - q_pow_m1.1[1]).abs() < 1e-12 );
+/// assert!( (q_inv.1[2] - q_pow_m1.1[2]).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    let (sin, cos) = (t * acos_safe(q.0)).sin_cos();
+    let (sin, cos) = (t * q.0.acos()).sin_cos();
     ( cos, scale(sin / norm(q.1), q.1) )
 }
 
@@ -1128,7 +1213,7 @@ where T: Float {
 /// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{Quaternion, mul, pow, sqrt};
+/// # use quaternion_core::{Quaternion, mul, sqrt};
 /// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
 /// let q_sqrt = sqrt(q);
 /// 
@@ -1146,6 +1231,32 @@ where T: Float {
     let norm_q = pythag(q.0, norm_v);
     let coef = ((norm_q - q.0) * half).sqrt() / norm_v;
     ( ((norm_q + q.0) * half).sqrt(), scale(coef, q.1) )
+}
+
+/// Square root of Versor.
+/// 
+/// If the argument `q` is guaranteed to be a Versor, 
+/// it is less calculation cost than the `sqrt(...)` function.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, normalize, mul, sqrt_versor};
+/// let q: Quaternion<f64> = normalize( (1.0, [2.0, 3.0, 4.0]) );
+/// let q_sqrt = sqrt_versor(q);
+/// 
+/// let result = mul(q_sqrt, q_sqrt);
+/// assert!( (q.0    - result.0).abs() < 1e-12 );
+/// assert!( (q.1[0] - result.1[0]).abs() < 1e-12 );
+/// assert!( (q.1[1] - result.1[1]).abs() < 1e-12 );
+/// assert!( (q.1[2] - result.1[2]).abs() < 1e-12 );
+/// ```
+#[inline]
+pub fn sqrt_versor<T>(q: Quaternion<T>) -> Quaternion<T>
+where T: Float {
+    let half = cast(0.5);
+    let coef = (half - q.0 * half).sqrt() / norm(q.1);
+    ( mul_add(q.0, half, half).sqrt(), scale(coef, q.1) )
 }
 
 /// Rotation of point (Point Rotation - Frame Fixed)
@@ -1273,12 +1384,11 @@ pub fn rotate_a_to_b_param<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<
 where T: Float {
     let dot_ab = dot(a, b);
     let norm_ab_square = dot(a, a) * dot(b, b);
-    let tmp_acos = dot_ab / norm_ab_square.sqrt();
-    if tmp_acos.is_infinite() {
+    let cos_theta = dot_ab / norm_ab_square.sqrt();
+    if cos_theta.is_infinite() {
         IDENTITY()
     } else {
-        let theta = acos_safe(tmp_acos);
-        let (sin, cos) = ( t * theta * cast(0.5) ).sin_cos();
+        let (sin, cos) = ( t * cos_theta.acos() * cast(0.5) ).sin_cos();
         let coef_v = sin / (norm_ab_square - dot_ab * dot_ab).sqrt();
         if coef_v.is_finite() {
             ( cos, scale(coef_v, cross(a, b)) )
@@ -1400,19 +1510,26 @@ fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
     (index, max_num)
 }
 
-/// 定義域外の値をカットして未定義動作を防ぐ．
-#[inline(always)]
-fn acos_safe<T: Float>(x: T) -> T {
-    x.abs().min( T::one() ).copysign(x).acos()
-}
-
+// f32,f64のメソッドには同様の機能を提供するhypot()が存在するが，
+// このクレートはマイコン上での動作も想定しているため内部で平方根の
+// 計算を行わないMoler-Morrison algorithmを採用した．収束が速いから
+// ノルムの計算に使用しても丸め誤差が蓄積しにくいというのも理由の一つ．
+// あと，単純に実装が美しい．
+// 
 /// Moler-Morrison algorithmにより，ピタゴラスの定理
 /// `c^2 = a^2 + b^2`
 /// を満たすcを求める．
 /// 
+/// `c = (a*a + b*b).sqrt()`のように実装した場合，有害なアンダーフロー
+/// やオーバーフローが発生する可能性がある．
+/// Moler-Morrison algorithmは他の方法に比べて速度面で若干劣るものの，
+/// 堅牢かつ移植性の高い実装で正確な計算結果を得ることができる．
+/// cがオーバーフローしない範囲の値である限り，本関数による演算で
+/// オーバーフローが起こることはない．
+/// 
 /// 反復回数は有効数字6桁なら2回, 20桁なら3回, 60桁なら4回．
 /// aとbの絶対値が大きく異なる場合（例えば|a| >> |b|）には，
-/// 少ない反復回数で結果が求まる．
+/// より少ない反復回数で結果が求まる．
 #[inline]
 fn pythag<T: Float>(a: T, b: T) -> T {
     let mut a = a.abs();
@@ -1426,7 +1543,7 @@ fn pythag<T: Float>(a: T, b: T) -> T {
 
     let two : T = cast(2.0);
     let four: T = cast(4.0);
-    for _ in 0..4 {
+    for _ in 0..4 {  // loopにするとinfやNaNが入った際に抜けられなくなる
         let mut s = b / a;
         s = s * s;
         let tmp = four + s;
