@@ -36,7 +36,8 @@
 extern crate std;
 
 use core::mem;
-use num_traits::{Float, FloatConst};
+#[cfg(any(feature = "std", feature = "libm"))]
+use num_traits::float::{Float, FloatConst};
 
 mod euler;
 mod generics;
