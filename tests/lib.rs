@@ -477,18 +477,46 @@ fn test_to_axis_angle() {
 #[test]
 fn test_rotate_a_to_b() {
     let a = normalize([1.0f64, -0.5, -2.0]);
+
+    // 適当にbを作って確認
+    {
+        let q = from_axis_angle([-1.0, 5.0, -0.5], 0.7);
+        let b = point_rotation(q, a);
     
-    let q = from_axis_angle([1.0, 0.5, -0.5], PI);
-    let b = point_rotation(q, a);
+        let a_to_b = rotate_a_to_b(a, b);
+        let a_to_b_t = rotate_a_to_b_param(a, b, 1.0);
+        let b_rest = point_rotation(a_to_b, a);
+        let b_rest_t = point_rotation(a_to_b_t, a);
+        assert_eq_vec(b, b_rest);
+        assert_eq_vec(b, b_rest_t);
+        assert!((1.0 - norm(a_to_b)).abs() < EPSILON);
+        assert!((1.0 - norm(a_to_b_t)).abs() < EPSILON);
+    }
 
-    let a_to_b = rotate_a_to_b(a, b);
-    let a_to_b_t = rotate_a_to_b_param(a, b, 1.0);
-    println!("a_to_b: {:?}", a_to_b);
-    let b_rest = point_rotation(a_to_b, a);
-    let b_rest_t = point_rotation(a_to_b_t, a);
+    // aとbが平行かつ逆向きな場合（回転軸の求め方が特殊になる）
+    {
+        let b = negate(a);
+        let a_to_b = rotate_a_to_b(a, b);
+        let a_to_b_param = rotate_a_to_b_param(a, b, 1.0);
+        let b_rest = point_rotation(a_to_b, a);
+        let b_rest_param = point_rotation(a_to_b_param, a);
+        assert_eq_vec(b, b_rest);
+        assert_eq_vec(b, b_rest_param);
+        assert!((1.0 - norm(a_to_b)).abs() < EPSILON);
+        assert!((1.0 - norm(a_to_b_param)).abs() < EPSILON);
+    }
 
-    assert_eq_vec(b, b_rest);
-    assert_eq_vec(b, b_rest_t);
+    // ゼロベクトルを入れた場合
+    {
+        let b = [0.0; 3];
+        let a_to_b = rotate_a_to_b(a, b);  // 入れ替えても大丈夫
+        assert_eq!(1.0, a_to_b.0);
+        assert_eq!(0.0, sum(a_to_b.1));
+        let a_to_b_param = rotate_a_to_b_param(a, b, 1.0);
+        println!("{:?}", a_to_b_param);
+        assert_eq!(1.0, a_to_b_param.0);
+        assert_eq!(0.0, sum(a_to_b_param.1));
+    }
 }
 
 fn assert_eq_vec(a: Vector3<f64>, b: Vector3<f64>) {
