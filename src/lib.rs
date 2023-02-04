@@ -1,7 +1,7 @@
 //! Quaternion library written in Rust.
 //! 
 //! This provides Quaternion operations and interconversion with several attitude 
-//! representations as generic functions (Supports `f32` & `f64`).
+//! representations as generic functions (supports `f32` & `f64`).
 //! 
 //! ## Generics
 //! 
@@ -35,15 +35,19 @@
 #[cfg(feature = "std")]
 extern crate std;
 
-use core::{mem, mem::MaybeUninit};
 #[cfg(any(feature = "std", feature = "libm"))]
 use num_traits::float::{Float, FloatConst};
 
 mod euler;
 mod generics;
+mod private_functions;
 pub use generics::QuaternionOps;
+use private_functions::{
+    IDENTITY, ZERO_VECTOR, cast, mul_add, acos_safe, 
+    sinc, max4, orthogonal_vector, pythag
+};
 
-/// Vector3 (Pure Quaternion)
+/// Three dimensional vector (Pure Quaternion)
 /// 
 /// The type `[q1, q2, q3]` is equivalent to the expression `q1i + q2j + q3k`,
 /// where `i`, `j`, `k` are basis of quaternions and satisfy the following equality:
@@ -72,7 +76,7 @@ pub type Quaternion<T> = (T, Vector3<T>);
 /// `
 pub type DCM<T> = [Vector3<T>; 3];
 
-/// Specify the rotation type of Euler angles.
+/// Specifies the rotation type of Euler angles.
 /// 
 /// Considering a fixed `Reference frame` and a rotating `Body frame`, 
 /// `Intrinsic rotation` and `Extrinsic rotation` represent the following rotations:
@@ -85,11 +89,12 @@ pub enum RotationType {
     Extrinsic,
 }
 
-/// Represents 12 different rotations.
+/// Specifies the rotation sequence of Euler angles.
 /// 
 /// Each variant reads from left to right.
-/// For example, `RotationSequence::XYZ` represents rotation around the X axis first, 
-/// then the Y axis, and finally the Z axis in that order (X ---> Y ---> Z).
+/// For example, `RotationSequence::XYZ` represents first a rotation 
+/// around the X axis, then around the Y axis, and finally around 
+/// the Z axis (X ---> Y ---> Z).
 #[derive(Debug, Clone, Copy)]
 pub enum RotationSequence {
     // Proper (z-x-z, x-y-x, y-z-y, z-y-z, x-z-x, y-x-y)
@@ -134,12 +139,12 @@ pub enum RotationSequence {
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let theta = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
-    let f = ( theta * cast(0.5) ).sin_cos();
-    let coef = f.0 / norm(axis);
+    let (sin, cos) = ( theta * cast(0.5) ).sin_cos();
+    let coef = sin / norm(axis);
     if coef.is_infinite() {
         IDENTITY()
     } else {
-        ( f.1, scale(coef, axis) )
+        ( cos, scale(coef, axis) )
     }
 }
 
@@ -170,14 +175,16 @@ where T: Float + FloatConst {
 #[inline]
 pub fn to_axis_angle<T>(q: Quaternion<T>) -> (Vector3<T>, T)
 where T: Float {
-    let norm_q_v = norm(q.1);
-    let coef = norm_q_v.recip();
-    if coef.is_infinite() {
+    let norm_v = norm(q.1);
+    let norm_inv = norm_v.recip();
+    if norm_inv.is_infinite() {
         ( ZERO_VECTOR(), T::zero() )
     } else {
-        // 少しの誤差は見逃す．
-        let tmp = norm_q_v.min( T::one() ).asin();
-        ( scale(coef, q.1), (tmp + tmp).copysign(q.0) ) // theta = 2*tmp
+        let mut angle = cast::<T>(2.0) * norm_v.min( T::one() ).asin();
+        if q.0 < T::zero() {
+            angle = -angle;
+        }
+        ( scale(norm_inv, q.1), angle )
     }
 }
 
@@ -351,7 +358,7 @@ where T: Float {
     ]
 }
 
-/// Convert Euler angles to Versor.
+/// Convert euler angles to versor.
 /// 
 /// The type of rotation (Intrinsic or Extrinsic) is specified by `RotationType` enum, 
 /// and the rotation sequence (XZX, XYZ, ...) is specified by `RotationSequence` enum.
@@ -410,7 +417,7 @@ where T: Float + FloatConst {
     }
 }
 
-/// Convert Versor to Euler angles.
+/// Convert versor to euler angles.
 /// 
 /// The type of rotation (Intrinsic or Extrinsic) is specified by `RotationType` enum, 
 /// and the rotation sequence (XZX, XYZ, ...) is specified by `RotationSequence` enum.
@@ -481,9 +488,9 @@ where T: Float + FloatConst {
 /// Convert Rotation vector to Versor.
 /// 
 /// The Rotation vector itself represents the axis of rotation, 
-/// and the norm represents the angle of rotation around the axis.
+/// and the norm represents the angle \[rad\] of rotation around the axis.
 /// 
-/// Range of the norm of the rotation vector: `[0, 2π]`
+/// Maximum range of the norm of the rotation vector: `[0, 2π]`
 /// 
 /// # Examples
 /// 
@@ -506,16 +513,11 @@ where T: Float + FloatConst {
 /// assert!( (r[2] - 1.0).abs() < 1e-12 );
 /// ```
 #[inline]
-pub fn from_rotation_vector<T>(v: Vector3<T>) -> Quaternion<T>
+pub fn from_rotation_vector<T>(r: Vector3<T>) -> Quaternion<T>
 where T: Float {
-    let theta = norm(v);
-    let f = ( theta * cast(0.5) ).sin_cos();
-    let coef = f.0 / theta;
-    if coef.is_infinite() {
-        IDENTITY()
-    } else {
-        ( f.1, scale(coef, v) )
-    }
+    let half: T = cast(0.5);
+    let half_theta = half * norm(r);
+    (half_theta.cos(), scale(half * sinc(half_theta), r))
 }
 
 /// Convert Versor to Rotation vector.
@@ -523,7 +525,7 @@ where T: Float {
 /// The Rotation vector itself represents the axis of rotation, 
 /// and the norm represents the angle of rotation around the axis.
 /// 
-/// Range of the norm of the rotation vector: `[0, 2π]`
+/// Norm range of the calculation result: `[0, π]`
 /// 
 /// # Examples
 /// 
@@ -547,13 +549,11 @@ where T: Float {
 #[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
-    let tmp = acos_safe(q.0);
-    let coef = (tmp + tmp) / norm(q.1);
-    if coef.is_infinite() {
-        ZERO_VECTOR()
-    } else {
-        scale(coef, q.1)
+    let mut half_theta = norm(q.1).min( T::one() ).asin();
+    if q.0 < T::zero() {
+        half_theta = -half_theta;
     }
+    scale(cast::<T>(2.0) / sinc(half_theta), q.1)
 }
 
 /// Product of DCM and Vector3
@@ -866,6 +866,9 @@ where T: Float {
 /// Compared to `dot(a, a).sqrt()`, this function is less likely
 /// to cause overflow and underflow.
 /// 
+/// When the `norm-sqrt` feature is enabled, the default 
+/// implementation is compiled with `dot(a, a).sqrt()` instead.
+/// 
 /// # Examples
 /// 
 /// ```
@@ -881,6 +884,8 @@ where T: Float {
 /// // --- Check about overflow --- //
 /// let v: Vector3<f32> = [1e15, 2e20, -3e15];
 /// assert_eq!( dot(v, v).sqrt(), f32::INFINITY );  // Oh...
+/// 
+/// #[cfg(not(feature = "norm-sqrt"))]
 /// assert_eq!( norm(v), 2e20 );  // Excellent!
 /// ```
 #[inline]
@@ -890,8 +895,6 @@ where T: Float, U: QuaternionOps<T> {
 }
 
 /// Normalization of Vector3 or Quaternion.
-/// 
-/// If you enter a zero vector, it returns a zero vector.
 /// 
 /// # Examples
 /// 
@@ -918,7 +921,7 @@ where T: Float, U: QuaternionOps<T> {
 #[inline]
 pub fn normalize<T, U>(a: U) -> U
 where T: Float, U: QuaternionOps<T> {
-    a.normalize()
+    scale(norm(a).recip(), a)
 }
 
 /// Invert the sign of a Vector3 or Quaternion.
@@ -1337,72 +1340,83 @@ where T: Float {
 
 /// Calculate the versor to rotate from vector `a` to vector `b` (Without singularity!).
 /// 
-/// If you enter a zero vector, it returns an identity quaternion.
+/// This function calculates `q` satisfying `b = point_rotation(q, a)` 
+/// when `norm(a) = norm(b)`.
+/// If `norm(a) > 0` and `norm(b) > 0`, then `q` can be calculated with good 
+/// accuracy no matter what the positional relationship between `a` and `b` is.
+/// 
+/// If you enter a zero vector either `a` or `b`, it returns `None`.
 /// 
 /// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{Vector3, cross, rotate_a_to_b, point_rotation};
+/// # use quaternion_core::{Vector3, cross, rotate_a_to_b, point_rotation, normalize};
 /// let a: Vector3<f64> = [1.5, -0.5, 0.2];
 /// let b: Vector3<f64> = [0.1, 0.6, 1.0];
 /// 
-/// let q = rotate_a_to_b(a, b);
+/// let q = rotate_a_to_b(a, b).unwrap();
 /// let b_check = point_rotation(q, a);
 /// 
-/// let cross = cross(b, b_check);
-/// assert!( cross[0].abs() < 1e-12 );
-/// assert!( cross[1].abs() < 1e-12 );
-/// assert!( cross[2].abs() < 1e-12 );
+/// let b_u = normalize(b);
+/// let b_check_u = normalize(b_check);
+/// assert!( (b_u[0] - b_check_u[0]).abs() < 1e-12 );
+/// assert!( (b_u[1] - b_check_u[1]).abs() < 1e-12 );
+/// assert!( (b_u[2] - b_check_u[2]).abs() < 1e-12 );
 /// ```
 #[inline]
-pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>) -> Quaternion<T>
+pub fn rotate_a_to_b<T>(a: Vector3<T>, b: Vector3<T>) -> Option<Quaternion<T>>
 where T: Float {
-    let norm_a = dot(a, a).sqrt();
-    let norm_b = dot(b, b).sqrt();
-    if norm_a == T::zero() || norm_b == T::zero() {
-        return IDENTITY();
+    let norm_inv_a = norm(a).recip();
+    let norm_inv_b = norm(b).recip();
+    if norm_inv_a.is_infinite() || norm_inv_b.is_infinite() {
+        return None;
     }
-    let a_u = scale(norm_a.recip(), a);
-    let b_u = scale(norm_b.recip(), b);
+    let a = scale(norm_inv_a, a);
+    let b = scale(norm_inv_b, b);
 
-    // 特異点回避はどこで切り替えてもいいけど，とりあえず90degで切り替える
-    if dot(a_u, b_u) >= T::zero() {
-        let tmp = add(a_u, b_u);
-        let axis = scale(dot(tmp, tmp).sqrt().recip(), tmp);
-        (T::zero(), axis)
+    let a_add_b = add(a, b);
+    let dot_a_add_b = dot(a_add_b, a_add_b);
+    if dot_a_add_b >= T::one() {  // arccos(a・b) = 120degで切り替え
+        Some( (T::zero(), scale(dot_a_add_b.sqrt().recip(), a_add_b)) )
     } else {
-        let tmp = sub(a_u, b_u);
-        let axis_a2mb = scale(dot(tmp, tmp).sqrt().recip(), tmp);
-        let axis_mb2b = orthogonal_vector(b);
-        mul(axis_mb2b, axis_a2mb)
+        let norm_a_sub_b = (cast::<T>(4.0) - dot_a_add_b).sqrt();
+        let axis_a2mb = scale(norm_a_sub_b.recip(), sub(a, b));  // a ==> -b
+        let axis_mb2b = orthogonal_vector(b);  // -b ==> b
+        Some( mul(axis_mb2b, axis_a2mb) )
     }
 }
 
 /// Calculate the versor to rotate from vector `a` to vector `b` by the shortest path.
 /// 
-/// The parameter `t` adjusts the amount of movement from `a` to `b`, 
-/// so that When `t = 1`, it moves to position `b` completely.
+/// The parameter `t` adjusts the amount of movement from `a` to `b`. 
+/// When `t = 1`, `a` moves completely to position `b`.
 /// 
-/// If you enter a zero vector, it returns an identity quaternion.
+/// The algorithm used in this function is less accurate when `a` and `b` are parallel. 
+/// Therefore, it is better to use the `rotate_a_to_b(a, b)` function when `t = 1` and 
+/// the rotation axis is not important.
+/// 
+/// If you enter a zero vector either `a` or `b`, it returns `None`.
 #[inline]
-pub fn rotate_a_to_b_param<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Quaternion<T>
+pub fn rotate_a_to_b_shortest<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Option<Quaternion<T>>
 where T: Float {
-    let norm_a_b = (dot(a, a) * dot(b, b)).sqrt();
-    if norm_a_b == T::zero() {
-        return IDENTITY();
+    let norm_inv_a = norm(a).recip();
+    let norm_inv_b = norm(b).recip();
+    if norm_inv_a.is_infinite() || norm_inv_b.is_infinite() {
+        return None;
     }
+    let a = scale(norm_inv_a, a);
+    let b = scale(norm_inv_b, b);
 
     let axis = cross(a, b);
-    let norm_axis_inv = dot(axis, axis).sqrt().recip();
+    let norm_axis_inv = norm(axis).recip();
     if norm_axis_inv.is_finite() {
-        let cos_theta = dot(a, b) / norm_a_b;
-        let (sin, cos) = (t * acos_safe(cos_theta) * cast(0.5)).sin_cos();
-        (cos, scale(sin * norm_axis_inv, axis))
-    } else {
+        let (sin, cos) = (t * acos_safe(dot(a, b)) * cast(0.5)).sin_cos();
+        Some( (cos, scale(sin * norm_axis_inv, axis)) )
+    } else {  // Singularity (a || b)
         if dot(a, b) > T::zero() {
-            IDENTITY()
+            Some( IDENTITY() )  // a = b
         } else {
-            (T::zero(), orthogonal_vector(a))  // theta = πの場合
+            Some( (T::zero(), orthogonal_vector(a)) )  // a = -b
         }
     }
 }
@@ -1419,19 +1433,10 @@ where T: Float {
 #[inline]
 pub fn lerp<T>(a: Quaternion<T>, b: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    debug_assert!(
-        t >= T::zero() && t <= T::one(), 
-        "Parameter `t` is out of range!"
-    );
-
     // 最短経路で補間する
     if dot(a, b).is_sign_negative() {
         // bの符号を反転
-        if cfg!(feature = "fma") {
-            scale_add(-t, add(a, b), a)
-        } else {
-            sub( a, scale(t, add(a, b)) )
-        }
+        scale_add(-t, add(a, b), a)
     } else {
         scale_add( t, sub(b, a), a)
     }
@@ -1445,12 +1450,7 @@ where T: Float {
 /// The arguments `a` and `b` must be Versor.
 #[inline]
 pub fn slerp<T>(a: Quaternion<T>, mut b: Quaternion<T>, t: T) -> Quaternion<T>
-where T: Float {
-    debug_assert!(
-        t >= T::zero() && t <= T::one(), 
-        "Parameter `t` is out of range!"
-    );
-    
+where T: Float {    
     // 最短経路で補間する
     let mut dot = dot(a, b);
     if dot.is_sign_negative() {
@@ -1469,184 +1469,5 @@ where T: Float {
         let term1 = scale(s1 * coef, a);
         let term2 = scale(s2 * coef, b);
         add(term1, term2)
-    }
-}
-
-// ============================================================================= //
-// Private functions
-// ============================================================================= //
-/// Identity quaternion
-#[inline]
-#[allow(non_snake_case)]
-fn IDENTITY<T: Float>() -> Quaternion<T> {
-    (T::one(), [T::zero(); 3])
-}
-
-#[inline]
-#[allow(non_snake_case)]
-fn ZERO_VECTOR<T: Float>() -> Vector3<T> {
-    [T::zero(); 3]
-}
-
-/// 定数呼び出し以外に使わないのでエラー処理を省略．
-#[inline(always)]
-fn cast<T: Float>(x: f64) -> T {
-    num_traits::cast::<f64, T>(x).unwrap()
-}
-
-/// `fma` featureを有効にした場合は`s.mul_add(a, b)`として展開され，
-/// 有効にしなかった場合は単純な積和`s*a + b`に展開してコンパイルされる．
-#[inline(always)]
-fn mul_add<T: Float>(s: T, a: T, b: T) -> T {
-    if cfg!(feature = "fma") {
-        s.mul_add(a, b)
-    } else {
-        s * a + b
-    }
-}
-
-/// （主に呼び出し側の特異点近傍で）NaNにならないように定義域外の値をカットする．
-#[inline(always)]
-fn acos_safe<T: Float>(x: T) -> T {
-    // FloatConstを使いたくないからこの実装とする．
-    (if x.abs() > T::one() { x.signum() } else { x }).acos()
-}
-
-/// 配列内の最大値とそのインデックスを返す．
-#[inline]
-fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
-    let mut index = 0;
-    let mut max_num = nums[0];
-    for (i, num) in nums.iter().enumerate().skip(1) {
-        if *num > max_num {
-            max_num = *num;
-            index = i;
-        }
-    }
-    (index, max_num)
-}
-
-/// `a`に直交し，ノルムが1であるベクトルを返す．ただし`norm(a) > 0`であること．
-/// 
-/// 【理論】
-/// aとbが直交する場合には両者の内積がゼロになるので，そこから考えて内積が0に
-/// なるようにbの要素を作れば良い．
-/// 具体的には，aの要素のうち２つを入れ替えて，残り一つの要素をゼロにする．また，
-/// 入れ替える要素のうち片方の符号を反転させる．
-/// 例えば，`a = [0.5, 1.0, -1.5]`であれば`b = [0.0, 1.5, 1.0]`とすることで
-/// aに直交なベクトルbが求まる．
-/// 
-/// 注意点として，入れ替える要素は片方が必ずゼロ以外で無ければならない．
-/// 例えば`a = [1.0, 0.0, 0.0]`のような場合に2つめと3つめの要素を入れ替えて
-/// しまうと直交なベクトルとならない．
-/// 
-/// この関数では，入れ替える要素が一意に決まるように絶対値が最大のものと中間の
-/// ものを入れ替え，最大値の符号を反転させる．例えば，`a = [0.5, -0.8, -1.5]`
-/// に対しては`b = [0.0, 1.5, -0.8]`とする．
-#[inline]
-fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
-    let mut working_array: Vector3<T> = unsafe {MaybeUninit::uninit().assume_init()};
-
-    // aの絶対値が最大となるインデックスを探す（working_arrayにはaの絶対値を入れる）
-    working_array[0] = a[0].abs();
-    let mut maximum_index: usize = 0;
-    let mut max_val = working_array[0];
-    for (i, val) in a.iter().enumerate().skip(1) {
-        working_array[i] = val.abs();
-        if working_array[i] > max_val {
-            max_val = working_array[i];
-            maximum_index = i;
-        }
-    }
-    // working_arrayの中央値を探す
-    let idx1 = (maximum_index + 1) % 3;
-    let idx2 = (maximum_index + 2) % 3;
-    let median_index = if working_array[idx1] > working_array[idx2] {
-        idx1
-    } else {
-        idx2
-    };
-
-    let norm_inv = pythag(a[median_index], a[maximum_index]).recip();
-    working_array[median_index] = -a[maximum_index] * norm_inv;
-    working_array[maximum_index] = a[median_index]  * norm_inv;
-    working_array[3 - (median_index + maximum_index)] = T::zero();
-
-    working_array
-}
-
-// f32,f64のメソッドには同様の機能を提供するhypot()が存在するが，
-// このクレートはマイコン上での動作も想定しているため内部で平方根の
-// 計算を行わないMoler-Morrison algorithmを採用した．収束が速いから
-// ノルムの計算に使用しても丸め誤差が蓄積しにくいというのも理由の一つ．
-// あと，単純に実装が美しい．
-// 
-/// Moler-Morrison algorithmにより，ピタゴラスの定理
-/// `c^2 = a^2 + b^2`
-/// を満たすcを求める．
-/// 
-/// `c = (a*a + b*b).sqrt()`のように実装した場合，有害なアンダーフロー
-/// やオーバーフローが発生する可能性がある．
-/// Moler-Morrison algorithmは他の方法に比べて速度面で若干劣るものの，
-/// 堅牢かつ移植性の高い実装で正確な計算結果を得ることができる．
-/// cがオーバーフローしない範囲の値である限り，本関数による演算で
-/// オーバーフローが起こることはない．
-/// 
-/// 反復回数は有効数字6桁なら2回, 20桁なら3回, 60桁なら4回．
-/// aとbの絶対値が大きく異なる場合（例えば|a| >> |b|）には，
-/// より少ない反復回数で結果が求まる．
-#[inline]
-fn pythag<T: Float>(a: T, b: T) -> T {
-    let mut a = a.abs();
-    let mut b = b.abs();
-    if a < b {
-        mem::swap(&mut a, &mut b);
-    }
-    if b == T::zero() {
-        return a;
-    }
-
-    let two : T = cast(2.0);
-    let four: T = cast(4.0);
-    for _ in 0..4 {  // loopにするとinfやNaNが入った際に抜けられなくなる
-        let mut s = b / a;
-        s = s * s;
-        let tmp = four + s;
-        if tmp == four {  // 収束判定（これでちゃんとbreakできる）
-            break;
-        }
-        s = s / tmp;
-        a = mul_add(two, a * s, a);
-        b = s * b;
-    }
-    a
-}
-
-
-#[cfg(test)]
-mod test_private_functions {
-    use super::*;
-
-    #[test]
-    fn test_max4() {
-        let array = [-0.5, 2.0, 3.0, 0.1];
-        let (idx, val) = max4(array);
-        assert_eq!(idx, 2);
-        assert!((val - 3.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn test_orthogonal_vector() {
-        let a = normalize([1.0, -5.0, 3.0]);
-        let b = orthogonal_vector(a);
-        assert!(dot(a, b).abs() < 1e-12);
-        assert!((1.0 - norm(b)).abs() < 1e-12);
-    }
-
-    #[test]
-    fn test_pythag() {
-        let a = 13.0f64.sqrt();
-        let b = pythag(-2.0, 3.0);
-        assert!((a - b).abs() < 1e-12);
     }
 }

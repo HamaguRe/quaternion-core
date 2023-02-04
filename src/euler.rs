@@ -12,7 +12,7 @@ const THRESHOLD: f64 = 0.9999984;
 /// Intrinsic rotationのオイラー角を四元数に変換する。
 #[inline]
 pub fn from_intrinsic_euler_angles<T>(rs: RotationSequence, angles: Vector3<T>) -> Quaternion<T>
-where T: Float + FloatConst {
+where T: Float {
     use RotationSequence::*;
     let [alpha, beta, gamma] = scale(cast(0.5), angles);
     let (sinb, cosb) = beta.sin_cos();
@@ -126,7 +126,7 @@ where T: Float + FloatConst {
 /// Tait-Bryanの場合は，Intrinsicの式の第二項の符号を反転させれば良い．
 #[inline]
 pub fn from_extrinsic_euler_angles<T>(rs: RotationSequence, angles: Vector3<T>) -> Quaternion<T>
-where T: Float + FloatConst {
+where T: Float {
     use RotationSequence::*;
     let [alpha, beta, gamma] = scale(cast(0.5), angles);
     let (sinb, cosb) = beta.sin_cos();

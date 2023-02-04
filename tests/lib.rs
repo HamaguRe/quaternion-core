@@ -104,7 +104,7 @@ fn test_dcm() {
     // a <--> b の相互変換が正しく行えるかテスト
     let a = [1.0f64, 0.0, 0.0];
     let b = normalize([0.0f64, 1.0, 1.0]);
-    let q = rotate_a_to_b(a, b);
+    let q = rotate_a_to_b(a, b).unwrap();
 
     let m_a2b = to_dcm(q);
     let b_check = matrix_product(m_a2b, a);
@@ -483,8 +483,8 @@ fn test_rotate_a_to_b() {
         let q = from_axis_angle([-1.0, 5.0, -0.5], 0.7);
         let b = point_rotation(q, a);
     
-        let a_to_b = rotate_a_to_b(a, b);
-        let a_to_b_t = rotate_a_to_b_param(a, b, 1.0);
+        let a_to_b = rotate_a_to_b(a, b).unwrap();
+        let a_to_b_t = rotate_a_to_b_shortest(a, b, 1.0).unwrap();
         let b_rest = point_rotation(a_to_b, a);
         let b_rest_t = point_rotation(a_to_b_t, a);
         assert_eq_vec(b, b_rest);
@@ -496,33 +496,30 @@ fn test_rotate_a_to_b() {
     // aとbが平行かつ逆向きな場合（回転軸の求め方が特殊になる）
     {
         let b = negate(a);
-        let a_to_b = rotate_a_to_b(a, b);
-        let a_to_b_param = rotate_a_to_b_param(a, b, 1.0);
+        let a_to_b = rotate_a_to_b(a, b).unwrap();
+        let a_to_b_shortest = rotate_a_to_b_shortest(a, b, 1.0).unwrap();
         let b_rest = point_rotation(a_to_b, a);
-        let b_rest_param = point_rotation(a_to_b_param, a);
+        let b_rest_param = point_rotation(a_to_b_shortest, a);
         assert_eq_vec(b, b_rest);
         assert_eq_vec(b, b_rest_param);
         assert!((1.0 - norm(a_to_b)).abs() < EPSILON);
-        assert!((1.0 - norm(a_to_b_param)).abs() < EPSILON);
+        assert!((1.0 - norm(a_to_b_shortest)).abs() < EPSILON);
     }
 
     // ゼロベクトルを入れた場合
     {
         let b = [0.0; 3];
-        let a_to_b = rotate_a_to_b(a, b);  // 入れ替えても大丈夫
-        assert_eq!(1.0, a_to_b.0);
-        assert_eq!(0.0, sum(a_to_b.1));
-        let a_to_b_param = rotate_a_to_b_param(a, b, 1.0);
-        println!("{:?}", a_to_b_param);
-        assert_eq!(1.0, a_to_b_param.0);
-        assert_eq!(0.0, sum(a_to_b_param.1));
+        let a_to_b = rotate_a_to_b(a, b);
+        assert_eq!(None, a_to_b);
+        let a_to_b_shortest = rotate_a_to_b_shortest(a, b, 1.0);
+        assert_eq!(None, a_to_b_shortest);
     }
 }
 
 fn assert_eq_vec(a: Vector3<f64>, b: Vector3<f64>) {
-    assert!((a[0] - b[0]).abs() < EPSILON);
-    assert!((a[1] - b[1]).abs() < EPSILON);
-    assert!((a[2] - b[2]).abs() < EPSILON);
+    for i in 0..a.len() {
+        assert!((a[i] - b[i]).abs() < EPSILON);
+    }
 }
 
 /// 二つの四元数を比較する．

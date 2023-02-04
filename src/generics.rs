@@ -23,7 +23,6 @@ pub trait QuaternionOps<T>: Copy {
     /// `self ∘ b + c`
     fn hadamard_add(self, b: Self, c: Self) -> Self;
     fn norm(self) -> T;
-    fn normalize(self) -> Self;
     /// `-self`
     fn negate(self) -> Self;
     /// `self * rhs`
@@ -94,21 +93,18 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
 
     #[inline]
     fn norm(self) -> T {
-        let mut s = self[0];
-        for val in self.iter().skip(1) {
-            s = super::pythag(s, *val);
+        #[cfg(feature = "norm-sqrt")]
+        {
+            super::dot(self, self).sqrt()
         }
-        s
-    }
 
-    // 零ベクトルを入力した時は零ベクトルを返す
-    #[inline]
-    fn normalize(self) -> Self {
-        let coef = self.norm().recip();
-        if coef.is_infinite() {
-            super::ZERO_VECTOR()
-        } else {
-            self.scale(coef)
+        #[cfg(not(feature = "norm-sqrt"))]
+        {
+            let mut s = self[0];
+            for val in self.iter().skip(1) {
+                s = super::pythag(s, *val);
+            }
+            s
         }
     }
 
@@ -175,16 +171,19 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
 
     #[inline]
     fn norm(self) -> T {
-        let mut s = self.0;
-        for val in self.1 {
-            s = super::pythag(s, val)
+        #[cfg(feature = "norm-sqrt")]
+        {
+            super::dot(self, self).sqrt()
         }
-        s
-    }
 
-    #[inline]
-    fn normalize(self) -> Self {
-        self.scale( self.norm().recip() )
+        #[cfg(not(feature = "norm-sqrt"))]
+        {
+            let mut s = self.0;
+            for val in self.1 {
+                s = super::pythag(s, val)
+            }
+            s
+        }
     }
 
     #[inline]
