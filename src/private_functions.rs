@@ -1,6 +1,6 @@
 //! Private functions
 
-use core::{mem, mem::MaybeUninit};
+use core::mem::MaybeUninit;
 use super::{Float, Vector3, Quaternion};
 
 
@@ -146,7 +146,7 @@ pub fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
 
         #[cfg(not(feature = "norm-sqrt"))]
         {
-            pythag(a[i_med], a[i_max]).recip()
+            a[i_med].hypot(a[i_max]).recip()
         }
     };
     working_array[i_med] = -a[i_max] * norm_inv;
@@ -154,51 +154,4 @@ pub fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
     working_array[3 - (i_med + i_max)] = T::zero();
 
     working_array
-}
-
-// f32,f64のメソッドには同様の機能を提供するhypot()が存在するが，
-// このクレートはマイコン上での動作も想定しているため内部で平方根の
-// 計算を行わないMoler-Morrison algorithmを採用した．収束が速いから
-// ノルムの計算に使用しても丸め誤差が蓄積しにくいというのも理由の一つ．
-// あと，単純に実装が美しい．
-// 
-/// Moler-Morrison algorithmにより，ピタゴラスの定理
-/// `c^2 = a^2 + b^2`
-/// を満たすcを求める．
-/// 
-/// `c = (a*a + b*b).sqrt()`のように実装した場合，有害なアンダーフロー
-/// やオーバーフローが発生する可能性がある．
-/// Moler-Morrison algorithmは他の方法に比べて速度面で若干劣るものの，
-/// 堅牢かつ移植性の高い実装で正確な計算結果を得ることができる．
-/// cがオーバーフローしない範囲の値である限り，本関数による演算で
-/// オーバーフローが起こることはない．
-/// 
-/// 反復回数は有効数字6桁なら2回, 20桁なら3回, 60桁なら4回．
-/// aとbの絶対値が大きく異なる場合（例えば|a| >> |b|）には，
-/// より少ない反復回数で結果が求まる．
-#[inline]
-pub fn pythag<T: Float>(a: T, b: T) -> T {
-    let mut a = a.abs();
-    let mut b = b.abs();
-    if a < b {
-        mem::swap(&mut a, &mut b);
-    }
-    if b == T::zero() {
-        return a;
-    }
-
-    let two : T = cast(2.0);
-    let four: T = cast(4.0);
-    for _ in 0..4 {  // loopにするとinfやNaNが入った際に抜けられなくなる
-        let mut s = b / a;
-        s = s * s;
-        let tmp = four + s;
-        if tmp == four {  // 収束判定（これでちゃんとbreakできる）
-            break;
-        }
-        s = s / tmp;
-        a = mul_add(two, a * s, a);
-        b = s * b;
-    }
-    a
 }

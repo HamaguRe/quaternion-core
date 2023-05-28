@@ -44,7 +44,7 @@ mod private_functions;
 pub use generics::QuaternionOps;
 use private_functions::{
     IDENTITY, ZERO_VECTOR, cast, mul_add, acos_safe, 
-    sinc, max4, orthogonal_vector, pythag
+    sinc, max4, orthogonal_vector
 };
 
 /// Three dimensional vector (Pure Quaternion)
@@ -1103,7 +1103,7 @@ where T: Float, U: QuaternionOps<T> {
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let norm_v = norm(q.1);
-    let norm_q = pythag(q.0, norm_v);
+    let norm_q = q.0.hypot(norm_v);
     let coef = (q.0 / norm_q).acos() / norm_v;
     ( norm_q.ln(), scale(coef, q.1) )
 }
@@ -1167,7 +1167,7 @@ where T: Float {
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     let norm_v = norm(q.1);
-    let norm_q = pythag(q.0, norm_v);
+    let norm_q = q.0.hypot(norm_v);
     let omega = (q.0 / norm_q).acos();
     let (sin, cos) = (t * omega).sin_cos();
     let coef = norm_q.powf(t);
@@ -1233,7 +1233,7 @@ pub fn sqrt<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let half = cast(0.5);
     let norm_v = norm(q.1);
-    let norm_q = pythag(q.0, norm_v);
+    let norm_q = q.0.hypot(norm_v);
     let coef = ((norm_q - q.0) * half).sqrt() / norm_v;
     ( ((norm_q + q.0) * half).sqrt(), scale(coef, q.1) )
 }

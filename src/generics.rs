@@ -1,9 +1,5 @@
 //! 四元数と純虚四元数で共通する処理をまとめる
 
-// Pure Quaternionのexpは使うけど，lnの引数にPure Quaternionを取ることは
-// 普通無いと思うから実装しない．同じ理由でpowの実装も無し．
-// どうしてもPure Quaternionを入れたければln((0.0, pure))みたいにすれば良い．
-
 use super::{Vector3, Quaternion, Float};
 
 
@@ -102,7 +98,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
         {
             let mut s = self[0];
             for val in self.iter().skip(1) {
-                s = super::pythag(s, *val);
+                s = s.hypot(*val);
             }
             s
         }
@@ -180,7 +176,7 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
         {
             let mut s = self.0;
             for val in self.1 {
-                s = super::pythag(s, val)
+                s = s.hypot(val)
             }
             s
         }
