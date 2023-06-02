@@ -405,21 +405,28 @@ fn test_to_extrinsic_euler_angles() {
 
 #[test]
 fn test_rotation_vector() {
-    // 適当なVersorを作る
-    let q = from_axis_angle([1.0, 2.0, 3.0], PI);
-
-    // 回転ベクトルに変換
-    let rot_v = to_rotation_vector(q);
-
-    // 回転ベクトルから復元したVecsor
-    let mut q_rest = from_rotation_vector(rot_v);
-
-    // 符号が反転していても，３次元空間上で表す回転は同じ
-    if q.0.is_sign_positive() && q_rest.0.is_sign_negative() {
-        q_rest = negate(q_rest);
+    {
+        // 適当なVersorを作る
+        let q = from_axis_angle([1.0, 0.0, 0.0], PI / 2.0);
+        // 回転ベクトルに変換
+        let rv = to_rotation_vector(q);
+        assert_eq_vec(rv, [PI/2.0, 0.0, 0.0]);
+        // 回転ベクトルから復元したVecsor
+        let rv2q = from_rotation_vector(rv);
+        assert_eq_quat(q, rv2q);
     }
 
-    assert_eq_quat(q, q_rest);
+    // (PI, 2*PI]の回転は[-PI, PI]に変換して表現される
+    {
+        // 適当なVersorを作る
+        let q = from_axis_angle([1.0, 0.0, 0.0], 3.0*PI / 2.0);
+        // 回転ベクトルに変換
+        let rv = to_rotation_vector(q);
+        assert_eq_vec(rv, [-PI/2.0, 0.0, 0.0]);
+        // 回転ベクトルから復元したVecsor
+        let rv2q = from_rotation_vector(rv);
+        assert_eq_quat(q, rv2q);
+    }
 }
 
 #[test]

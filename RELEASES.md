@@ -1,4 +1,9 @@
+# Version 0.4.2 (2023-06-02)
+
+* Fixed a bug in the `to_rotation_vector` function. With that, version `0.4.0` and `0.4.1` were yanked.
+
 # Version 0.4.1 (2023-05-28)
+
 * Replaced the original pythag() function with the standard .hypot() method (because it was slow, even though the calculation results were the same).
 
 # Version 0.4.0 (2023-02-05)

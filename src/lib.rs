@@ -549,11 +549,12 @@ where T: Float {
 #[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
-    let mut half_theta = norm(q.1).min( T::one() ).asin();
+    let half_theta = norm(q.1).min( T::one() ).asin();  // [0, π/2]
+    let mut coef = cast::<T>(2.0) / sinc(half_theta);   // [2, π]
     if q.0 < T::zero() {
-        half_theta = -half_theta;
+        coef = -coef;  // sinc関数は偶関数なので，half_thetaに対する符号操作はここで行う必要がある．
     }
-    scale(cast::<T>(2.0) / sinc(half_theta), q.1)
+    scale(coef, q.1)
 }
 
 /// Product of DCM and Vector3
