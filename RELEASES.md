@@ -1,3 +1,8 @@
+# Version 0.4.3 (2023-11-13)
+
+* Added `identity` function. I thought I could just write `(1.0, [0.0; 3])` myself, but it is still more convenient to call the `identity` function.
+* Active use of the FMA instruction when computing dot products (when `fma` feature is enabled).
+
 # Version 0.4.2 (2023-06-02)
 
 * Fixed a bug in the `to_rotation_vector` function. With that, version `0.4.0` and `0.4.1` were yanked.

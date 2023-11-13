@@ -1,8 +1,8 @@
-//! オイラー角関係の処理を実装
+//! Implementation for Euler angles
 
 use super::{Float, FloatConst};
 use super::{RotationSequence, Vector3, Quaternion};
-use super::{scale, cast, to_dcm};
+use super::{scale, pfs::cast, to_dcm};
 
 /// 特異点判定の閾値
 /// 

@@ -1,20 +1,8 @@
 //! Private functions
 
 use core::mem::MaybeUninit;
-use super::{Float, Vector3, Quaternion};
+use super::{Float, Vector3};
 
-
-#[inline]
-#[allow(non_snake_case)]
-pub fn IDENTITY<T: Float>() -> Quaternion<T> {
-    (T::one(), [T::zero(); 3])
-}
-
-#[inline]
-#[allow(non_snake_case)]
-pub fn ZERO_VECTOR<T: Float>() -> Vector3<T> {
-    [T::zero(); 3]
-}
 
 /// 定数呼び出し以外に使わないのでエラー処理を省略．
 #[inline(always)]

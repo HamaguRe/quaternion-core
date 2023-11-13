@@ -40,12 +40,8 @@ use num_traits::float::{Float, FloatConst};
 
 mod euler;
 mod generics;
-mod private_functions;
+mod pfs;
 pub use generics::QuaternionOps;
-use private_functions::{
-    IDENTITY, ZERO_VECTOR, cast, mul_add, acos_safe, 
-    sinc, max4, orthogonal_vector
-};
 
 /// Three dimensional vector (Pure Quaternion)
 /// 
@@ -113,6 +109,19 @@ pub enum RotationSequence {
     YXZ,
 }
 
+/// Generate identity quaternion.
+/// 
+/// ```
+/// # use quaternion_core::{Quaternion, identity};
+/// let q: Quaternion<f64> = identity();
+/// println!("{:?}", q);  // <-- (1.0, [0.0, 0.0, 0.0])
+/// ```
+#[inline]
+pub fn identity<T>() -> Quaternion<T>
+where T: Float {
+    (T::one(), [T::zero(); 3])
+}
+
 /// Generate Versor by specifying rotation `angle`\[rad\] and `axis` vector.
 /// 
 /// The `axis` vector does not have to be a unit vector.
@@ -139,10 +148,10 @@ pub enum RotationSequence {
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
     let theta = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
-    let (sin, cos) = ( theta * cast(0.5) ).sin_cos();
+    let (sin, cos) = ( theta * pfs::cast(0.5) ).sin_cos();
     let coef = sin / norm(axis);
     if coef.is_infinite() {
-        IDENTITY()
+        identity()
     } else {
         ( cos, scale(coef, axis) )
     }
@@ -178,9 +187,9 @@ where T: Float {
     let norm_v = norm(q.1);
     let norm_inv = norm_v.recip();
     if norm_inv.is_infinite() {
-        ( ZERO_VECTOR(), T::zero() )
+        ( [T::zero(); 3], T::zero() )
     } else {
-        let mut angle = cast::<T>(2.0) * norm_v.min( T::one() ).asin();
+        let mut angle = pfs::cast::<T>(2.0) * norm_v.min( T::one() ).asin();
         if q.0 < T::zero() {
             angle = -angle;
         }
@@ -240,14 +249,14 @@ where T: Float {
     // ゼロ除算を避けるために，4通りの式で求めたうちの最大値を係数として使う．
     let m22_p_m33 = m[1][1] + m[2][2];
     let m22_m_m33 = m[1][1] - m[2][2];
-    let (index, max_num) = max4([
+    let (index, max_num) = pfs::max4([
         m[0][0] + m22_p_m33,
         m[0][0] - m22_p_m33,
        -m[0][0] + m22_m_m33,
        -m[0][0] - m22_m_m33,
     ]);
 
-    let half: T = cast(0.5);
+    let half: T = pfs::cast(0.5);
     let tmp = ( max_num + T::one() ).sqrt();
     let coef = half / tmp;
 
@@ -333,7 +342,7 @@ where T: Float {
 pub fn to_dcm<T>(q: Quaternion<T>) -> DCM<T>
 where T: Float {
     let neg_one = -T::one();
-    let two = cast(2.0);
+    let two = pfs::cast(2.0);
 
     // Compute these value only once.
     let (q0_q0, [q0_q1, q0_q2, q0_q3]) = scale(q.0, q);
@@ -341,15 +350,15 @@ where T: Float {
     let q1_q3 = q.1[0] * q.1[2];
     let q2_q3 = q.1[1] * q.1[2];
 
-    let m11 = mul_add(mul_add(q.1[0], q.1[0], q0_q0), two, neg_one);
+    let m11 = pfs::mul_add(pfs::mul_add(q.1[0], q.1[0], q0_q0), two, neg_one);
     let m12 = (q1_q2 - q0_q3) * two;
     let m13 = (q1_q3 + q0_q2) * two;
     let m21 = (q1_q2 + q0_q3) * two;
-    let m22 = mul_add(mul_add(q.1[1], q.1[1], q0_q0), two, neg_one);
+    let m22 = pfs::mul_add(pfs::mul_add(q.1[1], q.1[1], q0_q0), two, neg_one);
     let m23 = (q2_q3 - q0_q1) * two;
     let m31 = (q1_q3 - q0_q2) * two;
     let m32 = (q2_q3 + q0_q1) * two;
-    let m33 = mul_add(mul_add(q.1[2], q.1[2], q0_q0), two, neg_one);
+    let m33 = pfs::mul_add(pfs::mul_add(q.1[2], q.1[2], q0_q0), two, neg_one);
 
     [
         [m11, m12, m13],
@@ -515,9 +524,9 @@ where T: Float + FloatConst {
 #[inline]
 pub fn from_rotation_vector<T>(r: Vector3<T>) -> Quaternion<T>
 where T: Float {
-    let half: T = cast(0.5);
+    let half: T = pfs::cast(0.5);
     let half_theta = half * norm(r);
-    (half_theta.cos(), scale(half * sinc(half_theta), r))
+    (half_theta.cos(), scale(half * pfs::sinc(half_theta), r))
 }
 
 /// Convert Versor to Rotation vector.
@@ -550,7 +559,7 @@ where T: Float {
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
     let half_theta = norm(q.1).min( T::one() ).asin();  // [0, π/2]
-    let mut coef = cast::<T>(2.0) / sinc(half_theta);   // [2, π]
+    let mut coef = pfs::cast::<T>(2.0) / pfs::sinc(half_theta);   // [2, π]
     if q.0 < T::zero() {
         coef = -coef;  // sinc関数は偶関数なので，half_thetaに対する符号操作はここで行う必要がある．
     }
@@ -580,13 +589,11 @@ where T: Float {
 #[inline]
 pub fn matrix_product<T>(m: DCM<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
-    let mut r = [T::zero(); 3];
-    for i in 0..3 {
-        for j in 0..3 {
-            r[i] = mul_add(m[i][j], v[j], r[i]);
-        }
-    }
-    r
+    [
+        dot(m[0], v),
+        dot(m[1], v),
+        dot(m[2], v),
+    ]
 }
 
 /// Calculate the sum of each element of Quaternion or Vector3.
@@ -832,7 +839,7 @@ where T: Float, U: QuaternionOps<T> {
 #[inline]
 pub fn dot<T, U>(a: U, b: U) -> T 
 where T: Float, U: QuaternionOps<T> {
-    sum( hadamard(a, b) )
+    a.dot(b)
 }
 
 /// Cross product (vector product): `a × b`
@@ -1232,7 +1239,7 @@ where T: Float {
 #[inline]
 pub fn sqrt<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
-    let half = cast(0.5);
+    let half = pfs::cast(0.5);
     let norm_v = norm(q.1);
     let norm_q = q.0.hypot(norm_v);
     let coef = ((norm_q - q.0) * half).sqrt() / norm_v;
@@ -1260,9 +1267,9 @@ where T: Float {
 #[inline]
 pub fn sqrt_versor<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
-    let half = cast(0.5);
+    let half = pfs::cast(0.5);
     let coef = (half - q.0 * half).sqrt() / norm(q.1);
-    ( mul_add(q.0, half, half).sqrt(), scale(coef, q.1) )
+    ( pfs::mul_add(q.0, half, half).sqrt(), scale(coef, q.1) )
 }
 
 /// Rotation of point (Point Rotation - Frame Fixed)
@@ -1299,7 +1306,7 @@ where T: Float {
 pub fn point_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     let tmp = scale_add(q.0, v, cross(q.1, v));
-    scale_add(cast(2.0), cross(q.1, tmp), v)
+    scale_add(pfs::cast(2.0), cross(q.1, tmp), v)
 }
 
 /// Rotation of frame (Frame Rotation - Point Fixed)
@@ -1336,7 +1343,7 @@ where T: Float {
 pub fn frame_rotation<T>(q: Quaternion<T>, v: Vector3<T>) -> Vector3<T>
 where T: Float {
     let tmp = scale_add(q.0, v, cross(v, q.1));
-    scale_add(cast(2.0), cross(tmp, q.1), v)
+    scale_add(pfs::cast(2.0), cross(tmp, q.1), v)
 }
 
 /// Calculate the versor to rotate from vector `a` to vector `b` (Without singularity!).
@@ -1380,9 +1387,9 @@ where T: Float {
     if dot_a_add_b >= T::one() {  // arccos(a・b) = 120degで切り替え
         Some( (T::zero(), scale(dot_a_add_b.sqrt().recip(), a_add_b)) )
     } else {
-        let norm_a_sub_b = (cast::<T>(4.0) - dot_a_add_b).sqrt();
+        let norm_a_sub_b = (pfs::cast::<T>(4.0) - dot_a_add_b).sqrt();
         let axis_a2mb = scale(norm_a_sub_b.recip(), sub(a, b));  // a ==> -b
-        let axis_mb2b = orthogonal_vector(b);  // -b ==> b
+        let axis_mb2b = pfs::orthogonal_vector(b);  // -b ==> b
         Some( mul(axis_mb2b, axis_a2mb) )
     }
 }
@@ -1411,13 +1418,13 @@ where T: Float {
     let axis = cross(a, b);
     let norm_axis_inv = norm(axis).recip();
     if norm_axis_inv.is_finite() {
-        let (sin, cos) = (t * acos_safe(dot(a, b)) * cast(0.5)).sin_cos();
+        let (sin, cos) = (t * pfs::acos_safe(dot(a, b)) * pfs::cast(0.5)).sin_cos();
         Some( (cos, scale(sin * norm_axis_inv, axis)) )
     } else {  // Singularity (a || b)
         if dot(a, b) > T::zero() {
-            Some( IDENTITY() )  // a = b
+            Some( identity() )  // a = b
         } else {
-            Some( (T::zero(), orthogonal_vector(a)) )  // a = -b
+            Some( (T::zero(), pfs::orthogonal_vector(a)) )  // a = -b
         }
     }
 }
@@ -1459,7 +1466,7 @@ where T: Float {
         dot = -dot;
     }
     // If the distance between quaternions is close enough, use lerp.
-    if dot > cast(0.9995) {  // Approximation error < 0.017%
+    if dot > pfs::cast(0.9995) {  // Approximation error < 0.017%
         scale_add(t, sub(b, a), a)  // lerp
     } else {
         let omega = dot.acos();  // Angle between the two quaternions.
