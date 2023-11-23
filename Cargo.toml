@@ -22,7 +22,7 @@ norm-sqrt = []
 serde-serialize = ["serde"]
 
 [dependencies.serde]
-version = "1.0.193"
+version = "^1.0.193"
 features = ["derive"]
 optional = true
 
