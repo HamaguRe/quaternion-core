@@ -70,6 +70,11 @@ underflow are less likely to occur than with `dot(a, a).sqrt()`. However, if ext
 large values are not input and underflow is not that much of a concern, 
 `dot(a, a).sqrt()` is sufficient (and `dot(a, a).sqrt()` is faster than the default implementation in most cases).
 
+### serde-serialize
+
+When this feature is enabled, `RotationSequence` and `RotationType` will both
+implement `serde::Serialize` and `serde::Deserialize`.
+
 ## Example
 
 `src/main.rs`:
