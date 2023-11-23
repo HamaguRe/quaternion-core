@@ -79,6 +79,7 @@ pub type DCM<T> = [Vector3<T>; 3];
 /// 
 /// * `Intrinsic`: Rotate around the axes of the `Body frame`
 /// * `Extrinsic`: Rotate around the axes of the `Reference frame`
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub enum RotationType {
     Intrinsic,
@@ -91,6 +92,7 @@ pub enum RotationType {
 /// For example, `RotationSequence::XYZ` represents first a rotation 
 /// around the X axis, then around the Y axis, and finally around 
 /// the Z axis (X ---> Y ---> Z).
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy)]
 pub enum RotationSequence {
     // Proper (z-x-z, x-y-x, y-z-y, z-y-z, x-z-x, y-x-y)
