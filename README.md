@@ -18,14 +18,14 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-quaternion-core = "0.4"
+quaternion-core = "0.5"
 ```
 
 For use in a `no_std` environment:
 
 ```toml
 [dependencies.quaternion-core]
-version = "0.4"
+version = "0.5"
 default-features = false
 features = ["libm"]
 ```

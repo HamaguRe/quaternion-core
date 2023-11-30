@@ -1,3 +1,7 @@
+# Version 0.5.0 (2023-11-30)
+
+* Added `serde-serialize` feature (See [Pull request #2](https://github.com/HamaguRe/quaternion-core/pull/2)).
+
 # Version 0.4.3 (2023-11-13)
 
 * Added `identity` function. I thought I could just write `(1.0, [0.0; 3])` myself, but it is still more convenient to call the `identity` function.
