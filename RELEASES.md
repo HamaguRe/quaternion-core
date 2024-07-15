@@ -1,3 +1,8 @@
+# Version 0.5.1 (2024-07-15)
+
+* The implementation of `src/pfs`(private module) was reviewed.
+* The calculation results are not affected by this change.
+
 # Version 0.5.0 (2023-11-30)
 
 * Added `serde-serialize` feature (See [Pull request #2](https://github.com/HamaguRe/quaternion-core/pull/2)).

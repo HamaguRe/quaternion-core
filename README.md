@@ -77,8 +77,6 @@ implement `serde::Serialize` and `serde::Deserialize`.
 
 ## Example
 
-`src/main.rs`:
-
 ```rust
 use quaternion_core as quat;
 

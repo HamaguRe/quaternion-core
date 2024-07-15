@@ -31,7 +31,7 @@ pub fn mul_add<T: Float>(s: T, a: T, b: T) -> T {
 #[inline]
 pub fn acos_safe<T: Float>(x: T) -> T {
     // FloatConstを使いたくないからこの実装とする．
-    (if x.abs() > T::one() { x.signum() } else { x }).acos()
+    ( x.abs().min(T::one()).copysign(x) ).acos()
 }
 
 /// sinc(x) := sin(x) / x
@@ -74,15 +74,14 @@ pub fn sinc<T: Float>(x: T) -> T {
 /// 配列内の最大値とそのインデックスを返す．
 #[inline]
 pub fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
-    let mut index = 0;
-    let mut max_num = nums[0];
-    for (i, num) in nums.iter().enumerate().skip(1) {
-        if *num > max_num {
-            max_num = *num;
-            index = i;
+    let mut i_max = 0;
+    for i in 1..nums.len() {
+        if nums[i_max] < nums[i] {
+            i_max = i;
         }
     }
-    (index, max_num)
+
+    (i_max, nums[i_max])
 }
 
 /// `a`に直交し，ノルムが1であるベクトルを返す．ただし`norm(a) > 0`であること．
@@ -106,25 +105,27 @@ pub fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
 pub fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
     let mut working_array: Vector3<T> = unsafe {MaybeUninit::uninit().assume_init()};
 
-    // aの絶対値が最大となるインデックスを探す（working_arrayにはaの絶対値を入れる）
-    working_array[0] = a[0].abs();
-    let mut i_max: usize = 0;
-    let mut max_val = working_array[0];
-    for (i, val) in a.iter().enumerate().skip(1) {
+    // aの絶対値を入れておく
+    for (i, val) in a.iter().enumerate() {
         working_array[i] = val.abs();
-        if working_array[i] > max_val {
-            max_val = working_array[i];
-            i_max = i;
+    }
+
+    // aの絶対値が最大・最小となるインデックスを探す
+    let mut i_min: usize = 1;
+    let mut i_max: usize = 0;
+    if working_array[0] < working_array[1] {
+        i_min = 0;
+        i_max = 1;
+    }
+    if working_array[i_max] < working_array[2] {
+        i_max = 2;
+    } else {
+        if working_array[i_min] > working_array[2] {
+            i_min = 2;
         }
     }
-    // working_arrayの中央値を探す
-    let idx1 = (i_max + 1) % 3;
-    let idx2 = (i_max + 2) % 3;
-    let i_med = if working_array[idx1] > working_array[idx2] {
-        idx1
-    } else {
-        idx2
-    };
+
+    let i_med = 3 - (i_max + i_min);
 
     let norm_inv = {
         #[cfg(feature = "norm-sqrt")]
@@ -137,9 +138,9 @@ pub fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
             a[i_med].hypot(a[i_max]).recip()
         }
     };
+    working_array[i_min] = T::zero();
     working_array[i_med] = -a[i_max] * norm_inv;
     working_array[i_max] =  a[i_med] * norm_inv;
-    working_array[3 - (i_med + i_max)] = T::zero();
 
     working_array
 }
