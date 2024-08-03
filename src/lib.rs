@@ -149,7 +149,7 @@ where T: Float {
 #[inline]
 pub fn from_axis_angle<T>(axis: Vector3<T>, angle: T) -> Quaternion<T>
 where T: Float + FloatConst {
-    let theta = angle % ( T::PI() + T::PI() );  // limit to (-2π, 2π)
+    let theta = angle % ( T::PI() + T::PI() );  // Range reduction: (-2π, 2π)
     let (sin, cos) = ( theta * pfs::cast(0.5) ).sin_cos();
     let coef = sin / norm(axis);
     if coef.is_infinite() {
@@ -438,6 +438,8 @@ where T: Float + FloatConst {
 /// # let q = (1.0, [0.0; 3]);
 /// let angles = to_euler_angles(Intrinsic, XYZ, q);
 /// ```
+/// 
+/// Each element of `angles` takes a value in the range: `(-π, π]`.
 /// 
 /// Sequences: `angles[0]` ---> `angles[1]` ---> `angles[2]`
 /// 
@@ -1113,7 +1115,7 @@ where T: Float, U: QuaternionOps<T> {
 pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let norm_v = norm(q.1);
-    let norm_q = q.0.hypot(norm_v);
+    let norm_q = pfs::norm2(q.0, norm_v);
     let coef = (q.0 / norm_q).acos() / norm_v;
     ( norm_q.ln(), scale(coef, q.1) )
 }
@@ -1177,7 +1179,7 @@ where T: Float {
 pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     let norm_v = norm(q.1);
-    let norm_q = q.0.hypot(norm_v);
+    let norm_q = pfs::norm2(q.0, norm_v);
     let omega = (q.0 / norm_q).acos();
     let (sin, cos) = (t * omega).sin_cos();
     let coef = norm_q.powf(t);
@@ -1243,7 +1245,7 @@ pub fn sqrt<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let half = pfs::cast(0.5);
     let norm_v = norm(q.1);
-    let norm_q = q.0.hypot(norm_v);
+    let norm_q = pfs::norm2(q.0, norm_v);
     let coef = ((norm_q - q.0) * half).sqrt() / norm_v;
     ( ((norm_q + q.0) * half).sqrt(), scale(coef, q.1) )
 }

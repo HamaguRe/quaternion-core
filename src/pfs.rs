@@ -10,6 +10,23 @@ pub fn cast<T: Float>(x: f64) -> T {
     num_traits::cast::<f64, T>(x).unwrap()
 }
 
+/// 二次元ベクトル`[a, b]`のノルムを計算する．
+/// 
+/// `norm-sqrt`フィーチャーが有効の場合は`(a*a + b*b).sqrt()`とし，
+/// そうでない場合は`a.hypot(b)`として計算する．
+#[inline(always)]
+pub fn norm2<T: Float>(a: T, b: T) -> T {
+    #[cfg(feature = "norm-sqrt")]
+    {
+        (a*a + b*b).sqrt()
+    }
+
+    #[cfg(not(feature = "norm-sqrt"))]
+    {
+        a.hypot(b)
+    }
+}
+
 /// `fma` featureを有効にした場合は`s.mul_add(a, b)`として展開され，
 /// 有効にしなかった場合は単純な積和`s*a + b`に展開してコンパイルされる．
 #[inline(always)]
@@ -36,22 +53,21 @@ pub fn acos_safe<T: Float>(x: T) -> T {
 
 /// sinc(x) := sin(x) / x
 /// 
-/// sinc関数ではx=0において特異点とならずに計算できる
-/// （sin(x)/xにおけるx=0は可除去特異点）．
+/// sinc関数ではx=0において特異点とならずに計算できる（sin(x)/xにおけるx=0は可除特異点）．
 /// 
 /// sinc(Inf or NaN) is NaN
 #[inline]
 pub fn sinc<T: Float>(x: T) -> T {
-    // チェビシェフ近似多項式の係数
-    // [-1, 1]の範囲で最大誤差1.55e-15程度
+    // テレスコーピング法で求めた多項式係数（ほぼ最良近似式）
+    // f64で計算した場合，閉区間[-1, 1]において最大誤差 ±2.22e-16 程度．
     const COEF: [f64; 7] = [
-        1.5639670891687275e-10,  // s12
-        -2.504349140508566e-8,   // s10
-        2.7557233897823613e-6,   // s8
-        -0.00019841269414627052, // s6
-        0.00833333333232666,     // s4
-        -0.16666666666657756,    // s2
-        0.9999999999999986,      // s0
+        1.579349121783874e-10,   // s12
+        -2.5048466629256012e-8,  // s10
+        2.7557294426482064e-6,   // s8
+        -0.00019841269754547076, // s6
+        0.008333333333188874,    // s4
+        -0.16666666666665766,    // s2
+        0.9999999999999999,      // s0
     ];
 
     // 特異点回避できれば十分
@@ -62,10 +78,11 @@ pub fn sinc<T: Float>(x: T) -> T {
         // この変形はホーナー法（Horner's rule）と呼ばれるものである．
         let z = x * x;
         let mut y = cast(COEF[0]);
-        for i in 1..COEF.len() {
+        for i in 1..(COEF.len() - 1) {
             y = mul_add(y, z, cast(COEF[i]));
         }
-        y
+        y = mul_add(y, z, cast::<T>(COEF[COEF.len()-1]) - T::one());  // 精度改善のノウハウ
+        y + T::one()
     } else {
         x.sin() / x
     }
@@ -126,18 +143,8 @@ pub fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
     }
 
     let i_med = 3 - (i_max + i_min);
+    let norm_inv = norm2(a[i_med], a[i_max]).recip();
 
-    let norm_inv = {
-        #[cfg(feature = "norm-sqrt")]
-        {
-            (a[i_med] * a[i_med] + a[i_max] * a[i_max]).sqrt().recip()
-        }
-
-        #[cfg(not(feature = "norm-sqrt"))]
-        {
-            a[i_med].hypot(a[i_max]).recip()
-        }
-    };
     working_array[i_min] = T::zero();
     working_array[i_med] = -a[i_max] * norm_inv;
     working_array[i_max] =  a[i_med] * norm_inv;

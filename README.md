@@ -37,7 +37,7 @@ features = ["libm"]
 Interconversion with 24 different euler angles (12 each of `Intrinsic` and `Extrinsic`) 
 is possible!!
 
-Other interconversions with axis/angle and rotation vector are also possible.
+Other interconversions with `axis/angle` and `rotation vector` are also possible.
 
 ## Features
 
@@ -98,6 +98,16 @@ fn main() {
     }
 }
 ```
+
+## Development concept
+
+In creating this crate, I tried to keep the implementation simple and practical.
+
+All functions are implemented in such a way that the computational cost is as small as 
+possible (but not too complex to implement), which is a great advantage for everyone.
+
+Also, since I started creating this crate to experiment with attitude estimation, many parts 
+were implemented with the intention of running on a microcontroller (e.g. the `norm-sqrt` feature).
 
 ## Releases
 

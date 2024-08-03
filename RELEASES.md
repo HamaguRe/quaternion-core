@@ -1,3 +1,8 @@
+# Version 0.5.2 (2024-08-03)
+
+* The polynomial coefficients of the `sinc` function (in `src/pfs`) were re-calculated. The number of terms remained the same and the maximum error went from 1.55e-15 to 2.22e-16.
+* I created a `norm2` function (in `src/pfs`) and organized the implementation.
+
 # Version 0.5.1 (2024-07-15)
 
 * The implementation of `src/pfs`(private module) was reviewed.
