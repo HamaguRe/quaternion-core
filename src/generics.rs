@@ -40,7 +40,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     }
 
     #[inline]
-    fn add(self, rhs: Self) -> Self {
+    fn add(self, rhs: Vector3<T>) -> Vector3<T> {
         [
             self[0] + rhs[0], 
             self[1] + rhs[1], 
@@ -49,7 +49,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     }
 
     #[inline]
-    fn sub(self, rhs: Self) -> Self {
+    fn sub(self, rhs: Vector3<T>) -> Vector3<T> {
         [
             self[0] - rhs[0], 
             self[1] - rhs[1], 
@@ -58,7 +58,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     }
 
     #[inline]
-    fn scale(self, s: T) -> Self {
+    fn scale(self, s: T) -> Vector3<T> {
         [
             s * self[0],
             s * self[1],
@@ -67,7 +67,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     }
 
     #[inline]
-    fn scale_add(self, s: T, b: Self) -> Self {
+    fn scale_add(self, s: T, b: Vector3<T>) -> Vector3<T> {
         [
             mul_add(s, self[0], b[0]),
             mul_add(s, self[1], b[1]),
@@ -76,7 +76,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     }
 
     #[inline]
-    fn hadamard(self, rhs: Self) -> Self {
+    fn hadamard(self, rhs: Vector3<T>) -> Vector3<T> {
         [
             self[0] * rhs[0],
             self[1] * rhs[1],
@@ -85,7 +85,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     }
 
     #[inline]
-    fn hadamard_add(self, b: Self, c: Self) -> Self {
+    fn hadamard_add(self, b: Vector3<T>, c: Vector3<T>) -> Vector3<T> {
         [
             mul_add(self[0], b[0], c[0]),
             mul_add(self[1], b[1], c[1]),
@@ -94,7 +94,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     }
 
     #[inline]
-    fn dot(self, b: Self) -> T {
+    fn dot(self, b: Vector3<T>) -> T {
         #[cfg(feature = "fma")]
         {
             mul_add(self[0], b[0], mul_add(self[1], b[1], self[2] * b[2]))
@@ -124,19 +124,19 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     }
 
     #[inline]
-    fn negate(self) -> Self {
+    fn negate(self) -> Vector3<T> {
         [ -self[0], -self[1], -self[2] ]
     }
 
     // Product of Pure Quaternions
     #[inline]
-    fn mul(self, rhs: Self) -> Quaternion<T> {
+    fn mul(self, rhs: Vector3<T>) -> Quaternion<T> {
         ( -super::dot(self, rhs), super::cross(self, rhs) )
     }
 
     // 零ベクトルで特異点
     #[inline]
-    fn inv(self) -> Self {
+    fn inv(self) -> Vector3<T> {
         self.negate().scale( super::dot(self, self).recip() )
     }
 
@@ -155,37 +155,37 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
     }
 
     #[inline]
-    fn add(self, rhs: Self) -> Self {
+    fn add(self, rhs: Quaternion<T>) -> Quaternion<T> {
         ( self.0 + rhs.0, self.1.add(rhs.1) )
     }
 
     #[inline]
-    fn sub(self, rhs: Self) -> Self {
+    fn sub(self, rhs: Quaternion<T>) -> Quaternion<T> {
         ( self.0 - rhs.0,  self.1.sub(rhs.1) )
     }
 
     #[inline]
-    fn scale(self, s: T) -> Self {
+    fn scale(self, s: T) -> Quaternion<T> {
         ( s * self.0, self.1.scale(s) )
     }
 
     #[inline]
-    fn scale_add(self, s: T, b: Self) -> Self {
+    fn scale_add(self, s: T, b: Quaternion<T>) -> Quaternion<T> {
         ( mul_add(s, self.0, b.0), self.1.scale_add(s, b.1) )
     }
 
     #[inline]
-    fn hadamard(self, rhs: Self) -> Self {
+    fn hadamard(self, rhs: Quaternion<T>) -> Quaternion<T> {
         ( self.0 * rhs.0, self.1.hadamard(rhs.1) )
     }
 
     #[inline]
-    fn hadamard_add(self, b: Self, c: Self) -> Self {
+    fn hadamard_add(self, b: Quaternion<T>, c: Quaternion<T>) -> Quaternion<T> {
         ( mul_add(self.0, b.0, c.0), self.1.hadamard_add(b.1, c.1) )
     }
 
     #[inline]
-    fn dot(self, b: Self) -> T {
+    fn dot(self, b: Quaternion<T>) -> T {
         #[cfg(feature = "fma")]
         {
             mul_add(self.0, b.0, self.1.dot(b.1))
@@ -215,12 +215,12 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
     }
 
     #[inline]
-    fn negate(self) -> Self {
+    fn negate(self) -> Quaternion<T> {
         ( -self.0, self.1.negate() )
     }
 
     #[inline]
-    fn mul(self, rhs: Self) -> Quaternion<T> {
+    fn mul(self, rhs: Quaternion<T>) -> Quaternion<T> {
         let self0_b = rhs.scale(self.0);
         (
             self0_b.0 - super::dot(self.1, rhs.1),
@@ -229,7 +229,7 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
     }
 
     #[inline]
-    fn inv(self) -> Self {
+    fn inv(self) -> Quaternion<T> {
         super::conj(self).scale( super::dot(self, self).recip() )
     }
 

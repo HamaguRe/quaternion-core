@@ -572,6 +572,9 @@ where T: Float {
 
 /// Product of DCM and Vector3
 /// 
+/// This is the product of a 3x3 matrix and a 3D vector.
+/// It is used to apply the rotation represented by the DCM to the vector.
+/// 
 /// # Examples
 /// 
 /// ```
@@ -600,7 +603,7 @@ where T: Float {
     ]
 }
 
-/// Calculate the sum of each element of Quaternion or Vector3.
+/// Calculate the sum of each element of a quaternion (or vector).
 /// 
 /// # Examples
 /// 
@@ -622,7 +625,9 @@ where T: Float, U: QuaternionOps<T> {
     a.sum()
 }
 
-/// `a + b`
+/// Addition of two quaternions (or vectors): `a + b`
+/// 
+/// Calculate the addiction of each element of Quaternion or Vector3.
 /// 
 /// # Examples
 /// 
@@ -653,7 +658,7 @@ where T: Float, U: QuaternionOps<T> {
     a.add(b)
 }
 
-/// `a - b`
+/// Subtraction of two quaternions (or vectors): `a - b`
 /// 
 /// # Examples
 /// 
@@ -684,7 +689,7 @@ where T: Float, U: QuaternionOps<T> {
     a.sub(b)
 }
 
-/// `s * a`
+/// Multiplies each component of the quaternion (or vector) by a given real number, scaling the entire quaternion uniformly: `s * a`.
 /// 
 /// # Examples
 /// 
@@ -713,7 +718,7 @@ where T: Float, U: QuaternionOps<T> {
     a.scale(s)
 }
 
-/// `s * a + b`
+/// Scaling and addition in one step: `s * a + b`
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using 
 /// the `mul_add` method (`s.mul_add(a, b)`). 
@@ -748,9 +753,7 @@ where T: Float, U: QuaternionOps<T> {
     a.scale_add(s, b)
 }
 
-/// `a ∘ b`
-/// 
-/// Hadamard product of Vector3 or Quaternion.
+/// Calculate the element-wise product of two quaternions (or vectors)
 /// 
 /// # Examples
 /// 
@@ -781,9 +784,7 @@ where T: Float, U: QuaternionOps<T> {
     a.hadamard(b)
 }
 
-/// `a ∘ b + c`
-/// 
-/// Hadamard product and addiction of Quaternion or Vector3.
+/// Hadamard product and addition in one step.
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using 
 /// the `mul_add` method (`s.mul_add(a, b)`). 
@@ -820,9 +821,7 @@ where T: Float, U: QuaternionOps<T> {
     a.hadamard_add(b, c)
 }
 
-/// `a · b`
-/// 
-/// Dot product of Vector3 or Quaternion.
+/// Dot product of two quaternions (or vectors): `a · b`
 /// 
 /// # Examples
 /// 
@@ -846,7 +845,7 @@ where T: Float, U: QuaternionOps<T> {
     a.dot(b)
 }
 
-/// Cross product (vector product): `a × b`
+/// Cross product of two quaternions (or vectors): `a × b`
 /// 
 /// The product order is `a × b (!= b × a)`
 /// 
@@ -965,7 +964,10 @@ where T: Float, U: QuaternionOps<T> {
     a.negate()
 }
 
-/// Hamilton product (Product of Quaternion or Pure Quaternion)
+/// Multiplication of two quaternions (or vectors).
+/// 
+/// This is an operation also known as the Hamilton product.
+/// In this operation, the vector is treated as a pure quaternoin (which is a quaternion with zero real part).
 /// 
 /// The product order is `ab (!= ba)`
 /// 
@@ -1276,7 +1278,7 @@ where T: Float {
     ( pfs::mul_add(q.0, half, half).sqrt(), scale(coef, q.1) )
 }
 
-/// Rotation of point (Point Rotation - Frame Fixed)
+/// Point rotation by quaternion (Point Rotation - Frame Fixed)
 /// 
 /// `q v q*  (||q|| = 1)`
 /// 
@@ -1313,7 +1315,7 @@ where T: Float {
     scale_add(pfs::cast(2.0), cross(q.1, tmp), v)
 }
 
-/// Rotation of frame (Frame Rotation - Point Fixed)
+/// Frame rotation by quaternion (Frame Rotation - Point Fixed)
 /// 
 /// `q* v q  (||q|| = 1)`
 /// 
@@ -1352,10 +1354,12 @@ where T: Float {
 
 /// Calculate the versor to rotate from vector `a` to vector `b` (Without singularity!).
 /// 
-/// This function calculates `q` satisfying `b = point_rotation(q, a)` 
-/// when `norm(a) = norm(b)`.
+/// This function calculates `q` satisfying `b = point_rotation(q, a)` when `norm(a) = norm(b)`.
+/// 
 /// If `norm(a) > 0` and `norm(b) > 0`, then `q` can be calculated with good 
 /// accuracy no matter what the positional relationship between `a` and `b` is.
+/// However, this function does not guarantee what the axis of rotation will be. 
+/// If you want the rotation axis to be orthogonal to vectors `a` and `b`, you can use `rotate_a_to_b_shotest`.
 /// 
 /// If you enter a zero vector either `a` or `b`, it returns `None`.
 /// 
@@ -1399,6 +1403,11 @@ where T: Float {
 }
 
 /// Calculate the versor to rotate from vector `a` to vector `b` by the shortest path.
+/// 
+/// This function calculates `q` satisfying `b = point_rotation(q, a)` when `norm(a) = norm(b)`.
+/// 
+/// The axis of rotation of versor calculated by this function is always orthogonal to `a` and `b`.
+/// And, the angle of rotation around the axis takes values in the range from -Pi to +Pi radians.
 /// 
 /// The parameter `t` adjusts the amount of movement from `a` to `b`. 
 /// When `t = 1`, `a` moves completely to position `b`.

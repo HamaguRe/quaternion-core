@@ -81,7 +81,7 @@ pub fn sinc<T: Float>(x: T) -> T {
         for i in 1..(COEF.len() - 1) {
             y = mul_add(y, z, cast(COEF[i]));
         }
-        y = mul_add(y, z, cast::<T>(COEF[COEF.len()-1]) - T::one());  // 精度改善のノウハウ
+        y = mul_add(y, z, cast::<T>(COEF[COEF.len()-1]) - T::one());  // 精度改善のためのノウハウ
         y + T::one()
     } else {
         x.sin() / x
