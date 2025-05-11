@@ -2,7 +2,7 @@
 
 [![Latest version](https://img.shields.io/crates/v/quaternion-core?color=orange&style=flat-square)](https://crates.io/crates/quaternion-core)
 [![Documentation](https://img.shields.io/docsrs/quaternion-core/latest?color=brightgreen&style=flat-square&logo=docs.rs)](https://docs.rs/quaternion-core)
-![Minimum rustc](https://img.shields.io/badge/rustc-1.53+-red.svg?style=flat-square&logo=rust)
+![Minimum rustc](https://img.shields.io/badge/rustc-1.60+-red.svg?style=flat-square&logo=rust)
 ![License](https://img.shields.io/crates/l/quaternion-core?color=blue&style=flat-square)
 
 Quaternion library written in Rust.
@@ -32,7 +32,7 @@ features = ["libm"]
 
 ## Conversion
 
-![Conversion](https://raw.githubusercontent.com/HamaguRe/quaternion-core/master/conversion.png)
+![Conversion (DCM <--> Quaternion <--> Euler angles)](https://raw.githubusercontent.com/HamaguRe/quaternion-core/master/conversion.png)
 
 Interconversion with 24 different euler angles (12 each of `Intrinsic` and `Extrinsic`) 
 is possible!!
@@ -40,6 +40,13 @@ is possible!!
 Other interconversions with `axis/angle` and `rotation vector` are also possible.
 
 ## Features
+
+### libm
+
+If you set `default-features=false` (do not import `std`), you must enable this feature.
+
+In this case, mathematical functions (e.g. `sin`, `cos`, `sqrt` ...) are provided by 
+[libm](https://crates.io/crates/libm) crate.
 
 ### fma
 
@@ -52,13 +59,6 @@ This crate uses the `mul_add` method mainly to improve calculation speed, but if
 not support the `FMA` (Fused Multiply-Add) instruction or if the `libm` feature is 
 enabled, then the calculation is performed by the software implementation.
 In this case, it may be rather slower than if the `fma` feature is not enabled.
-
-### libm
-
-If you set `default-features=false` (do not import `std`), you must enable this feature.
-
-In this case, mathematical functions (e.g. `sin`, `cos`, `sqrt` ...) are provided by 
-[libm](https://crates.io/crates/libm) crate.
 
 ### norm-sqrt
 

@@ -1,6 +1,6 @@
 [package]
 name = "quaternion-core"
-version = "0.5.3"
+version = "0.5.4"
 authors = ["HamaguRe <hamagure@space-denpa.jp>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -16,8 +16,8 @@ exclude = [".gitignore", "conversion.png"]
 [features]
 default = ["std"]
 std = ["num-traits/std"]
-fma = []
 libm = ["num-traits/libm"]
+fma = []
 norm-sqrt = []
 serde-serialize = ["serde"]
 

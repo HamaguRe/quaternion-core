@@ -42,15 +42,6 @@ pub fn mul_add<T: Float>(s: T, a: T, b: T) -> T {
     }
 }
 
-/// （主に呼び出し側の特異点近傍で）NaNにならないように定義域外の値をカットする．
-/// 
-/// 勝手に値をカットしても問題ないところでのみ使うこと．
-#[inline]
-pub fn acos_safe<T: Float>(x: T) -> T {
-    // FloatConstを使いたくないからこの実装とする．
-    ( x.abs().min(T::one()).copysign(x) ).acos()
-}
-
 /// sinc(x) := sin(x) / x
 /// 
 /// sinc関数ではx=0において特異点とならずに計算できる（sin(x)/xにおけるx=0は可除特異点）．

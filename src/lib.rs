@@ -136,7 +136,7 @@ where T: Float {
 /// # use quaternion_core::{from_axis_angle, point_rotation};
 /// # let PI = std::f64::consts::PI;
 /// // Generates a quaternion representing the
-/// // rotation of π/2[rad] around the y-axis.
+/// // rotation of pi/2[rad] around the y-axis.
 /// let q = from_axis_angle([0.0, 1.0, 0.0], PI/2.0);
 /// 
 /// // Rotate the point.
@@ -162,10 +162,16 @@ where T: Float + FloatConst {
 /// Calculate the rotation `axis` (unit vector) and the rotation `angle`\[rad\] 
 /// around the `axis` from the Versor.
 /// 
-/// If identity quaternion is entered, `angle` returns zero and 
-/// the `axis` returns a zero vector.
+/// If identity quaternion is entered, `angle` returns zero and the `axis` returns a zero vector.
 /// 
-/// Range of `angle`: `(-π, π]`
+/// Range of `angle`: `(-pi, pi]`
+/// 
+/// Because this function returns a normalized rotation axis, 
+/// when the norm of the vector part of Versor is zero, a singularity 
+/// occurs and accuracy decreases. Therefore, if you want to use the 
+/// calculated `angle` and `axis` as `scale(angle, axis)`, 
+/// it is better to use the `to_rotation_vector` function. 
+/// The `to_rotation_vector` function can be calculated without singularities.
 /// 
 /// # Examples
 /// 
@@ -439,7 +445,7 @@ where T: Float + FloatConst {
 /// let angles = to_euler_angles(Intrinsic, XYZ, q);
 /// ```
 /// 
-/// Each element of `angles` takes a value in the range: `(-π, π]`.
+/// Each element of `angles` takes a value in the range: `(-pi, pi]`.
 /// 
 /// Sequences: `angles[0]` ---> `angles[1]` ---> `angles[2]`
 /// 
@@ -503,7 +509,7 @@ where T: Float + FloatConst {
 /// The Rotation vector itself represents the axis of rotation, 
 /// and the norm represents the angle \[rad\] of rotation around the axis.
 /// 
-/// Maximum range of the norm of the rotation vector: `[0, 2π]`
+/// Maximum range of the norm of the rotation vector: `[0, 2pi]`
 /// 
 /// # Examples
 /// 
@@ -513,7 +519,7 @@ where T: Float + FloatConst {
 /// let angle = PI / 2.0;
 /// let axis = [1.0, 0.0, 0.0];
 /// 
-/// // This represents a rotation of π/2 around the x-axis.
+/// // This represents a rotation of pi/2 around the x-axis.
 /// let rot_vec = scale(angle, axis);  // Rotation vector
 /// 
 /// // Rotation vector ---> Quaternion
@@ -538,7 +544,7 @@ where T: Float {
 /// The Rotation vector itself represents the axis of rotation, 
 /// and the norm represents the angle of rotation around the axis.
 /// 
-/// Norm range of the calculation result: `[0, π]`
+/// Norm range of the calculation result: `[0, pi]`
 /// 
 /// # Examples
 /// 
@@ -562,8 +568,9 @@ where T: Float {
 #[inline]
 pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
-    let half_theta = norm(q.1).min( T::one() ).asin();  // [0, π/2]
-    let mut coef = pfs::cast::<T>(2.0) / pfs::sinc(half_theta);   // [2, π]
+    // half_thetaをasinで求めるとhalf_theta=±pi/2のときに精度低下するのでatanを使う．
+    let half_theta = (norm(q.1) / q.0).atan();  // [-pi/2, pi/2]
+    let mut coef = pfs::cast::<T>(2.0) / pfs::sinc(half_theta);   // [2, pi]
     if q.0 < T::zero() {
         coef = -coef;  // sinc関数は偶関数なので，half_thetaに対する符号操作はここで行う必要がある．
     }
@@ -1057,8 +1064,8 @@ where T: Float, U: QuaternionOps<T> {
     a.inv()
 }
 
-// acosは[-π/2, π/2]の範囲でしか値を返さないので、qのとり方によってはlnで完全に復元できない。
-// q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-π/2, π/2]の範囲内にある場合のみ。
+// acosは[-pi/2, pi/2]の範囲でしか値を返さないので、qのとり方によってはlnで完全に復元できない。
+// q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-pi/2, pi/2]の範囲内にある場合のみ。
 /// Exponential function of Quaternion or Pure Quaternion (Vector3).
 /// 
 /// # Examples
@@ -1097,8 +1104,8 @@ where T: Float, U: QuaternionOps<T> {
     a.exp()
 }
 
-// acosは[-π/2, π/2]の範囲でしか値を返さないので、qのとり方によってはlnで完全に復元できない。
-// q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-π/2, π/2]の範囲内にある場合のみ。
+// acosは[-pi/2, pi/2]の範囲でしか値を返さないので、qのとり方によってはlnで完全に復元できない。
+// q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-pi/2, pi/2]の範囲内にある場合のみ。
 /// Natural logarithm of Quaternion.
 /// 
 /// # Examples
@@ -1405,18 +1412,40 @@ where T: Float {
 /// Calculate the versor to rotate from vector `a` to vector `b` by the shortest path.
 /// 
 /// This function calculates `q` satisfying `b = point_rotation(q, a)` when `norm(a) = norm(b)`.
+/// The rotation axis of `q` is always perpendicular to `a` and `b`, and the rotation angle around 
+/// the axis ranges from -Pi to +Pi radians.
 /// 
-/// The axis of rotation of versor calculated by this function is always orthogonal to `a` and `b`.
-/// And, the angle of rotation around the axis takes values in the range from -Pi to +Pi radians.
+/// If `norm(a) > 0` and `norm(b) > 0`, `q` can be calculated with high accuracy regardless of the 
+/// relative positions of `a` and `b`. 
+/// However, if `a` and `b` are parallel and in opposite directions, the direction of the rotation 
+/// axis is not determined in principle, so there is no guarantee what the rotation axis will be 
+/// in this case (it is guaranteed that it is perpendicular to `a` and `b`).
 /// 
 /// The parameter `t` adjusts the amount of movement from `a` to `b`. 
 /// When `t = 1`, `a` moves completely to position `b`.
 /// 
-/// The algorithm used in this function is less accurate when `a` and `b` are parallel. 
-/// Therefore, it is better to use the `rotate_a_to_b(a, b)` function when `t = 1` and 
-/// the rotation axis is not important.
-/// 
 /// If you enter a zero vector either `a` or `b`, it returns `None`.
+/// 
+/// This function is slightly more computationally intensive when the angle between `a` and `b` 
+/// is close to PI, so it is recommended to use the `rotate_a_to_b` function if it is okay for 
+/// the rotation axis to not be orthogonal to `a` and `b`.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use quaternion_core::{Vector3, cross, rotate_a_to_b_shortest, point_rotation, normalize};
+/// let a: Vector3<f64> = [1.5, -0.5, 0.2];
+/// let b: Vector3<f64> = [0.1, 0.6, 1.0];
+/// 
+/// let q = rotate_a_to_b_shortest(a, b, 1.0).unwrap();
+/// let b_check = point_rotation(q, a);
+/// 
+/// let b_u = normalize(b);
+/// let b_check_u = normalize(b_check);
+/// assert!( (b_u[0] - b_check_u[0]).abs() < 1e-12 );
+/// assert!( (b_u[1] - b_check_u[1]).abs() < 1e-12 );
+/// assert!( (b_u[2] - b_check_u[2]).abs() < 1e-12 );
+/// ```
 #[inline]
 pub fn rotate_a_to_b_shortest<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Option<Quaternion<T>>
 where T: Float {
@@ -1428,18 +1457,46 @@ where T: Float {
     let a = scale(norm_inv_a, a);
     let b = scale(norm_inv_b, b);
 
-    let axis = cross(a, b);
-    let norm_axis_inv = norm(axis).recip();
-    if norm_axis_inv.is_finite() {
-        let (sin, cos) = (t * pfs::acos_safe(dot(a, b)) * pfs::cast(0.5)).sin_cos();
-        Some( (cos, scale(sin * norm_axis_inv, axis)) )
-    } else {  // Singularity (a || b)
-        if dot(a, b) > T::zero() {
-            Some( identity() )  // a = b
-        } else {
-            Some( (T::zero(), pfs::orthogonal_vector(a)) )  // a = -b
+    let one = T::one();
+    let half = pfs::cast::<T>(0.5);
+    let a_dot_b = dot(a, b);  // == cos(theta)
+    let q_a2b = if a_dot_b > pfs::cast(-0.94) {  // theta < 160 deg
+        let q_s = (half * (one + a_dot_b)).sqrt();  // == cos(theta/2)
+        (q_s, scale(half / q_s, cross(a, b)))  // a --> b
+    } else {
+        let b_cross_a = cross(b, a);
+        let q_s = (half * (one - a_dot_b)).sqrt();  // == cos((pi-theta)/2)
+        let q_a2mb = (q_s, scale(half / q_s, b_cross_a));  // a --> -b
+        let r_o = pfs::orthogonal_vector(b);
+
+        let c = sub(b_cross_a, r_o);
+        let norm_c = norm(c);  // norm_c > 0
+        let r_o_cross_c = cross(r_o, c);
+        let mut sin_rho = norm(r_o_cross_c) / norm_c;  // (-1, 1)
+        if dot(r_o_cross_c, b) < T::zero() {
+            sin_rho = -sin_rho;
         }
-    }
+        let cos_rho = (one - sin_rho * sin_rho).sqrt();  // (0, 1)
+
+        // r_o と b_cross_a の間の角度lambdaを求める
+        let numer = norm_c * sin_rho;
+        let denom = one - norm_c * cos_rho;
+        let lambda = numer.atan2(denom);  // (-pi, pi]
+
+        let (sin, cos) = (half * lambda).sin_cos();
+        let q_b = (cos, scale(sin, b));
+        let r = point_rotation(q_b, r_o);  // -b --> a
+
+        let q_a2b_s = -dot(r, q_a2mb.1);
+        let q_a2b_v = scale_add(q_a2mb.0, r, cross(r, q_a2mb.1));
+        (q_a2b_s, q_a2b_v)  // a --> b
+    };
+
+    // 特異点を避けるために回転ベクトルを経由する
+    let r = to_rotation_vector(q_a2b);
+    let q_a2b = from_rotation_vector(scale(t, r));
+
+    Some( q_a2b )
 }
 
 /// Lerp (Linear interpolation)

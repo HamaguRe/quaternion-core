@@ -1,3 +1,9 @@
+# Version 0.5.4 (2025-05-11)
+
+* Added documentation comment for the `to_axis_angle` function.
+* The internal implementation of the `to_rotation_vector` function has been improved. Before the change, the accuracy of `x.asin()` was degraded near `x=1`, so `atan` is used to prevent the accuracy degradation.
+* The implementation of the `rotate_a_to_b_shortest` function has been fundamentally changed so that it can be calculated with good accuracy no matter what the positional relationship between the vectors `a` and `b` is (I think this is pretty amazing...).
+
 # Version 0.5.3 (2024-10-27)
 
 * The implementation related to Euler angles was reviewed. The calculation results are the same as before.
