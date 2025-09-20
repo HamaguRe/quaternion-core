@@ -1,6 +1,5 @@
 //! Private functions
 
-use core::mem::MaybeUninit;
 use super::{Float, Vector3};
 
 
@@ -10,7 +9,7 @@ pub fn cast<T: Float>(x: f64) -> T {
     num_traits::cast::<f64, T>(x).unwrap()
 }
 
-/// 二次元ベクトル`[a, b]`のノルムを計算する．
+/// 二次元ベクトル`[a, b]`のL2ノルムを計算する．
 /// 
 /// `norm-sqrt`フィーチャーが有効の場合は`(a*a + b*b).sqrt()`とし，
 /// そうでない場合は`a.hypot(b)`として計算する．
@@ -111,24 +110,20 @@ pub fn max4<T: Float>(nums: [T; 4]) -> (usize, T) {
 /// に対しては`b = [0.0, 1.5, -0.8]`とする．
 #[inline]
 pub fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
-    let mut working_array: Vector3<T> = unsafe {MaybeUninit::uninit().assume_init()};
-
     // aの絶対値を入れておく
-    for (i, val) in a.iter().enumerate() {
-        working_array[i] = val.abs();
-    }
+    let mut b = a.map(|x| x.abs());
 
-    // aの絶対値が最大・最小となるインデックスを探す
-    let mut i_min: usize = 1;
-    let mut i_max: usize = 0;
-    if working_array[0] < working_array[1] {
-        i_min = 0;
-        i_max = 1;
+    // bの要素が最大・最小となるインデックスを探す
+    let mut i_min: usize = 0;
+    let mut i_max: usize = 1;
+    if b[0] > b[1] {
+        i_min = 1;
+        i_max = 0;
     }
-    if working_array[i_max] < working_array[2] {
+    if b[i_max] < b[2] {
         i_max = 2;
     } else {
-        if working_array[i_min] > working_array[2] {
+        if b[i_min] > b[2] {
             i_min = 2;
         }
     }
@@ -136,9 +131,9 @@ pub fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
     let i_med = 3 - (i_max + i_min);
     let norm_inv = norm2(a[i_med], a[i_max]).recip();
 
-    working_array[i_min] = T::zero();
-    working_array[i_med] = -a[i_max] * norm_inv;
-    working_array[i_max] =  a[i_med] * norm_inv;
+    b[i_min] = T::zero();
+    b[i_med] = -a[i_max] * norm_inv;
+    b[i_max] =  a[i_med] * norm_inv;
 
-    working_array
+    b
 }

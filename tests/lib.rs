@@ -491,7 +491,7 @@ fn test_rotate_a_to_b() {
         let b = point_rotation(q, a);
     
         let a_to_b = rotate_a_to_b(a, b).unwrap();
-        let a_to_b_t = rotate_a_to_b_shortest(a, b, 1.0).unwrap();
+        let a_to_b_t = rotate_a_to_b_shortest(a, b).unwrap();
         let b_rest = point_rotation(a_to_b, a);
         let b_rest_t = point_rotation(a_to_b_t, a);
         assert_eq_vec(b, b_rest);
@@ -504,7 +504,7 @@ fn test_rotate_a_to_b() {
     {
         let b = negate(a);
         let a_to_b = rotate_a_to_b(a, b).unwrap();
-        let a_to_b_shortest = rotate_a_to_b_shortest(a, b, 1.0).unwrap();
+        let a_to_b_shortest = rotate_a_to_b_shortest(a, b).unwrap();
         let b_rest = point_rotation(a_to_b, a);
         let b_rest_param = point_rotation(a_to_b_shortest, a);
         assert_eq_vec(b, b_rest);
@@ -518,7 +518,7 @@ fn test_rotate_a_to_b() {
         let b = [0.0; 3];
         let a_to_b = rotate_a_to_b(a, b);
         assert_eq!(None, a_to_b);
-        let a_to_b_shortest = rotate_a_to_b_shortest(a, b, 1.0);
+        let a_to_b_shortest = rotate_a_to_b_shortest(a, b);
         assert_eq!(None, a_to_b_shortest);
     }
 }

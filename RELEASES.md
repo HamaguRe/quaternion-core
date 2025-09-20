@@ -1,3 +1,9 @@
+# Version 0.6.0 (2025-09-20)
+
+* Within the `from_euler_angles` function, I have removed the use of the `FloatConst` trait. Whilst the `FloatConst` trait was intended to catch out-of-range values via `debug_assert!`, I did not wish to employ this trait solely for debugging purposes and have therefore eliminated it.
+* The `from_rotation_vector` function now performs normalisation internally. This enables correct conversion to a Versor even when the norm of the rotation_vector argument exceeds 2π.
+* The argument for adjusting the vector's movement amount has been removed from the `rotate_a_to_b` function. Should you wish to adjust the vector's movement amount, please use the method described in the function documentation.
+
 # Version 0.5.4 (2025-05-11)
 
 * Added documentation comment for the `to_axis_angle` function.

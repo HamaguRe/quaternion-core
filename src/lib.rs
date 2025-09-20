@@ -23,7 +23,7 @@
 //! println!("{:?}", add(q1, q2));  // <--- It's (1.1, [2.2, 3.3, 4.4])
 //! ```
 //! 
-//! ## Versor
+//! ## What is Versor?
 //! 
 //! Versor refers to a Quaternion representing a rotation, the norm of which is 1.
 //! 
@@ -423,11 +423,7 @@ where T: Float {
 /// ```
 #[inline]
 pub fn from_euler_angles<T>(rt: RotationType, rs: RotationSequence, angles: Vector3<T>) -> Quaternion<T>
-where T: Float + FloatConst {
-    debug_assert!( angles[0].abs() <= T::PI() + T::PI(), "angles[0] is out of range!");
-    debug_assert!( angles[1].abs() <= T::PI() + T::PI(), "angles[1] is out of range!");
-    debug_assert!( angles[2].abs() <= T::PI() + T::PI(), "angles[2] is out of range!");
-
+where T: Float {
     match rt {
         RotationType::Intrinsic => euler::from_intrinsic_euler_angles(rs, angles),
         RotationType::Extrinsic => euler::from_extrinsic_euler_angles(rs, angles),
@@ -509,8 +505,6 @@ where T: Float + FloatConst {
 /// The Rotation vector itself represents the axis of rotation, 
 /// and the norm represents the angle \[rad\] of rotation around the axis.
 /// 
-/// Maximum range of the norm of the rotation vector: `[0, 2pi]`
-/// 
 /// # Examples
 /// 
 /// ```
@@ -533,9 +527,11 @@ where T: Float + FloatConst {
 /// ```
 #[inline]
 pub fn from_rotation_vector<T>(r: Vector3<T>) -> Quaternion<T>
-where T: Float {
+where T: Float + FloatConst {
     let half: T = pfs::cast(0.5);
-    let half_theta = half * norm(r);
+
+    let theta = norm(r) % ( T::PI() + T::PI() );  // Range reduction: [0, 2π)
+    let half_theta = half * theta;
     (half_theta.cos(), scale(half * pfs::sinc(half_theta), r))
 }
 
@@ -570,11 +566,8 @@ pub fn to_rotation_vector<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
     // half_thetaをasinで求めるとhalf_theta=±pi/2のときに精度低下するのでatanを使う．
     let half_theta = (norm(q.1) / q.0).atan();  // [-pi/2, pi/2]
-    let mut coef = pfs::cast::<T>(2.0) / pfs::sinc(half_theta);   // [2, pi]
-    if q.0 < T::zero() {
-        coef = -coef;  // sinc関数は偶関数なので，half_thetaに対する符号操作はここで行う必要がある．
-    }
-    scale(coef, q.1)
+    let coef = pfs::cast::<T>(2.0) / pfs::sinc(half_theta);   // [2, pi]
+    scale(coef.copysign(q.0), q.1)  // sinc関数は偶関数なので，half_thetaの符号をここで反映する必要がある．
 }
 
 /// Product of DCM and Vector3
@@ -1421,9 +1414,6 @@ where T: Float {
 /// axis is not determined in principle, so there is no guarantee what the rotation axis will be 
 /// in this case (it is guaranteed that it is perpendicular to `a` and `b`).
 /// 
-/// The parameter `t` adjusts the amount of movement from `a` to `b`. 
-/// When `t = 1`, `a` moves completely to position `b`.
-/// 
 /// If you enter a zero vector either `a` or `b`, it returns `None`.
 /// 
 /// This function is slightly more computationally intensive when the angle between `a` and `b` 
@@ -1433,11 +1423,11 @@ where T: Float {
 /// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{Vector3, cross, rotate_a_to_b_shortest, point_rotation, normalize};
+/// # use quaternion_core::{Vector3, scale, cross, to_rotation_vector, from_rotation_vector, rotate_a_to_b_shortest, point_rotation, normalize};
 /// let a: Vector3<f64> = [1.5, -0.5, 0.2];
 /// let b: Vector3<f64> = [0.1, 0.6, 1.0];
 /// 
-/// let q = rotate_a_to_b_shortest(a, b, 1.0).unwrap();
+/// let q = rotate_a_to_b_shortest(a, b).unwrap();
 /// let b_check = point_rotation(q, a);
 /// 
 /// let b_u = normalize(b);
@@ -1445,9 +1435,17 @@ where T: Float {
 /// assert!( (b_u[0] - b_check_u[0]).abs() < 1e-12 );
 /// assert!( (b_u[1] - b_check_u[1]).abs() < 1e-12 );
 /// assert!( (b_u[2] - b_check_u[2]).abs() < 1e-12 );
+/// 
+/// // --- If the amount of displacement of vector `a` is to be adjusted --- //
+/// // The parameter `t` adjusts the amount of movement from `a` to `b`. 
+/// // When `t = 1`, `a` moves completely to position `b`.
+/// let t = 0.5;
+/// let mut q = rotate_a_to_b_shortest(a, b).unwrap();
+/// let r = to_rotation_vector(q);  // To avoid singularities, proceed via the rotation vector.
+/// q = from_rotation_vector(scale(t, r));
 /// ```
 #[inline]
-pub fn rotate_a_to_b_shortest<T>(a: Vector3<T>, b: Vector3<T>, t: T) -> Option<Quaternion<T>>
+pub fn rotate_a_to_b_shortest<T>(a: Vector3<T>, b: Vector3<T>) -> Option<Quaternion<T>>
 where T: Float {
     let norm_inv_a = norm(a).recip();
     let norm_inv_b = norm(b).recip();
@@ -1457,31 +1455,27 @@ where T: Float {
     let a = scale(norm_inv_a, a);
     let b = scale(norm_inv_b, b);
 
-    let one = T::one();
     let half = pfs::cast::<T>(0.5);
     let a_dot_b = dot(a, b);  // == cos(theta)
-    let q_a2b = if a_dot_b > pfs::cast(-0.94) {  // theta < 160 deg
-        let q_s = (half * (one + a_dot_b)).sqrt();  // == cos(theta/2)
-        (q_s, scale(half / q_s, cross(a, b)))  // a --> b
+    if a_dot_b > pfs::cast(-0.94) {  // theta < 160 deg
+        let q_s = (half + half * a_dot_b).sqrt();  // == cos(theta/2)
+        Some( (q_s, scale(half / q_s, cross(a, b))) )  // a --> b
     } else {
         let b_cross_a = cross(b, a);
-        let q_s = (half * (one - a_dot_b)).sqrt();  // == cos((pi-theta)/2)
+        let q_s = (half - half * a_dot_b).sqrt();  // == cos((pi-theta)/2)
         let q_a2mb = (q_s, scale(half / q_s, b_cross_a));  // a --> -b
         let r_o = pfs::orthogonal_vector(b);
 
         let c = sub(b_cross_a, r_o);
-        let norm_c = norm(c);  // norm_c > 0
         let r_o_cross_c = cross(r_o, c);
-        let mut sin_rho = norm(r_o_cross_c) / norm_c;  // (-1, 1)
-        if dot(r_o_cross_c, b) < T::zero() {
-            sin_rho = -sin_rho;
-        }
-        let cos_rho = (one - sin_rho * sin_rho).sqrt();  // (0, 1)
+
+        // rho < pi/2
+        let norm_c = norm(c);  // norm_c > 0
+        let norm_c_sin_rho = norm(r_o_cross_c).copysign( dot(r_o_cross_c, b) );  // norm(c) * sin(rho)
+        let norm_c_cos_rho = (norm_c * norm_c - norm_c_sin_rho * norm_c_sin_rho).sqrt();  // norm(c) * cos(rho)
 
         // r_o と b_cross_a の間の角度lambdaを求める
-        let numer = norm_c * sin_rho;
-        let denom = one - norm_c * cos_rho;
-        let lambda = numer.atan2(denom);  // (-pi, pi]
+        let lambda = norm_c_sin_rho.atan2(T::one() - norm_c_cos_rho);  // (-pi, pi]
 
         let (sin, cos) = (half * lambda).sin_cos();
         let q_b = (cos, scale(sin, b));
@@ -1489,14 +1483,8 @@ where T: Float {
 
         let q_a2b_s = -dot(r, q_a2mb.1);
         let q_a2b_v = scale_add(q_a2mb.0, r, cross(r, q_a2mb.1));
-        (q_a2b_s, q_a2b_v)  // a --> b
-    };
-
-    // 特異点を避けるために回転ベクトルを経由する
-    let r = to_rotation_vector(q_a2b);
-    let q_a2b = from_rotation_vector(scale(t, r));
-
-    Some( q_a2b )
+        Some( (q_a2b_s, q_a2b_v) )  // a --> b
+    }
 }
 
 /// Lerp (Linear interpolation)
