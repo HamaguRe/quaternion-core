@@ -411,7 +411,7 @@ fn test_rotation_vector() {
         // 回転ベクトルに変換
         let rv = to_rotation_vector(q);
         assert_eq_vec(rv, [PI/2.0, 0.0, 0.0]);
-        // 回転ベクトルから復元したVecsor
+        // 回転ベクトルから復元したVersor
         let rv2q = from_rotation_vector(rv);
         assert_eq_quat(q, rv2q);
     }
@@ -423,7 +423,7 @@ fn test_rotation_vector() {
         // 回転ベクトルに変換
         let rv = to_rotation_vector(q);
         assert_eq_vec(rv, [-PI/2.0, 0.0, 0.0]);
-        // 回転ベクトルから復元したVecsor
+        // 回転ベクトルから復元したVersor
         let rv2q = from_rotation_vector(rv);
         assert_eq_quat(q, rv2q);
     }

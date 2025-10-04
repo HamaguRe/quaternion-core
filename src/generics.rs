@@ -1,6 +1,7 @@
 //! 四元数と純虚四元数で共通する処理をまとめる
 
-use super::{Vector3, Quaternion, Float, pfs::mul_add};
+use crate::pfs;
+use super::{Vector3, Quaternion, Float};
 
 
 /// This trait provides operations common to Quaternions and Pure Quaternions (Vector3).
@@ -69,9 +70,9 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     #[inline]
     fn scale_add(self, s: T, b: Vector3<T>) -> Vector3<T> {
         [
-            mul_add(s, self[0], b[0]),
-            mul_add(s, self[1], b[1]),
-            mul_add(s, self[2], b[2]),
+            pfs::mul_add(s, self[0], b[0]),
+            pfs::mul_add(s, self[1], b[1]),
+            pfs::mul_add(s, self[2], b[2]),
         ]
     }
 
@@ -87,9 +88,9 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     #[inline]
     fn hadamard_add(self, b: Vector3<T>, c: Vector3<T>) -> Vector3<T> {
         [
-            mul_add(self[0], b[0], c[0]),
-            mul_add(self[1], b[1], c[1]),
-            mul_add(self[2], b[2], c[2]),
+            pfs::mul_add(self[0], b[0], c[0]),
+            pfs::mul_add(self[1], b[1], c[1]),
+            pfs::mul_add(self[2], b[2], c[2]),
         ]
     }
 
@@ -97,7 +98,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     fn dot(self, b: Vector3<T>) -> T {
         #[cfg(feature = "fma")]
         {
-            mul_add(self[0], b[0], mul_add(self[1], b[1], self[2] * b[2]))
+            pfs::mul_add(self[0], b[0], pfs::mul_add(self[1], b[1], self[2] * b[2]))
         }
 
         #[cfg(not(feature = "fma"))]
@@ -143,8 +144,7 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
     #[inline]
     fn exp(self) -> Quaternion<T> {
         let norm_v = self.norm();
-        let (sin, cos) = norm_v.sin_cos();
-        ( cos, self.scale(sin / norm_v) )
+        ( norm_v.cos(), self.scale( pfs::sinc(norm_v) ) )
     }
 }
 
@@ -171,7 +171,7 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
 
     #[inline]
     fn scale_add(self, s: T, b: Quaternion<T>) -> Quaternion<T> {
-        ( mul_add(s, self.0, b.0), self.1.scale_add(s, b.1) )
+        ( pfs::mul_add(s, self.0, b.0), self.1.scale_add(s, b.1) )
     }
 
     #[inline]
@@ -181,14 +181,14 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
 
     #[inline]
     fn hadamard_add(self, b: Quaternion<T>, c: Quaternion<T>) -> Quaternion<T> {
-        ( mul_add(self.0, b.0, c.0), self.1.hadamard_add(b.1, c.1) )
+        ( pfs::mul_add(self.0, b.0, c.0), self.1.hadamard_add(b.1, c.1) )
     }
 
     #[inline]
     fn dot(self, b: Quaternion<T>) -> T {
         #[cfg(feature = "fma")]
         {
-            mul_add(self.0, b.0, self.1.dot(b.1))
+            pfs::mul_add(self.0, b.0, self.1.dot(b.1))
         }
 
         #[cfg(not(feature = "fma"))]
@@ -236,8 +236,7 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
     #[inline]
     fn exp(self) -> Quaternion<T> {
         let norm_v = self.1.norm();
-        let (sin, cos) = norm_v.sin_cos();
         let coef = self.0.exp();
-        ( coef * cos, self.1.scale((coef * sin) / norm_v) )
+        ( coef * norm_v.cos(), self.1.scale(coef * pfs::sinc(norm_v)) )
     }
 }

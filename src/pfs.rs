@@ -128,7 +128,7 @@ pub fn orthogonal_vector<T: Float>(a: Vector3<T>) -> Vector3<T> {
         }
     }
 
-    let i_med = 3 - (i_max + i_min);
+    let i_med = 3 - (i_min + i_max);
     let norm_inv = norm2(a[i_med], a[i_max]).recip();
 
     b[i_min] = T::zero();

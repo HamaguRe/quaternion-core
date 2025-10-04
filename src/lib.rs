@@ -1156,6 +1156,12 @@ where T: Float {
 /// # use quaternion_core::{Quaternion, mul, inv, pow, sqrt};
 /// let q: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
 /// 
+/// let q_pow_0 = pow(q, 0.0);
+/// assert!( (1.0 - q_pow_0.0).abs() < 1e-12 );
+/// assert!( (0.0 - q_pow_0.1[0]).abs() < 1e-12 );
+/// assert!( (0.0 - q_pow_0.1[1]).abs() < 1e-12 );
+/// assert!( (0.0 - q_pow_0.1[2]).abs() < 1e-12 );
+/// 
 /// let q_q = mul(q, q);
 /// let q_pow_2 = pow(q, 2.0);
 /// assert!( (q_q.0    - q_pow_2.0).abs() < 1e-12 );
@@ -1182,10 +1188,12 @@ pub fn pow<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
     let norm_v = norm(q.1);
     let norm_q = pfs::norm2(q.0, norm_v);
-    let omega = (q.0 / norm_q).acos();
-    let (sin, cos) = (t * omega).sin_cos();
+    let omega = (norm_v / q.0).atan();
     let coef = norm_q.powf(t);
-    ( coef * cos, scale((coef / norm_v) * sin, q.1) )
+    let tmp = t * omega;
+    let numer = coef * t * pfs::sinc(tmp);
+    let denom = norm_q * pfs::sinc(omega);
+    ( coef * tmp.cos(), scale(numer / denom, q.1) )
 }
 
 /// Power function of Versor.
@@ -1198,6 +1206,12 @@ where T: Float {
 /// ```
 /// # use quaternion_core::{Quaternion, normalize, mul, inv, pow_versor, sqrt};
 /// let q: Quaternion<f64> = normalize( (1.0, [2.0, 3.0, 4.0]) );
+/// 
+/// let q_pow_0 = pow_versor(q, 0.0);
+/// assert!( (1.0 - q_pow_0.0).abs() < 1e-12 );
+/// assert!( (0.0 - q_pow_0.1[0]).abs() < 1e-12 );
+/// assert!( (0.0 - q_pow_0.1[1]).abs() < 1e-12 );
+/// assert!( (0.0 - q_pow_0.1[2]).abs() < 1e-12 );
 /// 
 /// let q_q = mul(q, q);
 /// let q_pow_2 = pow_versor(q, 2.0);
@@ -1223,8 +1237,9 @@ where T: Float {
 #[inline]
 pub fn pow_versor<T>(q: Quaternion<T>, t: T) -> Quaternion<T>
 where T: Float {
-    let (sin, cos) = (t * q.0.acos()).sin_cos();
-    ( cos, scale(sin / norm(q.1), q.1) )
+    let omega = ( norm(q.1) / q.0 ).atan();
+    let tmp = t * omega;
+    ( tmp.cos(), scale(t * pfs::sinc(tmp) / pfs::sinc(omega), q.1) )
 }
 
 /// Square root of Quaternion.
@@ -1248,7 +1263,8 @@ where T: Float {
     let half = pfs::cast(0.5);
     let norm_v = norm(q.1);
     let norm_q = pfs::norm2(q.0, norm_v);
-    let coef = ((norm_q - q.0) * half).sqrt() / norm_v;
+    let omega = (norm_v / q.0).atan();
+    let coef = half * pfs::sinc(omega*half) / (norm_q.sqrt() * pfs::sinc(omega));
     ( ((norm_q + q.0) * half).sqrt(), scale(coef, q.1) )
 }
 
@@ -1274,7 +1290,8 @@ where T: Float {
 pub fn sqrt_versor<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let half = pfs::cast(0.5);
-    let coef = (half - q.0 * half).sqrt() / norm(q.1);
+    let omega = (norm(q.1) / q.0).atan();
+    let coef = half * pfs::sinc(omega*half) / pfs::sinc(omega);
     ( pfs::mul_add(q.0, half, half).sqrt(), scale(coef, q.1) )
 }
 
