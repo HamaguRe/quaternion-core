@@ -32,7 +32,7 @@ features = ["libm"]
 
 ## Conversion
 
-![Interconversion with several rotation expressions.](https://raw.githubusercontent.com/HamaguRe/quaternion-core/master/conversion.png)
+![Interconversion with several rotation expressions.](https://raw.githubusercontent.com/HamaguRe/quaternion-core/016f95eef2bca3f43ae77306da64e85c64c30bb7/conversion.png)
 
 This crate provides functions to convert between quaternions and several rotation
 representations (as shown in the image above).
