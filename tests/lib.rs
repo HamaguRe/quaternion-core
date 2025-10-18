@@ -38,8 +38,8 @@ fn test_get_angle() {
     // range: (-π, π)
     let angle3 = 2.0 * (norm(q.1) / q.0).atan();  // これで正しい．atan2だと値域がおかしくなる．
 
-    println!("axis: {:?}", normalize(q.1));
-    println!("angle1: {}PI, angle2: {}PI, angle3: {}PI", angle1/PI, angle2/PI, angle3/PI);
+    //println!("axis: {:?}", normalize(q.1));
+    //println!("angle1: {}PI, angle2: {}PI, angle3: {}PI", angle1/PI, angle2/PI, angle3/PI);
 
     assert!( (angle1 - 0.5*PI).abs() < EPSILON );
     assert!( (angle2 - 0.5*PI).abs() < EPSILON );
@@ -53,14 +53,14 @@ fn test_axis_angle() {
     let axis = normalize([0.0, 1.0, 1.0]);
     let angle = -1.5*PI;
     let q = from_axis_angle(axis, angle);
-    println!("q: {:?}", q);
+    //println!("q: {:?}", q);
 
     assert!( (1.0 - norm(q)).abs() < EPSILON );
 
     let (re_axis, re_angle) = to_axis_angle(q);
 
-    println!("re_axis: {:?}", re_axis);
-    println!("re_angle: {}*PI", re_angle / PI);
+    //println!("re_axis: {:?}", re_axis);
+    //println!("re_angle: {}*PI", re_angle / PI);
 
     // 軸ベクトルのチェック
     if angle.is_sign_positive() {
@@ -334,24 +334,24 @@ fn test_from_extrinsic_euler_angles() {
 fn check_quat_to_euler(rt: RotationType, rs: RotationSequence, angles: Vector3<f64>) {
     let q = from_euler_angles(rt, rs, angles);
     let q2e = to_euler_angles(rt, rs, q);  // <-- ここで変換している
-    println!("rt: {:?}, rs: {:?}", rt, rs);
-    println!("angles: {:?}", angles);
-    println!("q2e: {:?}", q2e);
+    //println!("rt: {:?}, rs: {:?}", rt, rs);
+    //println!("angles: {:?}", angles);
+    //println!("q2e: {:?}", q2e);
 
     // 元のオイラー角と全く同じものを復元することは出来ないけど，回転としては同じものを表している．
     // 角度でチェックするよりベクトルの回転で見たほうが楽．
     let v = [1.0, 0.5, -0.2];
     let r_angles = point_rotation(q, v);
     let r_result = point_rotation(from_euler_angles(rt, rs, q2e), v);
-    println!("roteta angles: {:?}", r_angles);
-    println!("roteta q2e: {:?}", r_result);
+    //println!("roteta angles: {:?}", r_angles);
+    //println!("roteta q2e: {:?}", r_result);
     assert_eq_vec(r_angles, r_result);
     // 向きの異なるベクトルで再チェック
     let v = [-0.2, 1.5, 0.8];
     let r_angles = point_rotation(q, v);
     let r_result = point_rotation(from_euler_angles(rt, rs, q2e), v);
-    println!("roteta angles: {:?}", r_angles);
-    println!("roteta q2e: {:?}", r_result);
+    //println!("roteta angles: {:?}", r_angles);
+    //println!("roteta q2e: {:?}", r_result);
     assert_eq_vec(r_angles, r_result);
 }
 

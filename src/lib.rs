@@ -1,12 +1,12 @@
-//! Quaternion library written in Rust.
+//! Quaternion library written in Rust. 
 //! 
-//! This provides Quaternion operations and interconversion with several attitude 
-//! representations as generic functions (supports `f32` & `f64`).
+//! This crate provides Quaternion operations and conversions between several rotation 
+//! representations. Functions are generic and support `f32` and `f64`.
 //! 
 //! ## Generics
 //! 
 //! Functions implementing the `QuaternionOps` trait can take both `Quaternion<T>` 
-//! and `Vector3<T>` as arguments. In this case, `Vector3<T>` is treated as a Pure Quaternion.
+//! and `Vector3<T>` types as arguments (How convenient...!!).
 //! 
 //! For example:
 //! ```
@@ -15,17 +15,20 @@
 //! // --- Vector3 --- //
 //! let v1: Vector3<f32> = [1.0, 2.0, 3.0];
 //! let v2: Vector3<f32> = [0.1, 0.2, 0.3];
-//! println!("{:?}", add(v1, v2));  // <--- It's [1.1, 2.2, 3.3]
+//! 
+//! let added_v = add(v1, v2);  // <--- [1.1, 2.2, 3.3]
 //! 
 //! // --- Quaternion --- //
 //! let q1: Quaternion<f64> = (1.0, [2.0, 3.0, 4.0]);
 //! let q2: Quaternion<f64> = (0.1, [0.2, 0.3, 0.4]);
-//! println!("{:?}", add(q1, q2));  // <--- It's (1.1, [2.2, 3.3, 4.4])
+//! 
+//! let added_q = add(q1, q2);  // <--- (1.1, [2.2, 3.3, 4.4])
 //! ```
 //! 
 //! ## What is Versor?
 //! 
-//! Versor refers to a Quaternion representing a rotation, the norm of which is 1.
+//! Versor denotes a Quaternion representing rotation, with a norm of 1. 
+//! This is precisely what is meant by a Unit Quaternion.
 //! 
 //! The documentation for this crate basically writes Versor instead of Unit Quaternion, 
 //! but the difference in usage is not clear.
@@ -63,13 +66,13 @@ pub type Quaternion<T> = (T, Vector3<T>);
 /// 
 /// `mij`: row `i`, column `j`
 /// 
-/// `
+/// ```ignore
 /// [
 ///     [m11, m12, m13],
 ///     [m21, m22, m23],
 ///     [m31, m32, m33]
 /// ]
-/// `
+/// ```
 pub type DCM<T> = [Vector3<T>; 3];
 
 /// Specifies the rotation type of Euler angles.
@@ -113,11 +116,7 @@ pub enum RotationSequence {
 
 /// Generate identity quaternion.
 /// 
-/// ```
-/// # use quaternion_core::{Quaternion, identity};
-/// let q: Quaternion<f64> = identity();
-/// println!("{:?}", q);  // <-- (1.0, [0.0, 0.0, 0.0])
-/// ```
+/// It returns `(1.0, [0.0, 0.0, 0.0])`.
 #[inline]
 pub fn identity<T>() -> Quaternion<T>
 where T: Float {
@@ -159,24 +158,34 @@ where T: Float + FloatConst {
     }
 }
 
-/// Calculate the rotation `axis` (unit vector) and the rotation `angle`\[rad\] 
-/// around the `axis` from the Versor.
+/// Extracts the rotation `axis` and the rotation `angle` around the `axis` from the Versor.
 /// 
-/// If identity quaternion is entered, `angle` returns zero and the `axis` returns a zero vector.
-/// 
-/// Range of `angle`: `(-pi, pi]`
-/// 
+/// # Returns
+///
+/// The function returns a tuple `(axis, angle)`, where:
+///
+/// * **`axis`**: The rotation axis as a **unit vector** (`Vector3`).
+/// * **`angle`**: The rotation angle in **radians**. The range is `(-PI, PI]`.
+///
+/// ## Special Case: Identity Quaternion
+///
+/// If the input is the **Identity Quaternion** `(1.0, [0.0, 0.0, 0.0])`, 
+/// the function returns an angle of zero and a zero axis vector.
+///
+/// # Singularity
+///
 /// Because this function returns a normalized rotation axis, 
 /// when the norm of the vector part of Versor is zero, a singularity 
-/// occurs and accuracy decreases. Therefore, if you want to use the 
-/// calculated `angle` and `axis` as `scale(angle, axis)`, 
+/// occurs and accuracy decreases.
+/// 
+/// If you want to use the calculated `angle` and `axis` as `scale(angle, axis)`, 
 /// it is better to use the `to_rotation_vector` function. 
 /// The `to_rotation_vector` function can be calculated without singularities.
-/// 
+///
 /// # Examples
 /// 
 /// ```
-/// # use quaternion_core::{from_axis_angle, to_axis_angle};
+/// # use quaternion_core::{from_axis_angle, to_axis_angle, sub, normalize};
 /// # let PI = std::f64::consts::PI;
 /// let axis_ori = [0.0, 1.0, 2.0];
 /// let angle_ori = PI / 2.0;
@@ -184,9 +193,10 @@ where T: Float + FloatConst {
 /// 
 /// let (axis, angle) = to_axis_angle(q);
 /// 
-/// assert!( (axis_ori[0] - axis[0]).abs() < 1e-12 );
-/// assert!( (axis_ori[0] - axis[0]).abs() < 1e-12 );
-/// assert!( (axis_ori[0] - axis[0]).abs() < 1e-12 );
+/// let diff = sub( normalize(axis_ori), normalize(axis) );
+/// assert!( diff[0].abs() < 1e-12 );
+/// assert!( diff[1].abs() < 1e-12 );
+/// assert!( diff[2].abs() < 1e-12 );
 /// assert!( (angle_ori - angle).abs() < 1e-12 );
 /// ```
 #[inline]
@@ -205,16 +215,22 @@ where T: Float {
     }
 }
 
-/// Convert a DCM to a Versor representing 
-/// the `q v q*` rotation (Point Rotation - Frame Fixed).
+/// Converts a **Direction Cosine Matrix (DCM)** into a **Versor**
 /// 
-/// When convert to a DCM representing `q* v q` rotation
-/// (Frame Rotation - Point Fixed) to a Versor, do the following:
-/// 
+/// Crucially, this function assumes the input DCM represents a
+/// Point Rotation (Frame Fixed), where a vector `v` is rotated by the operation `q v q*`.
+///
+/// If your input DCM represents a **Frame Rotation (Point Fixed)**,
+/// which corresponds to the rotation `q* v q`, you must take the conjugate
+/// of the resulting Versor to get the correct rotation:
+///
 /// ```
-/// # use quaternion_core::{from_dcm, to_dcm, conj};
-/// # let dcm = to_dcm((1.0, [0.0; 3]));
-/// let q = conj( from_dcm(dcm) );
+/// # use quaternion_core::{from_dcm, conj, to_dcm};
+/// # let dcm = to_dcm(conj((1.0, [0.0; 3])));
+/// // q_pr represents the Versor for Point Rotation.
+/// let q_pr = from_dcm(dcm); 
+/// // q_fr is the Versor for the Frame Rotation.
+/// let q_fr = conj(q_pr);
 /// ```
 /// 
 /// # Examples
@@ -300,15 +316,18 @@ where T: Float {
     (q0, [q1, q2, q3])
 }
 
-/// Convert a Versor to a DCM representing 
-/// the `q v q*` rotation (Point Rotation - Frame Fixed).
-/// 
-/// When convert to a DCM representing the 
-/// `q* v q` rotation (Frame Rotation - Point Fixed), do the following:
-/// 
+/// Converts a **Versor** into a **Direction Cosine Matrix (DCM)**.
+///
+/// **By default, the output DCM represents a Point Rotation (Frame Fixed)**,
+/// which rotates a vector `v` by the quaternion operation `q v q*`.
+///
+/// If you need a DCM that represents a **Frame Rotation (Point Fixed)**
+/// (the rotation `q* v q`), you must take the conjugate of the Versor:
+///
 /// ```
 /// # use quaternion_core::{to_dcm, conj};
 /// # let q = (1.0, [0.0; 3]);
+/// // This DCM represents the Frame Rotation.
 /// let dcm = to_dcm( conj(q) );
 /// ```
 /// 
@@ -375,14 +394,16 @@ where T: Float {
     ]
 }
 
-/// Convert euler angles to versor.
-/// 
-/// The type of rotation (Intrinsic or Extrinsic) is specified by `RotationType` enum, 
-/// and the rotation sequence (XZX, XYZ, ...) is specified by `RotationSequence` enum.
-/// 
-/// Each element of `angles` should be specified in the range: `[-2π, 2π]`.
-/// 
-/// Sequences: `angles[0]` ---> `angles[1]` ---> `angles[2]`
+/// Converts a **Euler Angles** into a **Versor**.
+///
+/// This function requires two parameters to fully define the rotation:
+///
+/// 1.  `RotationType`: Specifies whether the rotation is **Intrinsic** or **Extrinsic**.
+/// 2.  `RotationSequence`: Defines the three-axis sequence (e.g., XYZ, ZYX, XZX, ...).
+///
+/// The input `angles` array must contain the three angles in **radians**,
+/// corresponding to the specified rotation sequence: `angles[0]` -> `angles[1]` -> `angles[2]`.
+/// (Each angle should be within the range: `[-2*PI, 2*PI]`).
 /// 
 /// # Examples
 /// 
@@ -430,45 +451,41 @@ where T: Float {
     }
 }
 
-/// Convert versor to euler angles.
-/// 
-/// The type of rotation (Intrinsic or Extrinsic) is specified by `RotationType` enum, 
-/// and the rotation sequence (XZX, XYZ, ...) is specified by `RotationSequence` enum.
-/// 
-/// ```
-/// # use quaternion_core::{RotationType::Intrinsic, RotationSequence::XYZ, to_euler_angles};
-/// # let q = (1.0, [0.0; 3]);
-/// let angles = to_euler_angles(Intrinsic, XYZ, q);
-/// ```
-/// 
-/// Each element of `angles` takes a value in the range: `(-pi, pi]`.
-/// 
-/// Sequences: `angles[0]` ---> `angles[1]` ---> `angles[2]`
-/// 
-/// # Singularity
-/// 
+/// Converts a **Versor** into a **Euler Angles**.
+///
+/// This function requires two parameters to fully define the rotation:
+///
+/// 1.  `RotationType`: Specifies whether the rotation is **Intrinsic** or **Extrinsic**.
+/// 2.  `RotationSequence`: Defines the three-axis sequence (e.g., XYZ, ZYX, XZX, ...).
+///
+/// The output `angles` array contains the three angles, corresponding to the sequence:
+/// `angles[0]` -> `angles[1]` -> `angles[2]`.
+/// Each angle is returned in the range: `(-PI, PI]`.
+///
+/// # Singularity (Gimbal Lock) 
+///
 /// ## RotationType::Intrinsic
 /// 
-/// For Proper Euler angles (ZXZ, XYX, YZY, ZYZ, XZX, YXY), the singularity is reached 
+/// For Proper Euler Angles (ZXZ, XYX, YZY, ZYZ, XZX, YXY), the singularity is reached 
 /// when the sine of the second rotation angle is 0 (angle = 0, ±π, ...), and for 
 /// Tait-Bryan angles (XYZ, YZX, ZXY, XZY, ZYX, YXZ), the singularity is reached when 
 /// the cosine of the second rotation angle is 0 (angle = ±π/2).
 /// 
-/// At the singularity, the third rotation angle is set to 0\[rad\].
-/// 
 /// ## RotationType::Extrinsic
 /// 
-/// As in the case of Intrinsic rotation, for Proper Euler angles, the singularity occurs 
+/// As in the case of Intrinsic rotation, for Proper Euler Angles, the singularity occurs 
 /// when the sine of the second rotation angle is 0 (angle = 0, ±π, ...), and for 
 /// Tait-Bryan angles, the singularity occurs when the cosine of the second rotation angle 
 /// is 0 (angle = ±π/2).
 /// 
-/// At the singularity, the first rotation angle is set to 0\[rad\].
-/// 
+/// ## Resolution at Singularity
+/// * For **Intrinsic** rotation, the **third angle** (`angles[2]`) is set to 0 \[rad\].
+/// * For **Extrinsic** rotation, the **first angle** (`angles[0]`) is set to 0 \[rad\].
+///
 /// # Examples
 /// 
-/// Depending on the rotation angle of each axis, it may not be possible to recover the 
-/// same rotation angle as the original. However, they represent the same rotation in 3D space.
+/// Depending on the rotation angle of each axis, it may not be possible to recover 
+/// the same rotation angle as the original. However, they represent the same rotation in 3D space.
 /// 
 /// ```
 /// # use quaternion_core::{from_euler_angles, to_euler_angles, point_rotation};
@@ -500,10 +517,16 @@ where T: Float + FloatConst {
     }
 }
 
-/// Convert Rotation vector to Versor.
+/// Converts a **Rotation Vector** into a **Versor**.
+///
+/// A Rotation Vector is a convenient representation where:
 /// 
-/// The Rotation vector itself represents the axis of rotation, 
-/// and the norm represents the angle \[rad\] of rotation around the axis.
+/// 1.  Its **direction** defines the **rotation axis**.
+/// 2.  Its **norm** defines the **rotation angle** (in radians).
+///
+/// There are no particular restrictions on the norm of the input Rotation Vector.
+/// Also, even if a zero vector is input, the conversion to a Versor can be performed 
+/// without falling into a singularity.
 /// 
 /// # Examples
 /// 
@@ -535,13 +558,16 @@ where T: Float + FloatConst {
     (half_theta.cos(), scale(half * pfs::sinc(half_theta), r))
 }
 
-/// Convert Versor to Rotation vector.
+/// Converts a **Versor** into a **Rotation Vector**.
 /// 
-/// The Rotation vector itself represents the axis of rotation, 
-/// and the norm represents the angle of rotation around the axis.
+/// A Rotation Vector is a convenient representation where:
 /// 
-/// Norm range of the calculation result: `[0, pi]`
+/// 1.  Its **direction** defines the **rotation axis**.
+/// 2.  Its **norm** defines the **rotation angle** (in radians).
 /// 
+/// The resulting vector's norm (the rotation angle) is always constrained
+/// to the range: `[0, PI]`
+///
 /// # Examples
 /// 
 /// ```
@@ -570,7 +596,7 @@ where T: Float {
     scale(coef.copysign(q.0), q.1)  // sinc関数は偶関数なので，half_thetaの符号をここで反映する必要がある．
 }
 
-/// Product of DCM and Vector3
+/// Product of **Direction Cosine Matrix (DCM)** and **Vector3**
 /// 
 /// This is the product of a 3x3 matrix and a 3D vector.
 /// It is used to apply the rotation represented by the DCM to the vector.
@@ -603,7 +629,7 @@ where T: Float {
     ]
 }
 
-/// Calculate the sum of each element of a quaternion (or vector).
+/// Sum all elements of a Quaternion or Vector3.
 /// 
 /// # Examples
 /// 
@@ -625,9 +651,7 @@ where T: Float, U: QuaternionOps<T> {
     a.sum()
 }
 
-/// Addition of two quaternions (or vectors): `a + b`
-/// 
-/// Calculate the addiction of each element of Quaternion or Vector3.
+/// Addition of two Quaternions or Vector3s: `a + b`
 /// 
 /// # Examples
 /// 
@@ -658,7 +682,7 @@ where T: Float, U: QuaternionOps<T> {
     a.add(b)
 }
 
-/// Subtraction of two quaternions (or vectors): `a - b`
+/// Subtraction of two Quaternions or Vector3s: `a - b`
 /// 
 /// # Examples
 /// 
@@ -689,7 +713,7 @@ where T: Float, U: QuaternionOps<T> {
     a.sub(b)
 }
 
-/// Multiplies each component of the quaternion (or vector) by a given real number, scaling the entire quaternion uniformly: `s * a`.
+/// Scaling a Quaternion or Vector3 by a scalar factor: `s * a`
 /// 
 /// # Examples
 /// 
@@ -753,7 +777,7 @@ where T: Float, U: QuaternionOps<T> {
     a.scale_add(s, b)
 }
 
-/// Calculate the element-wise product of two quaternions (or vectors)
+/// Calculate the element-wise product of two Quaternions or Vector3s.
 /// 
 /// # Examples
 /// 
@@ -821,7 +845,7 @@ where T: Float, U: QuaternionOps<T> {
     a.hadamard_add(b, c)
 }
 
-/// Dot product of two quaternions (or vectors): `a · b`
+/// Dot product of two Quaternions or Vector3s: `a · b`
 /// 
 /// # Examples
 /// 
@@ -845,7 +869,7 @@ where T: Float, U: QuaternionOps<T> {
     a.dot(b)
 }
 
-/// Cross product of two quaternions (or vectors): `a × b`
+/// Cross product of two Quaternions or Vector3s: `a × b`
 /// 
 /// The product order is `a × b (!= b × a)`
 /// 
@@ -872,7 +896,7 @@ where T: Float {
     ]
 }
 
-/// Calculate L2 norm of Vector3 or Quaternion.
+/// Calculate L2 norm of Vector3s or Quaternions.
 /// 
 /// Compared to `dot(a, a).sqrt()`, this function is less likely
 /// to cause overflow and underflow.
@@ -905,7 +929,7 @@ where T: Float, U: QuaternionOps<T> {
     a.norm()
 }
 
-/// Normalization of Vector3 or Quaternion.
+/// Normalize a Vector3 or Quaternion.
 /// 
 /// # Examples
 /// 
@@ -935,7 +959,7 @@ where T: Float, U: QuaternionOps<T> {
     scale(norm(a).recip(), a)
 }
 
-/// Invert the sign of a Vector3 or Quaternion.
+/// Invert the sign of a Vector3s or Quaternions.
 /// 
 /// # Examples
 /// 
@@ -964,10 +988,10 @@ where T: Float, U: QuaternionOps<T> {
     a.negate()
 }
 
-/// Multiplication of two quaternions (or vectors).
+/// Multiplication of two Quaternions or Pure Quaternoins (Vector3).
 /// 
 /// This is an operation also known as the Hamilton product.
-/// In this operation, the vector is treated as a pure quaternoin (which is a quaternion with zero real part).
+/// In this operation, the Vector3 is treated as a pure quaternoin (which is a quaternion with zero real part).
 /// 
 /// The product order is `ab (!= ba)`
 /// 
@@ -1003,7 +1027,7 @@ where T: Float, U: QuaternionOps<T> {
     a.mul(b)
 }
 
-/// Calculate the conjugate of Quaternion.
+/// Calculate the conjugate of a Quaternion.
 /// 
 /// # Examples
 /// 
@@ -1023,7 +1047,7 @@ where T: Float {
     ( q.0, negate(q.1) )
 }
 
-/// Calculate the inverse of Quaternion or Pure Quaternion (Vector3).
+/// Calculate the inverse of a Quaternion or Pure Quaternion (Vector3).
 /// 
 /// # Examples
 /// 
@@ -1059,7 +1083,8 @@ where T: Float, U: QuaternionOps<T> {
 
 // acosは[-pi/2, pi/2]の範囲でしか値を返さないので、qのとり方によってはlnで完全に復元できない。
 // q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-pi/2, pi/2]の範囲内にある場合のみ。
-/// Exponential function of Quaternion or Pure Quaternion (Vector3).
+//
+/// Exponential function of a Quaternion or Pure Quaternion (Vector3).
 /// 
 /// # Examples
 /// 
@@ -1099,7 +1124,8 @@ where T: Float, U: QuaternionOps<T> {
 
 // acosは[-pi/2, pi/2]の範囲でしか値を返さないので、qのとり方によってはlnで完全に復元できない。
 // q == ln(exp(q)) が成り立つのはcos(norm(q.1))が[-pi/2, pi/2]の範囲内にある場合のみ。
-/// Natural logarithm of Quaternion.
+// 
+/// Natural logarithm of a Quaternion.
 /// 
 /// # Examples
 /// 
@@ -1124,7 +1150,7 @@ where T: Float {
 
 // exp(q)の結果がVersorとなる条件は，qのスカラー部が0（つまりqが純虚四元数）．
 // 
-/// Natural logarithm of Versor.
+/// Natural logarithm of a Versor.
 /// 
 /// If the argument `q` is guaranteed to be a Versor,
 /// it is less calculation cost than the `ln(...)` function.
@@ -1148,7 +1174,7 @@ where T: Float {
     scale( q.0.acos() / norm(q.1), q.1)
 }
 
-/// Power function of Quaternion.
+/// Power function of a Quaternion.
 /// 
 /// # Examples
 /// 
@@ -1196,7 +1222,7 @@ where T: Float {
     ( coef * tmp.cos(), scale(numer / denom, q.1) )
 }
 
-/// Power function of Versor.
+/// Power function of a Versor.
 /// 
 /// If the argument `q` is guaranteed to be a Versor, 
 /// it is less calculation cost than the `pow(...)` function.
@@ -1242,7 +1268,7 @@ where T: Float {
     ( tmp.cos(), scale(t * pfs::sinc(tmp) / pfs::sinc(omega), q.1) )
 }
 
-/// Square root of Quaternion.
+/// Square root of a Quaternion.
 /// 
 /// # Examples
 /// 
@@ -1268,7 +1294,7 @@ where T: Float {
     ( ((norm_q + q.0) * half).sqrt(), scale(coef, q.1) )
 }
 
-/// Square root of Versor.
+/// Square root of a Versor.
 /// 
 /// If the argument `q` is guaranteed to be a Versor, 
 /// it is less calculation cost than the `sqrt(...)` function.
@@ -1295,7 +1321,7 @@ where T: Float {
     ( pfs::mul_add(q.0, half, half).sqrt(), scale(coef, q.1) )
 }
 
-/// Point rotation by quaternion (Point Rotation - Frame Fixed)
+/// Rotates a point by the Versor (Point Rotation - Frame Fixed)
 /// 
 /// `q v q*  (||q|| = 1)`
 /// 
@@ -1332,7 +1358,7 @@ where T: Float {
     scale_add(pfs::cast(2.0), cross(q.1, tmp), v)
 }
 
-/// Frame rotation by quaternion (Frame Rotation - Point Fixed)
+/// Rotates a frame by the Versor (Frame Rotation - Point Fixed)
 /// 
 /// `q* v q  (||q|| = 1)`
 /// 
@@ -1369,16 +1395,22 @@ where T: Float {
     scale_add(pfs::cast(2.0), cross(tmp, q.1), v)
 }
 
-/// Calculate the versor to rotate from vector `a` to vector `b` (Without singularity!).
+/// Calculate the Versor to rotate from vector `a` to vector `b` (Without singularity!).
 /// 
 /// This function calculates `q` satisfying `b = point_rotation(q, a)` when `norm(a) = norm(b)`.
 /// 
-/// If `norm(a) > 0` and `norm(b) > 0`, then `q` can be calculated with good 
-/// accuracy no matter what the positional relationship between `a` and `b` is.
-/// However, this function does not guarantee what the axis of rotation will be. 
-/// If you want the rotation axis to be orthogonal to vectors `a` and `b`, you can use `rotate_a_to_b_shotest`.
+/// # Characteristics
 /// 
-/// If you enter a zero vector either `a` or `b`, it returns `None`.
+/// * **Robustness:** This function can accurately calculate the versor regardless of the 
+/// combination of vector orientations (however, `norm(a) > 0` and `norm(b) > 0`).
+/// * **Axis Ambiguity:** This function provides **no guarantees** regarding the direction 
+/// or regularity of the rotation axis. If you require a rotation axis that is **orthogonal** 
+/// to both vector `a` and vector `b`, you should use `rotate_a_to_b_shortest` function.
+/// 
+/// # Returns
+/// 
+/// Returns `None` if either input vector `a` or `b` is a zero vector,
+/// as a rotation cannot be uniquely defined in that case.
 /// 
 /// # Examples
 /// 
@@ -1422,20 +1454,27 @@ where T: Float {
 /// Calculate the versor to rotate from vector `a` to vector `b` by the shortest path.
 /// 
 /// This function calculates `q` satisfying `b = point_rotation(q, a)` when `norm(a) = norm(b)`.
-/// The rotation axis of `q` is always perpendicular to `a` and `b`, and the rotation angle around 
-/// the axis ranges from -Pi to +Pi radians.
-/// 
-/// If `norm(a) > 0` and `norm(b) > 0`, `q` can be calculated with high accuracy regardless of the 
-/// relative positions of `a` and `b`. 
-/// However, if `a` and `b` are parallel and in opposite directions, the direction of the rotation 
-/// axis is not determined in principle, so there is no guarantee what the rotation axis will be 
-/// in this case (it is guaranteed that it is perpendicular to `a` and `b`).
-/// 
-/// If you enter a zero vector either `a` or `b`, it returns `None`.
-/// 
-/// This function is slightly more computationally intensive when the angle between `a` and `b` 
-/// is close to PI, so it is recommended to use the `rotate_a_to_b` function if it is okay for 
-/// the rotation axis to not be orthogonal to `a` and `b`.
+///
+/// # Characteristics
+///
+/// * **Shortest Path:** This method guarantees the rotation axis is always **orthogonal** to 
+/// both vector **a** and vector **b**, representing the geometrically shortest path between 
+/// the two directions.
+/// * **Rotation Angle:** The rotation angle is in the range `[0, PI]` radians.
+/// * **Parallel Vectors:** If vector `a` and `b` are **opposite** and parallel, the 
+/// rotation axis is theoretically ambiguous. This function provides a valid rotation, 
+/// but the axis direction is not guaranteed (although it will be orthogonal to the `a` and `b`).
+///
+/// # Performance Consideration
+///
+/// This function is slightly more computationally intensive than `rotate_a_to_b`, 
+/// especially when the angle between the vectors is near PI. If an orthogonal rotation 
+/// axis is not strictly required, `rotate_a_to_b` may be preferred for performance.
+///
+/// # Returns
+///
+/// Returns `None` if either input vector **a** or **b** is a zero vector,
+/// as a rotation cannot be uniquely defined in that case.
 /// 
 /// # Examples
 /// 

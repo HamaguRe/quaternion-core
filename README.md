@@ -5,9 +5,9 @@
 ![Minimum rustc](https://img.shields.io/badge/rustc-1.60+-red.svg?style=flat-square&logo=rust)
 ![License](https://img.shields.io/crates/l/quaternion-core?color=blue&style=flat-square)
 
-This is Quaternion library written in Rust.
+Quaternion library written in Rust.
 
-It's provides Quaternion operations and interconversion with several attitude 
+This crate provides Quaternion operations and interconversion with several rotation 
 representations as generic functions (supports `f32` & `f64`).
 
 Additionally, it also works in a `no_std` environment!
@@ -32,9 +32,9 @@ features = ["libm"]
 
 ## Conversion
 
-![Conversion (DCM <--> Quaternion <--> Euler angles)](https://raw.githubusercontent.com/HamaguRe/quaternion-core/master/conversion.png)
+![Interconversion with several rotation expressions.](https://raw.githubusercontent.com/HamaguRe/quaternion-core/master/conversion.png)
 
-This crate provides functions to convert between quaternions and various rotation
+This crate provides functions to convert between quaternions and several rotation
 representations (as shown in the image above).
 
 In particular, for Euler angles, it is possible to interconversion with 24 different 
