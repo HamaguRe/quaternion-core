@@ -1144,7 +1144,9 @@ pub fn ln<T>(q: Quaternion<T>) -> Quaternion<T>
 where T: Float {
     let norm_v = norm(q.1);
     let norm_q = pfs::norm2(q.0, norm_v);
-    let coef = (q.0 / norm_q).acos() / norm_v;
+    let omega = (norm_v / q.0).atan();
+    let coef = (norm_q * pfs::sinc(omega)).recip();
+
     ( norm_q.ln(), scale(coef, q.1) )
 }
 
@@ -1171,7 +1173,10 @@ where T: Float {
 #[inline]
 pub fn ln_versor<T>(q: Quaternion<T>) -> Vector3<T>
 where T: Float {
-    scale( q.0.acos() / norm(q.1), q.1)
+    let omega = (norm(q.1) / q.0).atan();
+    let coef = pfs::sinc(omega).recip();
+
+    scale(coef, q.1)
 }
 
 /// Power function of a Quaternion.

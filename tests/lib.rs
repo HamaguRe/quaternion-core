@@ -1,5 +1,6 @@
 // $ cargo test --features fma
 
+use num_traits::Float;
 use quaternion_core::*;
 
 const PI: f64 = std::f64::consts::PI;
@@ -443,6 +444,75 @@ fn test_mul() {
 
     let q = mul(a, b);
     assert_eq_quat(q, p);
+}
+
+#[test]
+fn test_ln() {
+    // 普通に実装した場合と計算結果を比較する。
+    {
+        let q = (2.5, [0.2, 1.4, 0.3]);
+        let a = ln(q);
+        let b = {
+            let coef = (q.0 / norm(q)).acos() / norm(q.1);
+            (norm(q).ln(), scale(coef, q.1))
+        };
+        assert_eq_quat(a, b);
+    }
+
+    {
+        let q = normalize( (2.5, [0.2, 1.4, 0.3]) );
+        let a = ln_versor(q);
+        let b = {
+            let coef = (q.0).acos() / norm(q.1);
+            scale(coef, q.1)
+        };
+        assert_eq_vec(a, b);
+    }
+
+    // ベクトル部ゼロの場合の特異点も除去できている！
+    let q = identity();
+    let a = ln(q);
+    assert_eq_quat((0.0, [0.0; 3]), a);
+    let b = ln_versor(q);
+    assert_eq_vec([0.0; 3], b);
+}
+
+#[test]
+fn test_pow() {
+    // 特異点除去版の実装と、一般的な数式通りの実装で計算結果が同じになることを確認。
+    {
+        let q = (2.5, [0.2, 1.4, 0.3]);
+        let t = 1.5;
+        let a = pow(q, t);
+        let b = {
+            let omega = (norm(q.1) / q.0).atan();
+            let s = (t * omega).cos();
+            let v = scale( (t * omega).sin(), normalize(q.1) );
+            scale(norm(q).powf(t), (s, v))
+        };
+        assert_eq_quat(a, b);
+    }
+
+    {
+        let q = normalize( (2.5, [0.2, 1.4, 0.3]) );
+        let t = 1.5;
+        let a = pow_versor(q, t);
+        let b = {
+            let omega = (norm(q.1) / q.0).atan();
+            let s = (t * omega).cos();
+            let v = scale( (t * omega).sin(), normalize(q.1) );
+            (s, v)
+        };
+        assert_eq_quat(a, b);
+    }
+
+    // ベクトル部ゼロの場合の特異点も除去できている！
+    let q = (2.0, [0.0; 3]);
+    let t = 2.0;
+    let a = pow(q, t);
+    assert_eq_quat((4.0, [0.0; 3]), a);
+    let b = ln_versor(identity());
+    assert_eq_vec([0.0; 3], b);
 }
 
 // 手計算した結果で動作確認

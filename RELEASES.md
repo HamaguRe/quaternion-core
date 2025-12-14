@@ -1,3 +1,7 @@
+# Version 0.6.1 (2025-12-14)
+
+* The implementation of the `ln` and `ln_versor` functions has been improved to eliminate singularities when the vector part is 0.
+
 # Version 0.6.0 (2025-10-18)
 
 * Within the `from_euler_angles` function, I have removed the use of the `FloatConst` trait. Whilst the `FloatConst` trait was intended to catch out-of-range values via `debug_assert!`, I did not wish to employ this trait solely for debugging purposes and have therefore eliminated it.
