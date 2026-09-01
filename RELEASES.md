@@ -1,3 +1,8 @@
+# Version 0.6.2
+
+* Added the `convert_handedness` function and the `Axis` enum.
+* Fixed a bug in the `from_axis_angle` function. When a zero vector was given as the `axis` argument and the `angle` argument was an integer multiple of 2π, the function returned `(1.0, [NaN, NaN, NaN])` instead of an identity quaternion.
+
 # Version 0.6.1 (2025-12-14)
 
 * The implementation of the `ln` and `ln_versor` functions has been improved to eliminate singularities when the vector part is 0.

@@ -47,6 +47,20 @@ fn test_get_angle() {
     assert!( (angle3 - 0.5*PI).abs() < EPSILON );
 }
 
+// axisにゼロベクトルを入れた場合，angleの値に関わらず単位クォータニオンを返す．
+//
+// angleが2πの整数倍のときはsin(θ/2)が0になるため，from_axis_angle関数の内部で
+// 計算するcoefがInfではなく0/0=NaNとなる．この場合を取りこぼすと
+// (1.0, [NaN, NaN, NaN])が返ってしまう．
+#[test]
+fn test_from_axis_angle_zero_axis() {
+    for angle in [0.0, 0.5*PI, PI, -PI, 2.0*PI, -2.0*PI, 4.0*PI] {
+        let q = from_axis_angle([0.0; 3], angle);
+        assert!( (q.0 - 1.0).abs() < EPSILON );
+        assert_eq_vec(q.1, [0.0; 3]);
+    }
+}
+
 #[test]
 fn test_axis_angle() {
     // to_axis_angle関数はどのような回転角を入れても正常に変換できるが，
@@ -591,6 +605,51 @@ fn test_rotate_a_to_b() {
         let a_to_b_shortest = rotate_a_to_b_shortest(a, b);
         assert_eq!(None, a_to_b_shortest);
     }
+}
+
+// 指定軸の鏡映をMとすると，座標系を変換した回転R'は R'(Mv) = M R(v) を満たす．
+// 往復変換だけでは符号の誤りを検出できないため，一般的な回転とベクトルを使って
+// point rotationとframe rotationの両方でこの交換則を確認する．
+#[test]
+fn test_convert_handedness() {
+    // 指定軸を反転させる鏡映
+    fn mirror(v: Vector3<f64>, axis: Axis) -> Vector3<f64> {
+        match axis {
+            Axis::X => [-v[0],  v[1],  v[2]],
+            Axis::Y => [ v[0], -v[1],  v[2]],
+            Axis::Z => [ v[0],  v[1], -v[2]],
+        }
+    }
+
+    let q = from_axis_angle([1.0, -2.0, 0.5], 0.7);
+    let v = [1.0, 2.0, 3.0];
+    for axis in [Axis::X, Axis::Y, Axis::Z] {
+        let q_conv = convert_handedness(q, axis);
+
+        // 座標系を変換しても単位四元数のままである
+        assert!( (norm(q_conv) - 1.0).abs() < EPSILON );
+
+        // 交換性（point_rotation）
+        assert_eq_vec(
+            point_rotation(q_conv, mirror(v, axis)),
+            mirror(point_rotation(q, v), axis)
+        );
+
+        // 交換性（frame_rotation）
+        assert_eq_vec(
+            frame_rotation(q_conv, mirror(v, axis)),
+            mirror(frame_rotation(q, v), axis)
+        );
+
+        // 同じ軸で2回変換すると元に戻る
+        assert_eq_quat( convert_handedness(q_conv, axis), q );
+    }
+
+    // 非単位四元数も暗黙に正規化せず，成分の符号だけを変換する
+    let q = (2.0, [1.0, -2.0, 0.5]);
+    assert_eq!(convert_handedness(q, Axis::X), (2.0, [1.0, 2.0, -0.5]));
+    assert_eq!(convert_handedness(q, Axis::Y), (2.0, [-1.0, -2.0, -0.5]));
+    assert_eq!(convert_handedness(q, Axis::Z), (2.0, [-1.0, 2.0, 0.5]));
 }
 
 fn assert_eq_vec(a: Vector3<f64>, b: Vector3<f64>) {

@@ -34,6 +34,8 @@
 //! but the difference in usage is not clear.
 //! Please think Versor = Unit Quaternion.
 
+// メモ：infiniteで逃してるところ、NaNが入るとバグるかも。is_infiniteの挙動を要確認。
+
 #![no_std]
 #[cfg(feature = "std")]
 extern crate std;
@@ -99,20 +101,15 @@ pub enum RotationType {
 #[derive(Debug, Clone, Copy)]
 pub enum RotationSequence {
     // Proper (z-x-z, x-y-x, y-z-y, z-y-z, x-z-x, y-x-y)
-    ZXZ,
-    XYX,
-    YZY,
-    ZYZ,
-    XZX,
-    YXY,
+    ZXZ, XYX, YZY, ZYZ, XZX, YXY,
     // Tait–Bryan (x-y-z, y-z-x, z-x-y, x-z-y, z-y-x, y-x-z)
-    XYZ,
-    YZX,
-    ZXY,
-    XZY,
-    ZYX,
-    YXZ,
+    XYZ, YZX, ZXY, XZY, ZYX, YXZ,
 }
+
+/// Specifies the axis.
+#[cfg_attr(feature = "serde-serialize", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Copy)]
+pub enum Axis { X, Y, Z }
 
 /// Generate identity quaternion.
 /// 
@@ -121,6 +118,56 @@ pub enum RotationSequence {
 pub fn identity<T>() -> Quaternion<T>
 where T: Float {
     (T::one(), [T::zero(); 3])
+}
+
+/// Converts a Quaternion between right-handed and left-handed coordinate systems.
+///
+/// The two systems are mirror images of each other: one coordinate axis points
+/// the opposite way, and the positive direction of rotation is reversed as well.
+/// This function accounts for both, returning the Quaternion that describes the
+/// same rotation in the other coordinate system.
+///
+/// The `axis` argument specifies which coordinate axis is reversed between the
+/// source and destination coordinate systems. For example, pass `Axis::Z` when
+/// the Z-axis is reversed between the two systems.
+///
+/// # Examples
+///
+/// ```
+/// # use quaternion_core::{Axis, from_axis_angle, convert_handedness};
+/// # let PI = std::f64::consts::PI;
+/// // Rotation of pi/2[rad] around the axis (1, 1, 1), described in a right-handed system.
+/// let q_rh = from_axis_angle([1.0, 1.0, 1.0], PI/2.0);
+///
+/// // The same rotation, described in a left-handed system
+/// // whose z-axis points the opposite way.
+/// let q_lh = convert_handedness(q_rh, Axis::Z);
+///
+/// // In the mirrored system, this rotation is described as -pi/2[rad]
+/// // around the axis (1, 1, -1).
+/// let expected = from_axis_angle([1.0, 1.0, -1.0], -PI/2.0);
+/// assert!( (q_lh.0    - expected.0).abs()    < 1e-12 );
+/// assert!( (q_lh.1[0] - expected.1[0]).abs() < 1e-12 );
+/// assert!( (q_lh.1[1] - expected.1[1]).abs() < 1e-12 );
+/// assert!( (q_lh.1[2] - expected.1[2]).abs() < 1e-12 );
+///
+/// // Applying the conversion twice restores the original Quaternion.
+/// let q = convert_handedness(q_lh, Axis::Z);
+/// assert!( (q_rh.0    - q.0).abs()    < 1e-12 );
+/// assert!( (q_rh.1[0] - q.1[0]).abs() < 1e-12 );
+/// assert!( (q_rh.1[1] - q.1[1]).abs() < 1e-12 );
+/// assert!( (q_rh.1[2] - q.1[2]).abs() < 1e-12 );
+/// ```
+#[inline]
+pub fn convert_handedness<T>(q: Quaternion<T>, axis: Axis) -> Quaternion<T>
+where T: Float {
+    // 右手系と左手系の変換は、x,y,zのうちの特定の1軸を反転させて、
+    // 更に全ての軸回りの回転方向を逆にすれば良い。
+    match axis {
+        Axis::X => (q.0, [ q.1[0], -q.1[1], -q.1[2]]),
+        Axis::Y => (q.0, [-q.1[0],  q.1[1], -q.1[2]]),
+        Axis::Z => (q.0, [-q.1[0], -q.1[1],  q.1[2]]),
+    }
 }
 
 /// Generate Versor by specifying rotation `angle`\[rad\] and `axis` vector.
@@ -151,10 +198,12 @@ where T: Float + FloatConst {
     let theta = angle % ( T::PI() + T::PI() );  // Range reduction: (-2π, 2π)
     let (sin, cos) = ( theta * pfs::cast(0.5) ).sin_cos();
     let coef = sin / norm(axis);
-    if coef.is_infinite() {
-        identity()
-    } else {
+    // axisがゼロベクトルのとき，sinの値によってcoefはInfにもNaNにもなる
+    // （angleが2πの整数倍のときはsin=0となり，0/0=NaNとなる）．
+    if coef.is_finite() {
         ( cos, scale(coef, axis) )
+    } else {
+        identity()
     }
 }
 

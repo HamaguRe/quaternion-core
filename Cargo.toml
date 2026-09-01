@@ -1,6 +1,6 @@
 [package]
 name = "quaternion-core"
-version = "0.6.1"
+version = "0.6.2"
 authors = ["HamaguRe <hamagure@space-denpa.jp>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -8,8 +8,8 @@ repository = "https://github.com/HamaguRe/quaternion-core.git"
 homepage = "https://github.com/HamaguRe/quaternion-core.git"
 documentation = "https://docs.rs/quaternion-core"
 description = "Provides quaternion operations and interconversion with several attitude representations."
-keywords = ["math", "quaternion", "vector"]
-categories = ["mathematics", "science", "no-std"]
+keywords = ["quaternion", "rotation", "attitude", "euler-angles", "math"]
+categories = ["mathematics", "science::robotics", "no-std::no-alloc", "embedded", "aerospace"]
 readme = "README.md"
 exclude = [".gitignore", "conversion.png"]
 
