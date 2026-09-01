@@ -34,8 +34,6 @@
 //! but the difference in usage is not clear.
 //! Please think Versor = Unit Quaternion.
 
-// メモ：infiniteで逃してるところ、NaNが入るとバグるかも。is_infiniteの挙動を要確認。
-
 #![no_std]
 #[cfg(feature = "std")]
 extern crate std;

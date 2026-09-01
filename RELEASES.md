@@ -1,4 +1,4 @@
-# Version 0.6.2
+# Version 0.6.2 (2026-09-01)
 
 * Added the `convert_handedness` function and the `Axis` enum.
 * Fixed a bug in the `from_axis_angle` function. When a zero vector was given as the `axis` argument and the `angle` argument was an integer multiple of 2π, the function returned `(1.0, [NaN, NaN, NaN])` instead of an identity quaternion.
