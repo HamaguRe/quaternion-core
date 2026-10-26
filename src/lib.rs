@@ -980,7 +980,7 @@ where T: Float {
 /// Compared to `dot(a, a).sqrt()`, this function is less likely
 /// to cause overflow and underflow.
 /// 
-/// When the `norm-sqrt` feature is enabled, the default 
+/// When the `prefer-speed` feature is enabled, the default
 /// implementation is compiled with `dot(a, a).sqrt()` instead.
 /// 
 /// # Examples
@@ -999,7 +999,7 @@ where T: Float {
 /// let v: Vector3<f32> = [1e15, 2e20, -3e15];
 /// assert_eq!( dot(v, v).sqrt(), f32::INFINITY );  // Oh...
 /// 
-/// #[cfg(not(feature = "norm-sqrt"))]
+/// #[cfg(not(feature = "prefer-speed"))]
 /// assert_eq!( norm(v), 2e20 );  // Excellent!
 /// ```
 #[inline]

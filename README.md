@@ -61,15 +61,18 @@ not support the `FMA` (Fused Multiply-Add) instruction or if the `libm` feature 
 enabled, then the calculation is performed by the software implementation.
 In this case, it may be rather slower than if the `fma` feature is not enabled.
 
-### norm-sqrt
+### prefer-speed
 
-When this feature is enabled, the default `norm(a)` implementation is compiled with 
-`dot(a, a).sqrt()` instead.
+This feature prioritizes calculation speed over robustness to extreme input magnitudes.
+It is disabled by default. The performance benefit depends on the target platform.
 
-By default, the `norm(a)` function is implemented in such a way that overflow and 
-underflow are less likely to occur than with `dot(a, a).sqrt()`. However, if extremely 
-large values are not input and underflow is not that much of a concern, 
-`dot(a, a).sqrt()` is sufficient (and `dot(a, a).sqrt()` is faster than the default implementation in most cases).
+Currently, it replaces `hypot`-based norm calculations with the square root of the
+sum of squares, both in `norm(a)` and in internal two-component norm calculations.
+This also affects functions that use these calculations internally.
+
+The intermediate squares may overflow or underflow even when the norm itself is
+representable. Enable this feature when the input range is controlled and this
+tradeoff is acceptable.
 
 ### serde-serialize
 
@@ -108,7 +111,7 @@ All functions are implemented in such a way that the computational cost is as sm
 possible (but not too complex to implement), which is a great advantage for everyone.
 
 Also, since I started creating this crate to experiment with attitude estimation, many parts 
-were implemented with the intention of running on a microcontroller (e.g. the `norm-sqrt` feature).
+were implemented with the intention of running on a microcontroller (e.g. the `prefer-speed` feature).
 
 ## Releases
 

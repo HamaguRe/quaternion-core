@@ -120,12 +120,12 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
 
     #[inline]
     fn norm(self) -> T {
-        #[cfg(feature = "norm-sqrt")]
+        #[cfg(feature = "prefer-speed")]
         {
             super::dot(self, self).sqrt()
         }
 
-        #[cfg(not(feature = "norm-sqrt"))]
+        #[cfg(not(feature = "prefer-speed"))]
         {
             let mut s = self[0];
             for val in self.iter().skip(1) {
@@ -215,12 +215,12 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
 
     #[inline]
     fn norm(self) -> T {
-        #[cfg(feature = "norm-sqrt")]
+        #[cfg(feature = "prefer-speed")]
         {
             super::dot(self, self).sqrt()
         }
 
-        #[cfg(not(feature = "norm-sqrt"))]
+        #[cfg(not(feature = "prefer-speed"))]
         {
             let mut s = self.0;
             for val in self.1 {

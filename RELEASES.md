@@ -1,3 +1,7 @@
+# Version 1.0.0 (Unreleased)
+
+* Renamed the `norm-sqrt` feature to `prefer-speed`. Update the feature name in dependent crates. The calculation method is unchanged: this opt-in feature uses the square root of the sum of squares for public and internal norm calculations, prioritizing speed over robustness to overflow and underflow.
+
 # Version 0.6.2 (2026-09-01)
 
 * Added the `convert_handedness` function and the `Axis` enum.

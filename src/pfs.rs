@@ -11,16 +11,16 @@ pub fn cast<T: Float>(x: f64) -> T {
 
 /// 二次元ベクトル`[a, b]`のL2ノルムを計算する．
 /// 
-/// `norm-sqrt`フィーチャーが有効の場合は`(a*a + b*b).sqrt()`とし，
+/// `prefer-speed`フィーチャーが有効の場合は`(a*a + b*b).sqrt()`とし，
 /// そうでない場合は`a.hypot(b)`として計算する．
 #[inline(always)]
 pub fn norm2<T: Float>(a: T, b: T) -> T {
-    #[cfg(feature = "norm-sqrt")]
+    #[cfg(feature = "prefer-speed")]
     {
         (a*a + b*b).sqrt()
     }
 
-    #[cfg(not(feature = "norm-sqrt"))]
+    #[cfg(not(feature = "prefer-speed"))]
     {
         a.hypot(b)
     }
