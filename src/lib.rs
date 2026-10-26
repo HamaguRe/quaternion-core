@@ -1629,11 +1629,11 @@ where T: Float {
 
 /// Lerp (Linear interpolation)
 /// 
-/// Generate a Versor that interpolate the shortest path from `a` to `b`.
+/// Generate a Quaternion that linearly interpolates between Versors `a` and `b`.
 /// The argument `t (0 <= t <= 1)` is the interpolation parameter.
 /// 
-/// The arguments `a` and `b` must be Versor.
-/// 
+/// Note that the result is not guaranteed to be a Versor.
+///
 /// Normalization is not performed internally because 
 /// it increases the computational complexity.
 #[inline]
