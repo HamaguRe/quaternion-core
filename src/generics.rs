@@ -18,6 +18,8 @@ pub trait QuaternionOps<T>: Copy {
     fn sub(self, rhs: Self) -> Self;
     /// `s * self`
     fn scale(self, s: T) -> Self;
+    /// `self / s`
+    fn devide(self, s: T) -> Self;
     /// `s * self + b`
     fn scale_add(self, s: T, b: Self) -> Self;
     /// `self ∘ rhs`
@@ -64,6 +66,15 @@ impl<T: Float> QuaternionOps<T> for Vector3<T> {
             s * self[0],
             s * self[1],
             s * self[2]
+        ]
+    }
+
+    #[inline]
+    fn devide(self, s: T) -> Vector3<T> {
+        [
+            self[0] / s,
+            self[1] / s,
+            self[2] / s
         ]
     }
 
@@ -167,6 +178,11 @@ impl<T: Float> QuaternionOps<T> for Quaternion<T> {
     #[inline]
     fn scale(self, s: T) -> Quaternion<T> {
         ( s * self.0, self.1.scale(s) )
+    }
+
+    #[inline]
+    fn devide(self, s: T) -> Quaternion<T> {
+        ( self.0 / s, self.1.devide(s) )
     }
 
     #[inline]

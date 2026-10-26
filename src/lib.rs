@@ -789,6 +789,38 @@ where T: Float, U: QuaternionOps<T> {
     a.scale(s)
 }
 
+/// Divide each component of a Quaternion or Vector3 by a scalar: `a / s`
+///
+/// Each component is divided directly by `s`, without multiplying by its reciprocal.
+/// Division by zero follows the floating-point behavior of the component type.
+///
+/// # Examples
+///
+/// ```
+/// # use quaternion_core::{Vector3, Quaternion, devide};
+/// // --- Vector3 --- //
+/// let v: Vector3<f64> = [2.0, 4.0, 6.0];
+/// let v_result = devide(v, 2.0);
+///
+/// assert!( (1.0 - v_result[0]).abs() < 1e-12 );
+/// assert!( (2.0 - v_result[1]).abs() < 1e-12 );
+/// assert!( (3.0 - v_result[2]).abs() < 1e-12 );
+///
+/// // --- Quaternion --- //
+/// let q: Quaternion<f64> = (2.0, [4.0, 6.0, 8.0]);
+/// let q_result = devide(q, 2.0);
+///
+/// assert!( (1.0 - q_result.0).abs() < 1e-12 );
+/// assert!( (2.0 - q_result.1[0]).abs() < 1e-12 );
+/// assert!( (3.0 - q_result.1[1]).abs() < 1e-12 );
+/// assert!( (4.0 - q_result.1[2]).abs() < 1e-12 );
+/// ```
+#[inline]
+pub fn devide<T, U>(a: U, s: T) -> U
+where T: Float, U: QuaternionOps<T> {
+    a.devide(s)
+}
+
 /// Scaling and addition in one step: `s * a + b`
 /// 
 /// If the `fma` feature is enabled, the FMA calculation is performed using 
